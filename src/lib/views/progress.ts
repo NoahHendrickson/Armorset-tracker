@@ -25,15 +25,33 @@ export interface ViewProgress {
   totalCells: number;
 }
 
+/** Fixed left-to-right order for tertiary columns (solo + merged trackers). */
+export const TERTIARY_STAT_DISPLAY_ORDER: readonly ArmorStatName[] = [
+  "Health",
+  "Class",
+  "Melee",
+  "Super",
+  "Weapons",
+  "Grenade",
+];
+
+export function orderTertiaryStatsForDisplay(
+  stats: readonly ArmorStatName[],
+): ArmorStatName[] {
+  const present = new Set(stats);
+  return TERTIARY_STAT_DISPLAY_ORDER.filter((t) => present.has(t));
+}
+
 // Returns the 4 tertiary candidates for an archetype: all 6 armor stats minus
 // the two stats the archetype already covers via its primary/secondary plugs.
 export function tertiaryStatsForArchetype(
   pair: { primary: ArmorStatName; secondary: ArmorStatName } | undefined,
 ): ArmorStatName[] {
   if (!pair) return [];
-  return ARMOR_STAT_NAMES.filter(
+  const raw = ARMOR_STAT_NAMES.filter(
     (s) => s !== pair.primary && s !== pair.secondary,
   );
+  return orderTertiaryStatsForDisplay(raw);
 }
 
 export function computeViewProgress(

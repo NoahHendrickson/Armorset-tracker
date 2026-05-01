@@ -1,6 +1,7 @@
 import type { ArmorSlot } from "@/lib/bungie/constants";
 import { SLOT_ORDER } from "@/lib/bungie/constants";
 import type { ArmorStatName } from "@/lib/db/types";
+import { orderTertiaryStatsForDisplay } from "@/lib/views/progress";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 
 /** Figma merge accents: primary green, secondary blue. */
@@ -25,7 +26,7 @@ export function unionTertiaryStats(
     ...(a.progress.tertiaryStats as ArmorStatName[]),
     ...(b.progress.tertiaryStats as ArmorStatName[]),
   ]);
-  return [...set].sort((x, y) => x.localeCompare(y));
+  return orderTertiaryStatsForDisplay([...set]);
 }
 
 export interface MergeCompareCellState {

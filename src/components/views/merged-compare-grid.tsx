@@ -11,6 +11,7 @@ import {
   mergeColorOrder,
   MERGE_ACCENT_BLUE,
   MERGE_ACCENT_GREEN,
+  unionTertiaryStats,
   type MergeCompareCellState,
 } from "@/lib/views/merge-compare";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
@@ -143,12 +144,7 @@ export function MergedCompareGrid({
   const bluePayload =
     greenId === anchorPayload.view.id ? partnerPayload : anchorPayload;
 
-  const tertiaries = [
-    ...new Set([
-      ...(greenPayload.progress.tertiaryStats as ArmorStatName[]),
-      ...(bluePayload.progress.tertiaryStats as ArmorStatName[]),
-    ]),
-  ].sort((a, b) => a.localeCompare(b));
+  const tertiaries = unionTertiaryStats(greenPayload, bluePayload);
 
   const iconPaths = {
     ...greenPayload.tertiaryStatIconPaths,
