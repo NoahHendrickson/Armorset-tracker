@@ -134,4 +134,69 @@
   .canvas-space-pan .rnd-tracker {
     pointer-events: none !important;
   }
+
+  /* Finite playground for trackers vs. react-zoom-pan-pinch infinite margin. */
+  .workspace-canvas-bounds {
+    background-color: rgba(30, 31, 32, 0.42);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.16),
+      inset 0 1px 0 rgb(255 255 255 / 0.05),
+      0 12px 40px rgb(0 0 0 / 0.45);
+  }
+
+  /* Edge framing so corners read even when heavily zoomed. */
+  .workspace-canvas-edge-overlay {
+    contain: strict;
+    color: rgb(255 255 255 / 0.22);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /**
+   * Outward “ping” on the workspace Create FAB when the new-tracker form is complete.
+   */
+  @keyframes new-tracker-create-ring-pulse {
+    0% {
+      transform: scale(0.88);
+      opacity: 0;
+    }
+    14% {
+      opacity: 1;
+    }
+    32% {
+      opacity: 0;
+    }
+    46% {
+      transform: scale(1.18);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1.18);
+      opacity: 0;
+    }
+  }
+
+  .new-tracker-create-ring {
+    pointer-events: none;
+    position: absolute;
+    inset: -3px;
+    z-index: 0;
+    border: 2px solid rgb(220 255 233 / 0.95);
+    box-shadow:
+      0 0 14px rgb(0 255 133 / 0.45),
+      inset 0 0 10px rgb(255 255 255 / 0.12);
+    transform-origin: center;
+    animation: new-tracker-create-ring-pulse 0.92s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  }
+
+  .new-tracker-create-ring--delayed {
+    animation-delay: 0.46s;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .new-tracker-create-ring {
+      animation: none;
+      opacity: 0;
+    }
+  }
 }

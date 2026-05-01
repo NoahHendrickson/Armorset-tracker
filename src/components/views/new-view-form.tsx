@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FloppyDisk } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import type { WorkspaceLayoutJson } from "@/lib/workspace/workspace-schema";
 import {
   Select,
@@ -30,10 +31,18 @@ interface NewViewFormProps {
   tunings: OptionItem[];
   /** Dialog / canvas mode — no navigation after save. */
   embedded?: boolean;
+  /** When set, the form is addressable by external submit controls via the `form` attribute. */
+  formId?: string;
+  /** Hide the inline submit button (use with `formId` and an external submit control). */
+  externalSubmit?: boolean;
   /** Persisted tracker frame on creation (canvas placement). */
   initialLayout?: WorkspaceLayoutJson;
-  onCreated?: (viewId: string) => void;
+  /** Includes `tracker` when the API returns workspace payload so the dashboard can merge without refetching. */
+  onCreated?: (viewId: string, tracker?: SerializableTrackerPayload) => void;
   onCancel?: () => void;
+  onBusyChange?: (busy: boolean) => void;
+  /** Fires when embedded “Create” via external submit becomes allowed (all required fields + not busy). */
+  onCanSubmitChange?: (canSubmit: boolean) => void;
 }
 
 const CLASS_OPTIONS: Array<{ value: ClassValue; label: string }> = [
@@ -47,13 +56,21 @@ export function NewViewForm({
   archetypes,
   tunings,
   embedded,
+  formId,
+  externalSubmit,
   initialLayout,
   onCreated,
   onCancel,
+  onBusyChange,
+  onCanSubmitChange,
 }: NewViewFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    onBusyChange?.(submitting || isPending);
+  }, [submitting, isPending, onBusyChange]);
 
   const [name, setName] = useState("");
   const [classType, setClassType] = useState<ClassValue | "">("");
@@ -85,10 +102,16 @@ export function NewViewForm({
   const canSubmit =
     name.trim().length > 0 &&
     classType !== "" &&
-    setHash &&
-    archetypeHash &&
-    tuningHash &&
+    setHash !== "" &&
+    archetypeHash !== "" &&
+    tuningHash !== "" &&
     !submitting;
+
+  const canSubmitWithTransition = canSubmit && !isPending;
+
+  useEffect(() => {
+    onCanSubmitChange?.(canSubmitWithTransition);
+  }, [canSubmitWithTransition, onCanSubmitChange]);
 
   function autoFillName() {
     if (!name && setLabel && archetypeLabel && classLabel) {
@@ -117,6 +140,7 @@ export function NewViewForm({
       const body = (await res.json()) as {
         error?: string;
         view?: { id: string };
+        tracker?: SerializableTrackerPayload;
       };
       if (!res.ok || !body.view) {
         toast.error(body.error ?? "Could not create view");
@@ -124,7 +148,7 @@ export function NewViewForm({
       }
       toast.success(embedded ? "Tracker created" : "View created");
       if (onCreated) {
-        startTransition(() => onCreated(body.view!.id));
+        startTransition(() => onCreated(body.view!.id, body.tracker));
       } else if (!embedded) {
         startTransition(() => router.push(`/views/${body.view!.id}`));
       }
@@ -136,7 +160,7 @@ export function NewViewForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-6">
+    <form id={formId} onSubmit={onSubmit} className="flex flex-col gap-6">
       <div className="grid gap-2">
         <Label htmlFor="class">Class</Label>
         <Select
@@ -269,7 +293,9 @@ export function NewViewForm({
         </p>
       </div>
 
-      <div className="flex items-center justify-between gap-3 pt-2">
+      <div
+        className={`flex gap-3 pt-2 ${embedded && externalSubmit ? "justify-start" : "items-center justify-between"}`}
+      >
         {embedded && onCancel ? (
           <Button variant="ghost" type="button" onClick={() => onCancel()}>
             <ArrowLeft weight="duotone" />
@@ -283,14 +309,16 @@ export function NewViewForm({
             </Link>
           </Button>
         )}
-        <Button type="submit" disabled={!canSubmit || isPending}>
-          <FloppyDisk weight="duotone" />
-          {submitting || isPending
-            ? "Saving..."
-            : embedded
-              ? "Create tracker"
-              : "Create view"}
-        </Button>
+        {!externalSubmit ? (
+          <Button type="submit" disabled={!canSubmit || isPending}>
+            <FloppyDisk weight="duotone" />
+            {submitting || isPending
+              ? "Saving..."
+              : embedded
+                ? "Create tracker"
+                : "Create view"}
+          </Button>
+        ) : null}
       </div>
     </form>
   );

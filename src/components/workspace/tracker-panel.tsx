@@ -10,6 +10,7 @@ import { RefreshButton } from "@/components/dashboard/refresh-button";
 import { ViewActions } from "@/components/views/view-actions";
 import { ViewDiagnosticsPanel } from "@/components/views/view-diagnostics";
 import { MergedCompareGrid } from "@/components/views/merged-compare-grid";
+import { TuningHeaderGlyph } from "@/components/views/tuning-header-glyph";
 import { ViewGrid } from "@/components/views/view-grid";
 import type { ArmorStatName } from "@/lib/db/types";
 import type { ViewProgress } from "@/lib/views/progress";
@@ -210,7 +211,7 @@ export function TrackerPanel({
         id={`tracker-${view.id}`}
         role="region"
         aria-label={ariaRegionLabel}
-        className="flex h-full overflow-hidden rounded-r-lg"
+        className="flex h-full overflow-hidden"
       >
         <aside
           aria-label="Tracker actions"
@@ -260,36 +261,54 @@ export function TrackerPanel({
                 className="flex min-w-0 flex-1 flex-col gap-1 border-b-2 pr-2"
                 style={{ borderColor: MERGE_ACCENT_GREEN }}
               >
-                <div className="flex items-center gap-2">
-                  <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
-                  <h2 className="truncate text-xl font-normal leading-7 text-white">
-                    {payload.view.name}
-                  </h2>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
+                    <h2 className="truncate text-xl font-normal leading-7 text-white">
+                      {payload.view.name}
+                    </h2>
+                  </div>
+                  <TuningHeaderGlyph
+                    tuningName={payload.tuningName}
+                    iconPath={payload.tuningStatIconPath}
+                  />
                 </div>
               </div>
               <div
                 className="flex min-w-0 flex-1 flex-col gap-1 border-b-2 pl-2"
                 style={{ borderColor: MERGE_ACCENT_BLUE }}
               >
-                <div className="flex items-center gap-2">
-                  <ClassGlyph
-                    classType={Number(mergePartnerPayload.view.class_type)}
-                    className={glyphClass}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 flex-row-reverse items-center gap-2">
+                    <h2 className="truncate text-right text-xl font-normal leading-7 text-white">
+                      {mergePartnerPayload.view.name}
+                    </h2>
+                    <ClassGlyph
+                      classType={Number(mergePartnerPayload.view.class_type)}
+                      className={glyphClass}
+                    />
+                  </div>
+                  <TuningHeaderGlyph
+                    tuningName={mergePartnerPayload.tuningName}
+                    iconPath={mergePartnerPayload.tuningStatIconPath}
                   />
-                  <h2 className="truncate text-right text-xl font-normal leading-7 text-white">
-                    {mergePartnerPayload.view.name}
-                  </h2>
                 </div>
               </div>
             </header>
           ) : (
-            <header className="flex shrink-0 items-center gap-2.5 p-4">
-              <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
-              <div className="min-w-0 flex-1">
-                <h2 className="truncate text-xl font-normal leading-7 text-white">
-                  {payload.view.name}
-                </h2>
+            <header className="flex shrink-0 items-start justify-between gap-2 p-4">
+              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-xl font-normal leading-7 text-white">
+                    {payload.view.name}
+                  </h2>
+                </div>
               </div>
+              <TuningHeaderGlyph
+                tuningName={payload.tuningName}
+                iconPath={payload.tuningStatIconPath}
+              />
             </header>
           )}
 

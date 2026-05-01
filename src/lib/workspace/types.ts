@@ -27,6 +27,8 @@ export interface SerializableTrackerPayload {
   } | null;
   /** Relative paths for tertiary column headers — JSON-serializable map. */
   tertiaryStatIconPaths: Record<string, string>;
+  /** Icon for the tuning +stat (+Weapons, …) when parsing succeeds. */
+  tuningStatIconPath: string | null;
   needsClass: boolean;
   showDiagnostics: boolean;
   resolvedSetHash: number;

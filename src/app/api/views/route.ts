@@ -1,8 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
+import type { ViewRow } from "@/lib/db/types";
 import { getServiceRoleClient } from "@/lib/db/server";
+import { getCachedInventoryWithSyncedAt } from "@/lib/inventory/sync";
+import { getManifestLookups } from "@/lib/manifest/lookups";
 import { listViewsForUser } from "@/lib/views/queries";
+import { buildSerializableTrackerPayload } from "@/lib/workspace/build-tracker-payload";
 import { workspaceLayoutSchema } from "@/lib/workspace/workspace-schema";
 
 const createSchema = z.object({
@@ -49,6 +53,8 @@ export async function POST(req: NextRequest) {
   }
 
   const sb = getServiceRoleClient();
+  const lookupsPromise = getManifestLookups();
+  const cachedPromise = getCachedInventoryWithSyncedAt(session.userId);
   const { layout: layoutPayload, ...createFields } = parsed.data;
   const { data, error } = await sb
     .from("views")
@@ -73,5 +79,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ view: data }, { status: 201 });
+  const viewRow = data as ViewRow;
+  const [lookups, cached] = await Promise.all([lookupsPromise, cachedPromise]);
+  const inventory = cached?.items ?? [];
+  const tracker = buildSerializableTrackerPayload(viewRow, lookups, inventory);
+
+  return NextResponse.json({ view: data, tracker }, { status: 201 });
 }

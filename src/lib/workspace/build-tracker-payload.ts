@@ -11,6 +11,7 @@ import {
   computeViewProgress,
   tertiaryStatsForArchetype,
 } from "@/lib/views/progress";
+import { tuningPositiveArmorStat } from "@/lib/views/tuning-positive-stat";
 import type {
   SerializableTrackerPayload,
   SerializableViewProgressCells,
@@ -71,6 +72,12 @@ export function buildSerializableTrackerPayload(
     "Unknown archetype";
   const tuningName =
     lookups.tuningNameByHash.get(Number(viewRow.tuning_hash)) ?? "Unknown tuning";
+  const tuningPositive = tuningPositiveArmorStat(tuningName);
+  const tuningStatIconPath =
+    tuningPositive !== null
+      ? (lookups.statIconByName.get(tuningPositive) ?? null)
+      : null;
+
   const className =
     Number(viewRow.class_type) >= 0
       ? CLASS_NAMES[Number(viewRow.class_type)]
@@ -100,6 +107,7 @@ export function buildSerializableTrackerPayload(
     setName,
     archetypeName,
     tuningName,
+    tuningStatIconPath,
     className,
     archetypePrimarySecondary: archetypePair
       ? { primary: archetypePair.primary, secondary: archetypePair.secondary }

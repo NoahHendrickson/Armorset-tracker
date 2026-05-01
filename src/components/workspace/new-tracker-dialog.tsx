@@ -1,18 +1,20 @@
 "use client";
 
-import { useMemo } from "react";
-import { Warning } from "@phosphor-icons/react/dist/ssr";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import { Plus, Warning, X } from "@phosphor-icons/react/dist/ssr";
 import { NewViewForm } from "@/components/views/new-view-form";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverClose,
+  PopoverContent,
+} from "@/components/ui/popover";
 import type { TrackerOptionItem } from "@/lib/views/tracker-option";
-import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import { centeredTrackerLayout } from "@/lib/workspace/workspace-schema";
+import type { SerializableTrackerPayload } from "@/lib/workspace/types";
+
+const WORKSPACE_NEW_TRACKER_FORM_ID = "workspace-new-tracker-form";
 
 export interface TrackerFormSelectors {
   setsByClass: { 0: TrackerOptionItem[]; 1: TrackerOptionItem[]; 2: TrackerOptionItem[] };
@@ -26,8 +28,20 @@ interface NewTrackerDialogProps {
   onOpenChange: (open: boolean) => void;
   trackers: SerializableTrackerPayload[];
   selectors: TrackerFormSelectors;
-  onCreated: () => void;
+  onCreated: (tracker?: SerializableTrackerPayload) => void;
 }
+
+const FAB_CLASSES =
+  "relative flex h-12 shrink-0 items-center gap-2 overflow-hidden rounded-none bg-[#07ad6b] px-6 text-sm font-medium text-white transition-colors hover:bg-[#0ac07a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#07ad6b] focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";
+
+function isFromFabShell(shell: HTMLDivElement | null, target: EventTarget | null) {
+  return Boolean(shell && target instanceof Node && shell.contains(target));
+}
+
+const FAB_SHADOW: CSSProperties = {
+  boxShadow:
+    "0 10px 20px -5px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(0,0,0,0.24), inset 0 -10px 14px -4px rgba(255,255,255,0.16)",
+};
 
 export function NewTrackerDialog({
   open,
@@ -36,6 +50,12 @@ export function NewTrackerDialog({
   selectors,
   onCreated,
 }: NewTrackerDialogProps) {
+  const fabShellRef = useRef<HTMLDivElement>(null);
+  const [submitBusy, setSubmitBusy] = useState(false);
+  const [canSubmitForm, setCanSubmitForm] = useState(false);
+
+  const showCreateReadyRing =
+    open && canSubmitForm && !submitBusy && !selectors.manifestEmpty;
   const initialLayout = useMemo(() => {
     const maxZ = trackers.length
       ? Math.max(...trackers.map((t) => t.view.layout.z))
@@ -43,20 +63,84 @@ export function NewTrackerDialog({
     return centeredTrackerLayout(maxZ + 1);
   }, [trackers]);
 
+  const label = submitBusy ? "Saving..." : open ? "Create" : "New tracker";
+  const aria = open ? "Create tracker (submit)" : "New tracker";
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(90vh,720px)] max-w-lg overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>New tracker</DialogTitle>
-          <DialogDescription>
-            Pick class, armor set, archetype, and tuning — then arrange it on the canvas.
-          </DialogDescription>
-        </DialogHeader>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setCanSubmitForm(false);
+        onOpenChange(next);
+      }}
+    >
+      <div ref={fabShellRef} className="relative inline-flex shrink-0 overflow-visible">
+        {showCreateReadyRing ? (
+          <>
+            <span className="new-tracker-create-ring rounded-none" aria-hidden />
+            <span
+              className="new-tracker-create-ring new-tracker-create-ring--delayed rounded-none"
+              aria-hidden
+            />
+          </>
+        ) : null}
+        <PopoverAnchor asChild>
+          <button
+            disabled={selectors.manifestEmpty || submitBusy}
+            type={open ? "submit" : "button"}
+            form={open ? WORKSPACE_NEW_TRACKER_FORM_ID : undefined}
+            onClick={(e) => {
+              if (!open && !selectors.manifestEmpty) {
+                e.preventDefault();
+                onOpenChange(true);
+              }
+            }}
+            className={`pointer-events-auto z-[1] ${FAB_CLASSES}`}
+            style={FAB_SHADOW}
+            aria-expanded={open}
+            aria-busy={submitBusy || undefined}
+            aria-haspopup="dialog"
+            aria-label={aria}
+          >
+            {!open ? <Plus className="h-5 w-5" weight="duotone" /> : null}
+            <span>{label}</span>
+          </button>
+        </PopoverAnchor>
+      </div>
+      <PopoverContent
+        side="top"
+        align="center"
+        sideOffset={10}
+        collisionPadding={16}
+        className="max-w-lg"
+        onPointerDownOutside={(e) => {
+          const target = e.detail.originalEvent.target;
+          if (isFromFabShell(fabShellRef.current, target)) e.preventDefault();
+        }}
+        onInteractOutside={(e) => {
+          if (isFromFabShell(fabShellRef.current, e.target ?? null)) e.preventDefault();
+        }}
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1 pr-2">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">New tracker</h2>
+            <p className="text-sm text-muted-foreground">
+              Pick class, armor set, archetype, and tuning — then arrange it on the canvas.
+            </p>
+          </div>
+          <PopoverClose
+            type="button"
+            className="shrink-0 rounded-none p-1.5 text-muted-foreground opacity-80 ring-offset-background transition-opacity hover:bg-muted hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            aria-label="Close"
+          >
+            <X weight="duotone" className="h-4 w-4" />
+          </PopoverClose>
+        </div>
 
         {selectors.manifestEmpty ? (
           <div
             role="alert"
-            className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm"
+            className="mb-4 flex items-start gap-3 rounded-none border border-amber-500/30 bg-amber-500/10 p-4 text-sm"
           >
             <Warning weight="duotone" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
             <div className="space-y-1">
@@ -69,18 +153,22 @@ export function NewTrackerDialog({
         ) : null}
 
         <NewViewForm
-            setsByClass={selectors.setsByClass}
-            archetypes={selectors.archetypes}
-            tunings={selectors.tunings}
-            embedded
-            initialLayout={initialLayout}
-            onCancel={() => onOpenChange(false)}
-            onCreated={() => {
-              onCreated();
-              onOpenChange(false);
-            }}
-          />
-      </DialogContent>
-    </Dialog>
+          setsByClass={selectors.setsByClass}
+          archetypes={selectors.archetypes}
+          tunings={selectors.tunings}
+          embedded
+          formId={WORKSPACE_NEW_TRACKER_FORM_ID}
+          externalSubmit
+          initialLayout={initialLayout}
+          onBusyChange={setSubmitBusy}
+          onCanSubmitChange={setCanSubmitForm}
+          onCancel={() => onOpenChange(false)}
+          onCreated={(_viewId, tracker) => {
+            onCreated(tracker);
+            onOpenChange(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }

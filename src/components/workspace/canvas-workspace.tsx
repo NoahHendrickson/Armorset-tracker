@@ -1,9 +1,9 @@
 "use client";
 
 import {
+  Crosshair,
   MagnifyingGlassMinus,
   MagnifyingGlassPlus,
-  Plus,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -16,12 +16,14 @@ import {
 import {
   TRACKER_DEFAULT_HEIGHT,
   TRACKER_WIDTH,
+  WORKSPACE_CANVAS_ELEMENT_ID,
   WORKSPACE_CANVAS_HEIGHT,
   WORKSPACE_CANVAS_WIDTH,
 } from "@/lib/workspace/workspace-constants";
 import { canAttemptMerge, MERGE_OVERLAP_TRIGGER_RATIO, mergeOverlapRatio } from "@/lib/views/canvas-merge";
 import { mergePreviewUnionPathD } from "@/lib/views/merge-preview-outline";
 import { computeWorkspaceMinScale } from "@/lib/workspace/workspace-min-scale";
+import { computeRecenterTranslation } from "@/lib/workspace/recenter-trackers";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
   parseWorkspaceLayout,
@@ -370,6 +372,94 @@ export function CanvasWorkspace({
     [],
   );
 
+  const handleRecenterWorkspace = useCallback(async () => {
+    if (draggingId !== null) return;
+    const surface = viewportSurfaceRef.current;
+    if (!surface) return;
+    const list = trackersRef.current;
+    if (list.length === 0) return;
+
+    const positions = list.map((t) => {
+      const lo = parseWorkspaceLayout(t.view.layout);
+      return { x: lo.x, y: lo.y };
+    });
+
+    const { dx, dy } = computeRecenterTranslation(
+      positions,
+      WORKSPACE_CANVAS_WIDTH,
+      WORKSPACE_CANVAS_HEIGHT,
+      TRACKER_WIDTH,
+      TRACKER_DEFAULT_HEIGHT,
+    );
+
+    const layoutChanged =
+      Math.abs(dx) > 1e-6 || Math.abs(dy) > 1e-6;
+
+    let updates: { id: string; layout: WorkspaceLayoutJson }[] = [];
+    if (layoutChanged) {
+      updates = list.map((t) => {
+        const lo = parseWorkspaceLayout(t.view.layout);
+        return {
+          id: t.view.id,
+          layout: { ...lo, x: lo.x + dx, y: lo.y + dy },
+        };
+      });
+
+      const layoutById = new Map(
+        updates.map((u): [string, WorkspaceLayoutJson] => [u.id, u.layout]),
+      );
+      setTrackers((prev) =>
+        prev.map((p) => {
+          const lo = layoutById.get(p.view.id);
+          if (!lo) return p;
+          return { ...p, view: { ...p.view, layout: lo } };
+        }),
+      );
+    }
+
+    /*
+     * Align viewport center with workspace center `(W/2, H/2)` in content coords.
+     * Library convention: `(wrapperMid - positionX) / scale === contentX` at viewport center
+     * (see react-zoom-pan-pinch zoom handlers).
+     */
+    const scale = Math.max(1, viewportMinScale);
+    const vw = surface.clientWidth;
+    const vh = surface.clientHeight;
+    const canvasCx = WORKSPACE_CANVAS_WIDTH / 2;
+    const canvasCy = WORKSPACE_CANVAS_HEIGHT / 2;
+    const positionX = vw / 2 - scale * canvasCx;
+    const positionY = vh / 2 - scale * canvasCy;
+    const camera: WorkspaceCameraJson = {
+      zoom: scale,
+      panX: positionX,
+      panY: positionY,
+    };
+    twRef.current?.setTransform(positionX, positionY, scale, 260);
+    await persistCamera(camera);
+
+    if (!layoutChanged || updates.length === 0) return;
+
+    const results = await Promise.all(
+      updates.map(async ({ id, layout }) => {
+        try {
+          const res = await fetch(`/api/views/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ layout }),
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      }),
+    );
+
+    if (results.some((ok) => !ok)) {
+      router.refresh();
+    }
+  }, [draggingId, viewportMinScale, persistCamera, router]);
+
   const onDragPosition = useCallback((viewId: string, x: number, y: number) => {
     setDraggingId(viewId);
     setDragLive({ x, y });
@@ -693,12 +783,31 @@ export function CanvasWorkspace({
               wrapperStyle={{ width: "100%", height: "100%" }}
             >
               <div
+                id={WORKSPACE_CANVAS_ELEMENT_ID}
+                className="workspace-canvas-bounds relative isolate"
                 style={{
                   width: WORKSPACE_CANVAS_WIDTH,
                   height: WORKSPACE_CANVAS_HEIGHT,
                   position: "relative",
                 }}
               >
+                <svg
+                  className="workspace-canvas-edge-overlay absolute left-0 top-0"
+                  width={WORKSPACE_CANVAS_WIDTH}
+                  height={WORKSPACE_CANVAS_HEIGHT}
+                  aria-hidden
+                >
+                  <rect
+                    x={0.5}
+                    y={0.5}
+                    width={WORKSPACE_CANVAS_WIDTH - 1}
+                    height={WORKSPACE_CANVAS_HEIGHT - 1}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1}
+                    vectorEffect="nonScalingStroke"
+                  />
+                </svg>
                 {mergePreviewPath ? (
                   <svg
                     className="pointer-events-none absolute left-0 top-0 overflow-visible"
@@ -748,8 +857,19 @@ export function CanvasWorkspace({
               </div>
             ) : null}
 
-            {/* Zoom controls — bottom right */}
+            {/* Zoom + recenter — bottom right */}
             <div className="pointer-events-none absolute bottom-6 right-6 z-30 flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="pointer-events-auto shadow-md"
+                aria-label="Recenter workspace and trackers"
+                disabled={trackers.length === 0 || draggingId !== null}
+                onClick={() => void handleRecenterWorkspace()}
+              >
+                <Crosshair className="h-4 w-4" weight="duotone" />
+              </Button>
               <Button
                 type="button"
                 size="sm"
@@ -774,20 +894,23 @@ export function CanvasWorkspace({
 
             {/* Sticky primary action — bottom-center of the canvas */}
             <div className="pointer-events-none absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 gap-2">
-              <button
-                type="button"
-                disabled={selectors.manifestEmpty}
-                onClick={() => setNewTrackerOpen(true)}
-                className="pointer-events-auto relative flex h-12 items-center gap-2 overflow-hidden bg-[#07ad6b] px-6 text-sm font-medium text-white transition-colors hover:bg-[#0ac07a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#07ad6b] focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60"
-                style={{
-                  boxShadow:
-                    "0 10px 20px -5px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(0,0,0,0.24), inset 0 -10px 14px -4px rgba(255,255,255,0.16)",
+              <NewTrackerDialog
+                open={newTrackerOpen}
+                onOpenChange={setNewTrackerOpen}
+                trackers={trackers}
+                selectors={selectors}
+                onCreated={(tracker) => {
+                  if (tracker) {
+                    setTrackers((prev) =>
+                      prev.some((t) => t.view.id === tracker.view.id)
+                        ? prev
+                        : [...prev, tracker],
+                    );
+                  } else {
+                    router.refresh();
+                  }
                 }}
-                aria-label="New tracker"
-              >
-                <Plus className="h-5 w-5" weight="duotone" />
-                <span>New tracker</span>
-              </button>
+              />
               <div className="pointer-events-auto">
                 <RefreshButton variant="fab" />
               </div>
@@ -796,15 +919,6 @@ export function CanvasWorkspace({
         </TransformWrapper>
       </div>
 
-      <NewTrackerDialog
-        open={newTrackerOpen}
-        onOpenChange={setNewTrackerOpen}
-        trackers={trackers}
-        selectors={selectors}
-        onCreated={() => {
-          router.refresh();
-        }}
-      />
     </div>
   );
 }

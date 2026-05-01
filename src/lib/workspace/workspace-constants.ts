@@ -2,6 +2,9 @@
 export const WORKSPACE_CANVAS_WIDTH = 4800;
 export const WORKSPACE_CANVAS_HEIGHT = 3600;
 
+/** Target for pan/zoom math and debugging — the bounded tracker layer. */
+export const WORKSPACE_CANVAS_ELEMENT_ID = "workspace-canvas-root";
+
 /**
  * Fixed tracker width — sized to fit the full stat grid without clipping.
  * Breakdown: 36px sidebar + 2px main-panel border + 32px body padding +
