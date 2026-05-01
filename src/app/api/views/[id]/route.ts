@@ -4,7 +4,10 @@ import { getSession } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
 import type { Json } from "@/lib/db/types";
 
-import { workspaceLayoutSchema } from "@/lib/workspace/workspace-schema";
+import {
+  parseWorkspaceLayout,
+  workspaceLayoutSchema,
+} from "@/lib/workspace/workspace-schema";
 
 const updateSchema = z.object({
   name: z.string().min(1).max(80).optional(),
@@ -74,6 +77,41 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const { id } = await params;
 
   const sb = getServiceRoleClient();
+
+  const { data: victim } = await sb
+    .from("views")
+    .select("layout")
+    .eq("user_id", session.userId)
+    .eq("id", id)
+    .maybeSingle();
+
+  const victimLayout =
+    victim?.layout !== undefined && victim?.layout !== null
+      ? parseWorkspaceLayout(victim.layout)
+      : null;
+  const partnerId = victimLayout?.mergedWith ?? null;
+
+  if (partnerId) {
+    const { data: partner } = await sb
+      .from("views")
+      .select("layout")
+      .eq("user_id", session.userId)
+      .eq("id", partnerId)
+      .maybeSingle();
+
+    if (partner?.layout !== undefined && partner?.layout !== null) {
+      const pl = parseWorkspaceLayout(partner.layout);
+      await sb
+        .from("views")
+        .update({
+          layout: { ...pl, mergedWith: null } as Json,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", session.userId)
+        .eq("id", partnerId);
+    }
+  }
+
   const { error } = await sb
     .from("views")
     .delete()

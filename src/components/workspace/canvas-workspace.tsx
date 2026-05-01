@@ -14,14 +14,18 @@ import {
   useTransformEffect,
 } from "react-zoom-pan-pinch";
 import {
+  TRACKER_DEFAULT_HEIGHT,
+  TRACKER_WIDTH,
   WORKSPACE_CANVAS_HEIGHT,
   WORKSPACE_CANVAS_WIDTH,
 } from "@/lib/workspace/workspace-constants";
+import { canAttemptMerge, mergeOverlapRatio, unionBounds } from "@/lib/views/canvas-merge";
 import { computeWorkspaceMinScale } from "@/lib/workspace/workspace-min-scale";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
-import type {
-  WorkspaceCameraJson,
-  WorkspaceLayoutJson,
+import {
+  parseWorkspaceLayout,
+  type WorkspaceCameraJson,
+  type WorkspaceLayoutJson,
 } from "@/lib/workspace/workspace-schema";
 import { Button } from "@/components/ui/button";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
@@ -29,7 +33,10 @@ import {
   NewTrackerDialog,
   type TrackerFormSelectors,
 } from "@/components/workspace/new-tracker-dialog";
-import { TrackerPanel } from "@/components/workspace/tracker-panel";
+import {
+  TrackerPanel,
+  type TrackerMergeRole,
+} from "@/components/workspace/tracker-panel";
 import { attachCanvasViewportWheel } from "@/components/workspace/canvas-viewport-wheel";
 
 function useDebouncedCamera(
@@ -70,6 +77,21 @@ function CameraPersist({
   return null;
 }
 
+function getMergeRole(
+  payload: SerializableTrackerPayload,
+  list: SerializableTrackerPayload[],
+): TrackerMergeRole {
+  const mw = payload.view.layout.mergedWith;
+  if (!mw) return "solo";
+  const partner = list.find((t) => t.view.id === mw);
+  if (!partner) return "solo";
+  if (payload.view.layout.z > partner.view.layout.z) return "anchor";
+  if (payload.view.layout.z < partner.view.layout.z) return "mergedPartner";
+  return payload.view.id.localeCompare(partner.view.id) > 0
+    ? "anchor"
+    : "mergedPartner";
+}
+
 /**
  * Renders the tracker layer and tracks the live transform scale. We pass
  * `scale` to each `<TrackerPanel>` (and from there to `<Rnd>`) so that
@@ -83,37 +105,66 @@ function CameraPersist({
  */
 function TrackerLayer({
   trackers,
-  syncedAt,
   hasInventory,
   initialScale,
-  onCommitLayout,
+  onDragPosition,
+  onDragLayoutEnd,
   onInteract,
+  draggingId,
+  mergeDropTargetId,
+  mergeDropValid,
+  onUnmergeAnchor,
 }: {
   trackers: SerializableTrackerPayload[];
-  syncedAt: Date | string | null;
   hasInventory: boolean;
   initialScale: number;
-  onCommitLayout: (viewId: string, layout: WorkspaceLayoutJson) => void;
+  onDragPosition: (viewId: string, x: number, y: number) => void;
+  onDragLayoutEnd: (viewId: string, layout: WorkspaceLayoutJson) => void;
   onInteract: (viewId: string) => void;
+  draggingId: string | null;
+  mergeDropTargetId: string | null;
+  mergeDropValid: boolean;
+  onUnmergeAnchor: (anchorViewId: string) => void;
 }) {
   const [scale, setScale] = useState(initialScale);
   useTransformEffect((ref) => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror live scale into state for child Rnd props
     setScale(ref.state.scale);
   });
   return (
     <>
-      {trackers.map((t) => (
-        <TrackerPanel
-          key={t.view.id}
-          payload={t}
-          syncedAt={syncedAt}
-          hasInventory={hasInventory}
-          scale={scale}
-          onCommitLayout={onCommitLayout}
-          onInteract={onInteract}
-        />
-      ))}
+      {trackers.map((t) => {
+        const mergeRole = getMergeRole(t, trackers);
+        const mw = t.view.layout.mergedWith;
+        const mergePartner =
+          mw ? trackers.find((p) => p.view.id === mw) ?? null : null;
+        const dropHighlight =
+          draggingId &&
+          mergeDropTargetId === t.view.id &&
+          draggingId !== t.view.id
+            ? mergeDropValid
+              ? "valid"
+              : "invalid"
+            : "none";
+        return (
+          <TrackerPanel
+            key={t.view.id}
+            payload={t}
+            hasInventory={hasInventory}
+            scale={scale}
+            onInteract={onInteract}
+            onDragPosition={onDragPosition}
+            onDragLayoutEnd={onDragLayoutEnd}
+            mergeRole={mergeRole}
+            mergePartnerPayload={mergePartner}
+            mergeDropHighlight={dropHighlight}
+            onUnmerge={
+              mergeRole === "anchor" && mergePartner
+                ? () => onUnmergeAnchor(t.view.id)
+                : undefined
+            }
+          />
+        );
+      })}
     </>
   );
 }
@@ -124,7 +175,6 @@ interface CanvasWorkspaceProps {
   initialTrackers: SerializableTrackerPayload[];
   initialCamera: WorkspaceCameraJson;
   focusTrackerId: string | null;
-  syncedAt: Date | string | null;
   syncWarning: string | null;
   hasInventory: boolean;
   selectors: TrackerFormSelectors;
@@ -136,7 +186,6 @@ export function CanvasWorkspace({
   initialTrackers,
   initialCamera,
   focusTrackerId,
-  syncedAt,
   syncWarning,
   hasInventory,
   selectors,
@@ -149,6 +198,25 @@ export function CanvasWorkspace({
   const lastFocused = useRef<string | null>(null);
   const [viewportPx, setViewportPx] = useState({ w: 0, h: 0 });
   const [spacePan, setSpacePan] = useState(false);
+
+  const trackersRef = useRef(trackers);
+  useEffect(() => {
+    trackersRef.current = trackers;
+  }, [trackers]);
+
+  const mergeHoverRef = useRef<{ targetId: string | null; valid: boolean }>({
+    targetId: null,
+    valid: false,
+  });
+
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragLive, setDragLive] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const [mergeDropTargetId, setMergeDropTargetId] = useState<string | null>(
+    null,
+  );
+  const [mergeDropValid, setMergeDropValid] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resync trackers after router.refresh()
@@ -274,6 +342,214 @@ export function CanvasWorkspace({
     [],
   );
 
+  const persistTwoLayouts = useCallback(
+    async (updates: { id: string; layout: WorkspaceLayoutJson }[]) => {
+      for (const { id, layout } of updates) {
+        try {
+          const res = await fetch(`/api/views/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ layout }),
+          });
+          if (!res.ok) continue;
+          const body = (await res.json()) as { view?: { layout?: unknown } };
+          const lo = body.view?.layout as WorkspaceLayoutJson | undefined;
+          if (lo) {
+            setTrackers((prev) =>
+              prev.map((p) =>
+                p.view.id === id ? { ...p, view: { ...p.view, layout: lo } } : p,
+              ),
+            );
+          }
+        } catch {
+          /* non-fatal */
+        }
+      }
+    },
+    [],
+  );
+
+  const onDragPosition = useCallback((viewId: string, x: number, y: number) => {
+    setDraggingId(viewId);
+    setDragLive({ x, y });
+    const current = trackersRef.current;
+    const self = current.find((t) => t.view.id === viewId);
+    const partnerId = self
+      ? (parseWorkspaceLayout(self.view.layout).mergedWith ?? null)
+      : null;
+
+    let best: { id: string; ratio: number } | null = null;
+    for (const t of current) {
+      if (t.view.id === viewId) continue;
+      // Stacked merged partner shares x/y — ignore as merge target so moves
+      // don't show merge chrome or block until the pointer leaves the union.
+      if (partnerId !== null && t.view.id === partnerId) continue;
+      const ratio = mergeOverlapRatio(
+        x,
+        y,
+        t.view.layout.x,
+        t.view.layout.y,
+      );
+      if (ratio < 0.2) continue;
+      if (!best || ratio > best.ratio) best = { id: t.view.id, ratio };
+    }
+    const targetId = best?.id ?? null;
+    let valid = false;
+    if (targetId) {
+      const src = current.find((t) => t.view.id === viewId);
+      const tgt = current.find((t) => t.view.id === targetId);
+      if (src && tgt) valid = canAttemptMerge(src, tgt);
+    }
+    mergeHoverRef.current = { targetId, valid };
+    setMergeDropTargetId(targetId);
+    setMergeDropValid(valid);
+  }, []);
+
+  const handleLayoutDragEnd = useCallback(
+    (viewId: string, layout: WorkspaceLayoutJson) => {
+      const hover = mergeHoverRef.current;
+      mergeHoverRef.current = { targetId: null, valid: false };
+      setDraggingId(null);
+      setDragLive(null);
+      setMergeDropTargetId(null);
+      setMergeDropValid(false);
+
+      const current = trackersRef.current;
+      const self = current.find((t) => t.view.id === viewId);
+      if (!self) return;
+
+      const selfLo = parseWorkspaceLayout(self.view.layout);
+      const w = TRACKER_WIDTH;
+      const h = TRACKER_DEFAULT_HEIGHT;
+      const normalized: WorkspaceLayoutJson = {
+        ...layout,
+        w,
+        h,
+      };
+
+      if (
+        hover.targetId &&
+        hover.valid &&
+        hover.targetId !== viewId &&
+        selfLo.mergedWith !== hover.targetId
+      ) {
+        const tgt = current.find((t) => t.view.id === hover.targetId);
+        if (!tgt || !canAttemptMerge(self, tgt)) {
+          void persistLayoutPatch(viewId, normalized);
+          return;
+        }
+        const maxZ = current.length
+          ? Math.max(...current.map((t) => t.view.layout.z))
+          : 0;
+        const tgtLo = parseWorkspaceLayout(tgt.view.layout);
+        const snapX = tgtLo.x;
+        const snapY = tgtLo.y;
+        const sourceLayout: WorkspaceLayoutJson = {
+          ...selfLo,
+          x: snapX,
+          y: snapY,
+          w,
+          h,
+          z: maxZ + 2,
+          mergedWith: tgt.view.id,
+        };
+        const targetLayout: WorkspaceLayoutJson = {
+          ...tgtLo,
+          x: snapX,
+          y: snapY,
+          w,
+          h,
+          z: maxZ + 1,
+          mergedWith: self.view.id,
+        };
+        void persistTwoLayouts([
+          { id: self.view.id, layout: sourceLayout },
+          { id: tgt.view.id, layout: targetLayout },
+        ]);
+        return;
+      }
+
+      const partnerId = selfLo.mergedWith ?? null;
+      if (partnerId) {
+        const partner = current.find((t) => t.view.id === partnerId);
+        if (partner) {
+          const partnerLo = parseWorkspaceLayout(partner.view.layout);
+          const nextSelf: WorkspaceLayoutJson = {
+            ...normalized,
+            mergedWith: partnerId,
+          };
+          const nextPartner: WorkspaceLayoutJson = {
+            ...partnerLo,
+            x: normalized.x,
+            y: normalized.y,
+            w,
+            h,
+            mergedWith: viewId,
+          };
+          void persistTwoLayouts([
+            { id: viewId, layout: nextSelf },
+            { id: partnerId, layout: nextPartner },
+          ]);
+          return;
+        }
+      }
+
+      void persistLayoutPatch(viewId, normalized);
+    },
+    [persistLayoutPatch, persistTwoLayouts],
+  );
+
+  const handleUnmergeAnchor = useCallback(
+    async (anchorViewId: string) => {
+      const current = trackersRef.current;
+      const anchor = current.find((t) => t.view.id === anchorViewId);
+      const partnerId = anchor?.view.layout.mergedWith;
+      if (!anchor || !partnerId) return;
+      const partner = current.find((t) => t.view.id === partnerId);
+      if (!partner) return;
+      const nudge = 40;
+      const anchorLo = parseWorkspaceLayout(anchor.view.layout);
+      const partnerLo = parseWorkspaceLayout(partner.view.layout);
+      const nextAnchor: WorkspaceLayoutJson = {
+        ...anchorLo,
+        mergedWith: null,
+      };
+      const nextPartner: WorkspaceLayoutJson = {
+        ...partnerLo,
+        x: partnerLo.x + nudge,
+        y: partnerLo.y + nudge,
+        mergedWith: null,
+      };
+      await persistTwoLayouts([
+        { id: anchorViewId, layout: nextAnchor },
+        { id: partnerId, layout: nextPartner },
+      ]);
+    },
+    [persistTwoLayouts],
+  );
+
+  const mergePreviewBox = useMemo(() => {
+    if (!draggingId || !dragLive || !mergeDropTargetId) return null;
+    const tgt = trackers.find((t) => t.view.id === mergeDropTargetId);
+    if (!tgt) return null;
+    const u = unionBounds([
+      {
+        x: dragLive.x,
+        y: dragLive.y,
+        w: TRACKER_WIDTH,
+        h: TRACKER_DEFAULT_HEIGHT,
+      },
+      {
+        x: tgt.view.layout.x,
+        y: tgt.view.layout.y,
+        w: TRACKER_WIDTH,
+        h: TRACKER_DEFAULT_HEIGHT,
+      },
+    ]);
+    if (!u) return null;
+    return { ...u, valid: mergeDropValid };
+  }, [dragLive, draggingId, mergeDropTargetId, mergeDropValid, trackers]);
+
   const handleInteract = useCallback(
     (viewId: string) => {
       setTrackers((prev) => {
@@ -281,14 +557,45 @@ export function CanvasWorkspace({
           ? Math.max(...prev.map((t) => t.view.layout.z))
           : 0;
         const target = prev.find((t) => t.view.id === viewId);
-        if (!target || target.view.layout.z >= maxZ) return prev;
-        const base = target.view.layout;
+        if (!target) return prev;
+
+        const targetLo = parseWorkspaceLayout(target.view.layout);
+        const pid = targetLo.mergedWith ?? null;
+        if (pid) {
+          const partner = prev.find((t) => t.view.id === pid);
+          if (!partner) return prev;
+          const partnerLo = parseWorkspaceLayout(partner.view.layout);
+          const topZ = Math.max(targetLo.z, partnerLo.z);
+          if (topZ >= maxZ) return prev;
+          const nextSelf: WorkspaceLayoutJson = {
+            ...targetLo,
+            z: maxZ + 2,
+          };
+          const nextPartner: WorkspaceLayoutJson = {
+            ...partnerLo,
+            z: maxZ + 1,
+          };
+          void persistTwoLayouts([
+            { id: viewId, layout: nextSelf },
+            { id: pid, layout: nextPartner },
+          ]);
+          return prev.map((p) => {
+            if (p.view.id === viewId)
+              return { ...p, view: { ...p.view, layout: nextSelf } };
+            if (p.view.id === pid)
+              return { ...p, view: { ...p.view, layout: nextPartner } };
+            return p;
+          });
+        }
+
+        if (targetLo.z >= maxZ) return prev;
         const nextLayout: WorkspaceLayoutJson = {
-          x: base.x,
-          y: base.y,
-          w: base.w,
-          h: base.h,
+          x: targetLo.x,
+          y: targetLo.y,
+          w: targetLo.w,
+          h: targetLo.h,
           z: maxZ + 1,
+          mergedWith: targetLo.mergedWith ?? null,
         };
         void persistLayoutPatch(viewId, nextLayout);
         return prev.map((p) =>
@@ -298,7 +605,7 @@ export function CanvasWorkspace({
         );
       });
     },
-    [persistLayoutPatch],
+    [persistLayoutPatch, persistTwoLayouts],
   );
 
   useEffect(() => {
@@ -396,13 +703,33 @@ export function CanvasWorkspace({
                   position: "relative",
                 }}
               >
+                {mergePreviewBox ? (
+                  <div
+                    className={`pointer-events-none absolute rounded-lg border-4 ${
+                      mergePreviewBox.valid
+                        ? "border-[#00FF85]"
+                        : "border-destructive/80"
+                    }`}
+                    style={{
+                      left: mergePreviewBox.x,
+                      top: mergePreviewBox.y,
+                      width: mergePreviewBox.w,
+                      height: mergePreviewBox.h,
+                      zIndex: 999998,
+                    }}
+                  />
+                ) : null}
                 <TrackerLayer
                   trackers={trackers}
-                  syncedAt={syncedAt}
                   hasInventory={hasInventory}
                   initialScale={initialCamera.zoom}
-                  onCommitLayout={persistLayoutPatch}
+                  onDragPosition={onDragPosition}
+                  onDragLayoutEnd={handleLayoutDragEnd}
                   onInteract={handleInteract}
+                  draggingId={draggingId}
+                  mergeDropTargetId={mergeDropTargetId}
+                  mergeDropValid={mergeDropValid}
+                  onUnmergeAnchor={handleUnmergeAnchor}
                 />
               </div>
             </TransformComponent>

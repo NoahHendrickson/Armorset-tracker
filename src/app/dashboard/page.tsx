@@ -64,7 +64,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   ]);
 
   const inventory = cached?.items ?? [];
-  const syncedAt = cached?.syncedAt ?? null;
 
   const trackerPayloads = views.map((view) =>
     buildSerializableTrackerPayload(view, lookups, inventory),
@@ -143,7 +142,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         initialTrackers={trackerPayloads}
         initialCamera={initialCamera}
         focusTrackerId={focusTrackerId}
-        syncedAt={syncedAt}
         syncWarning={syncWarning}
         hasInventory={cached !== null}
         selectors={selectors}

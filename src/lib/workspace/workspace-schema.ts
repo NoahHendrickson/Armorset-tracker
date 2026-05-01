@@ -14,6 +14,11 @@ export const workspaceLayoutSchema = z.object({
   h: z.number().positive().max(2000),
   /** Stacking order; larger appears on top. */
   z: z.number().int().min(0).max(1_000_000),
+  /**
+   * When set, this tracker is merged with exactly one partner (`views.id`).
+   * Must be symmetric: if A.mergedWith === B then B.mergedWith === A.
+   */
+  mergedWith: z.string().uuid().nullable().optional(),
 });
 
 export type WorkspaceLayoutJson = z.infer<typeof workspaceLayoutSchema>;

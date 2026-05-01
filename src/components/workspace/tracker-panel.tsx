@@ -1,26 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Rnd } from "react-rnd";
-import { DotsSixVertical } from "@phosphor-icons/react/dist/ssr";
+import {
+  DotsSixVertical,
+  SquareSplitHorizontal,
+} from "@phosphor-icons/react/dist/ssr";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
 import { ViewActions } from "@/components/views/view-actions";
 import { ViewDiagnosticsPanel } from "@/components/views/view-diagnostics";
+import { MergedCompareGrid } from "@/components/views/merged-compare-grid";
 import { ViewGrid } from "@/components/views/view-grid";
 import type { ArmorStatName } from "@/lib/db/types";
 import type { ViewProgress } from "@/lib/views/progress";
+import { MERGE_ACCENT_BLUE, MERGE_ACCENT_GREEN } from "@/lib/views/merge-compare";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
   TRACKER_DEFAULT_HEIGHT,
   TRACKER_WIDTH,
 } from "@/lib/workspace/workspace-constants";
 import type { WorkspaceLayoutJson } from "@/lib/workspace/workspace-schema";
-import { formatRelativeTime } from "@/lib/format";
+
+export type TrackerMergeRole = "solo" | "anchor" | "mergedPartner";
 
 interface TrackerPanelProps {
   payload: SerializableTrackerPayload;
   hasInventory: boolean;
-  syncedAt: Date | string | null;
   /**
    * Live canvas zoom factor. Forwarded to `<Rnd>` so react-draggable can
    * correctly translate screen-space mouse coordinates into canvas-space
@@ -28,25 +33,13 @@ interface TrackerPanelProps {
    * mousedown when zoomed (the library divides by scale, defaulting to 1).
    */
   scale: number;
-  onCommitLayout: (viewId: string, layout: WorkspaceLayoutJson) => void;
   onInteract: (viewId: string) => void;
-}
-
-function useDebouncedLayoutCommit(
-  onCommit: (viewId: string, layout: WorkspaceLayoutJson) => void,
-  delayMs: number,
-) {
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  return useCallback(
-    (viewId: string, layout: WorkspaceLayoutJson) => {
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => {
-        timer.current = null;
-        onCommit(viewId, layout);
-      }, delayMs);
-    },
-    [onCommit, delayMs],
-  );
+  onDragPosition?: (viewId: string, x: number, y: number) => void;
+  onDragLayoutEnd: (viewId: string, layout: WorkspaceLayoutJson) => void;
+  mergeRole: TrackerMergeRole;
+  mergePartnerPayload: SerializableTrackerPayload | null;
+  mergeDropHighlight: "none" | "valid" | "invalid";
+  onUnmerge?: () => void;
 }
 
 /**
@@ -93,16 +86,23 @@ function ClassGlyph({
   );
 }
 
+
+
 export function TrackerPanel({
   payload,
   hasInventory,
-  syncedAt,
   scale,
-  onCommitLayout,
+  onDragPosition,
+  onDragLayoutEnd,
   onInteract,
+  mergeRole,
+  mergePartnerPayload,
+  mergeDropHighlight,
+  onUnmerge,
 }: TrackerPanelProps) {
   const { view } = payload;
   const [layout, setLayout] = useState<WorkspaceLayoutJson>(view.layout);
+  const merged = Boolean(view.layout.mergedWith) && mergePartnerPayload !== null;
 
   useEffect(
     () => {
@@ -117,10 +117,9 @@ export function TrackerPanel({
       view.layout.w,
       view.layout.h,
       view.layout.z,
+      view.layout.mergedWith,
     ],
   );
-
-  const debouncedPush = useDebouncedLayoutCommit(onCommitLayout, 420);
 
   const viewProgressForGrid = useMemo(
     (): ViewProgress => ({
@@ -134,23 +133,66 @@ export function TrackerPanel({
     Record<ArmorStatName, string>
   >;
 
+  const showMergedGrid =
+    mergeRole === "anchor" && merged && mergePartnerPayload;
+
+  const glyphClass =
+    Number(view.class_type) < 0
+      ? "h-[15px] w-[30px] shrink-0 text-white"
+      : Number(view.class_type) === 2
+        ? "h-3.5 w-auto shrink-0"
+        : "h-7 w-auto shrink-0";
+
+  const ariaRegionLabel =
+    showMergedGrid && mergePartnerPayload
+      ? `Merged trackers ${payload.view.name} and ${mergePartnerPayload.view.name}`
+      : `Tracker ${payload.view.name}`;
+
+  const dropRing =
+    mergeDropHighlight === "valid"
+      ? "ring-2 ring-[#00FF85] ring-offset-0"
+      : mergeDropHighlight === "invalid"
+        ? "ring-2 ring-destructive/80 ring-offset-0"
+        : "";
+
+  const isGhostPartner = mergeRole === "mergedPartner";
+
+  if (isGhostPartner) {
+    return (
+      <Rnd
+        className="rnd-tracker pointer-events-none"
+        bounds="parent"
+        scale={scale}
+        position={{ x: layout.x, y: layout.y }}
+        size={{ width: TRACKER_WIDTH, height: TRACKER_DEFAULT_HEIGHT }}
+        enableResizing={false}
+        enableDragging={false}
+        style={{ zIndex: layout.z }}
+        cancel=".no-drag"
+      >
+        <div
+          id={`tracker-${view.id}`}
+          aria-hidden
+          className="h-full w-full opacity-0"
+        />
+      </Rnd>
+    );
+  }
+
   return (
     <Rnd
       className="rnd-tracker pointer-events-auto"
       dragHandleClassName="tracker-drag"
       bounds="parent"
-      // Required when the canvas is CSS-transformed via react-zoom-pan-pinch
-      // — react-draggable divides mouse delta / origin by `scale` to map
-      // screen pixels to local CSS pixels. Without this the tracker snaps
-      // to a wrong offset on mousedown.
       scale={scale}
       position={{ x: layout.x, y: layout.y }}
-      // Width and height are both fixed — the stat grid is a known size and
-      // trackers shouldn't be resizable. Rnd is only used for drag here.
       size={{ width: TRACKER_WIDTH, height: TRACKER_DEFAULT_HEIGHT }}
       enableResizing={false}
       style={{ zIndex: layout.z }}
       onDragStart={() => onInteract(view.id)}
+      onDrag={(_e, d) => {
+        onDragPosition?.(view.id, d.x, d.y);
+      }}
       onDragStop={(_e, d) => {
         const next: WorkspaceLayoutJson = {
           ...layout,
@@ -160,18 +202,16 @@ export function TrackerPanel({
           h: TRACKER_DEFAULT_HEIGHT,
         };
         setLayout(next);
-        debouncedPush(view.id, next);
+        onDragLayoutEnd(view.id, next);
       }}
       cancel=".no-drag"
     >
       <div
         id={`tracker-${view.id}`}
         role="region"
-        aria-label={`Tracker ${payload.view.name}`}
-        className="flex h-full overflow-hidden"
+        aria-label={ariaRegionLabel}
+        className="flex h-full overflow-hidden rounded-r-lg"
       >
-        {/* Sidebar toolbar (drag handle, refresh, rename, delete) — hugs its
-            buttons rather than stretching to the tracker's full height. */}
         <aside
           aria-label="Tracker actions"
           className="flex shrink-0 flex-col items-center gap-2 self-start bg-[#424347] p-2"
@@ -190,6 +230,20 @@ export function TrackerPanel({
 
           <span aria-hidden className="h-px w-full bg-white/10" />
 
+          {showMergedGrid && onUnmerge ? (
+            <>
+              <button
+                type="button"
+                aria-label="Split merged trackers"
+                onClick={onUnmerge}
+                className="no-drag flex h-5 w-5 cursor-pointer items-center justify-center text-[#00FF85]/80 transition-colors hover:text-[#00FF85] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00FF85]/40"
+              >
+                <SquareSplitHorizontal className="h-5 w-5" weight="bold" />
+              </button>
+              <span aria-hidden className="h-px w-full bg-white/10" />
+            </>
+          ) : null}
+
           <ViewActions
             viewId={view.id}
             initialName={view.name}
@@ -197,51 +251,52 @@ export function TrackerPanel({
           />
         </aside>
 
-        {/* Main content — dark tracker surface */}
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden border border-[#424347] bg-[#2d2e32] shadow-lg">
-          <header className="flex shrink-0 items-center gap-2.5 p-4">
-            <ClassGlyph
-              classType={Number(view.class_type)}
-              className={
-                Number(view.class_type) >= 0
-                  ? "h-7 w-auto shrink-0"
-                  : "h-[15px] w-[30px] shrink-0 text-white"
-              }
-            />
-            <div className="min-w-0 flex-1">
-              <h2 className="truncate text-xl font-normal leading-7 text-white">
-                {payload.view.name}
-              </h2>
-              <p className="mt-0.5 truncate text-xs text-white/50">
-                <span className="font-mono">
-                  {payload.progress.ownedCells}/{payload.progress.totalCells}
-                </span>
-                {payload.className ? <> · {payload.className}</> : null}
-                {payload.archetypePrimarySecondary ? (
-                  <>
-                    {" "}
-                    · +{payload.archetypePrimarySecondary.primary} / +
-                    {payload.archetypePrimarySecondary.secondary}
-                  </>
-                ) : null}
-                {syncedAt ? <> · synced {formatRelativeTime(syncedAt)}</> : null}
-              </p>
-            </div>
-          </header>
+        <div
+          className={`flex min-w-0 flex-1 flex-col overflow-hidden border border-[#424347] bg-[#2d2e32] shadow-lg ${dropRing}`}
+        >
+          {showMergedGrid && mergePartnerPayload ? (
+            <header className="flex shrink-0 items-stretch gap-0 border-b border-[#424347] px-4 pb-0 pt-4">
+              <div
+                className="flex min-w-0 flex-1 flex-col gap-1 border-b-2 pr-2"
+                style={{ borderColor: MERGE_ACCENT_GREEN }}
+              >
+                <div className="flex items-center gap-2">
+                  <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
+                  <h2 className="truncate text-xl font-normal leading-7 text-white">
+                    {payload.view.name}
+                  </h2>
+                </div>
+              </div>
+              <div
+                className="flex min-w-0 flex-1 flex-col gap-1 border-b-2 pl-2"
+                style={{ borderColor: MERGE_ACCENT_BLUE }}
+              >
+                <div className="flex items-center gap-2">
+                  <ClassGlyph
+                    classType={Number(mergePartnerPayload.view.class_type)}
+                    className={glyphClass}
+                  />
+                  <h2 className="truncate text-right text-xl font-normal leading-7 text-white">
+                    {mergePartnerPayload.view.name}
+                  </h2>
+                </div>
+              </div>
+            </header>
+          ) : (
+            <header className="flex shrink-0 items-center gap-2.5 p-4">
+              <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate text-xl font-normal leading-7 text-white">
+                  {payload.view.name}
+                </h2>
+              </div>
+            </header>
+          )}
 
-          {/*
-           * Only opt into vertical scrolling when extra content (no-class
-           * alert or diagnostics panel) genuinely pushes the body past the
-           * fixed 384px tracker height. In the normal case the grid is
-           * sized to fit exactly, so `overflow-auto` would surface a
-           * spurious scrollbar from sub-pixel flex rounding even though
-           * there's nothing to scroll. As a bonus this stops the canvas
-           * wheel handler from deferring trackpad pans into the tracker
-           * body when it's not actually scrollable.
-           */}
           <div
             className={`no-drag flex min-h-0 flex-1 flex-col gap-4 border-t border-[#424347] px-4 pt-4 pb-2 ${
-              payload.needsClass || payload.showDiagnostics
+              !showMergedGrid &&
+              (payload.needsClass || payload.showDiagnostics)
                 ? "overflow-y-auto"
                 : "overflow-hidden"
             }`}
@@ -259,11 +314,19 @@ export function TrackerPanel({
               </div>
             ) : null}
 
-            <ViewGrid
-              progress={viewProgressForGrid}
-              hasInventory={hasInventory}
-              tertiaryStatIconPaths={tertiaryPaths}
-            />
+            {showMergedGrid && mergePartnerPayload ? (
+              <MergedCompareGrid
+                anchorPayload={payload}
+                partnerPayload={mergePartnerPayload}
+                hasInventory={hasInventory}
+              />
+            ) : (
+              <ViewGrid
+                progress={viewProgressForGrid}
+                hasInventory={hasInventory}
+                tertiaryStatIconPaths={tertiaryPaths}
+              />
+            )}
 
             {payload.showDiagnostics ? (
               <ViewDiagnosticsPanel
