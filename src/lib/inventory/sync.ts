@@ -3,7 +3,10 @@ import { BungieApiError, getProfile } from "@/lib/bungie/client";
 import { PROFILE_COMPONENTS } from "@/lib/bungie/constants";
 import { withBackoff, withUserRateLimit } from "@/lib/bungie/rate-limit";
 import { getServiceRoleClient } from "@/lib/db/server";
-import { getValidAccessToken } from "@/lib/auth/tokens";
+import {
+  forceRefreshAccessToken,
+  getValidAccessToken,
+} from "@/lib/auth/tokens";
 import { getManifestLookups } from "@/lib/manifest/lookups";
 import type { Session } from "@/lib/auth/session";
 import type { DerivedArmorPieceJson, InventoryCacheRow, Json } from "@/lib/db/types";
@@ -71,25 +74,55 @@ export async function syncUserInventory(
     warnings.push("Manifest has not been synced yet — run /api/admin/manifest/sync first.");
   }
 
-  let profile;
-  try {
-    profile = await withUserRateLimit(session.userId, () =>
+  const fetchProfile = (token: string) =>
+    withUserRateLimit(session.userId, () =>
       withBackoff(
         () =>
           getProfile(
             session.bungieMembershipType,
             session.bungieMembershipId,
             PROFILE_COMPONENTS,
-            accessToken,
+            token,
           ),
         { retries: 2, baseMs: 400 },
       ),
     );
+
+  let profile;
+  try {
+    profile = await fetchProfile(accessToken);
   } catch (err) {
     if (err instanceof BungieApiError && err.maintenance) {
       throw new InventoryNotReady("Bungie API is in maintenance.", 503);
     }
-    throw err;
+    // Bungie sometimes revokes a token before our cached `expires_at` says it
+    // should be expired (server restarts on their side, user re-auth elsewhere,
+    // etc.). Force-refresh once and retry before giving up.
+    if (err instanceof BungieApiError && err.status === 401) {
+      const refreshed = await forceRefreshAccessToken(session.userId);
+      if (!refreshed) {
+        throw new InventoryNotReady(
+          "Bungie session expired — please sign in again.",
+          401,
+        );
+      }
+      try {
+        profile = await fetchProfile(refreshed);
+      } catch (retryErr) {
+        if (
+          retryErr instanceof BungieApiError &&
+          retryErr.status === 401
+        ) {
+          throw new InventoryNotReady(
+            "Bungie session expired — please sign in again.",
+            401,
+          );
+        }
+        throw retryErr;
+      }
+    } else {
+      throw err;
+    }
   }
 
   const items = deriveAllArmorPieces(profile, lookups);

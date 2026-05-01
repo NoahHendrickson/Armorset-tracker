@@ -7,7 +7,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 interface Props {
-  variant?: "primary" | "secondary";
+  /**
+   * `primary`/`secondary` = text + icon button (dashboard banners).
+   * `header-icon`         = compact icon-only trigger for the top app header.
+   */
+  variant?: "primary" | "secondary" | "header-icon";
   label?: string;
 }
 
@@ -59,6 +63,27 @@ export function SyncManifestButton({
     }
   }
 
+  if (variant === "header-icon") {
+    return (
+      <button
+        type="button"
+        onClick={sync}
+        disabled={isLoading}
+        aria-label={
+          isLoading ? "Syncing Bungie manifest" : "Sync Bungie manifest"
+        }
+        title="Sync Bungie manifest"
+        className="flex h-10 w-10 items-center justify-center border border-white/10 bg-white/5 text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+      >
+        {isLoading ? (
+          <ArrowsClockwise weight="duotone" className="h-5 w-5 animate-spin" />
+        ) : (
+          <Database weight="duotone" className="h-5 w-5" />
+        )}
+      </button>
+    );
+  }
+
   return (
     <Button
       variant={variant === "primary" ? "default" : "outline"}
@@ -68,9 +93,9 @@ export function SyncManifestButton({
       aria-label="Sync Bungie manifest"
     >
       {isLoading ? (
-        <ArrowsClockwise className="animate-spin" />
+        <ArrowsClockwise weight="duotone" className="animate-spin" />
       ) : (
-        <Database />
+        <Database weight="duotone" />
       )}
       <span>{isLoading ? "Syncing…" : label}</span>
     </Button>

@@ -20,6 +20,7 @@ export type Database = {
           display_name: string;
           created_at: string;
           updated_at: string;
+          workspace_camera: Json;
         };
         Insert: {
           id?: string;
@@ -28,6 +29,7 @@ export type Database = {
           display_name: string;
           created_at?: string;
           updated_at?: string;
+          workspace_camera?: Json;
         };
         Update: {
           id?: string;
@@ -36,6 +38,7 @@ export type Database = {
           display_name?: string;
           created_at?: string;
           updated_at?: string;
+          workspace_camera?: Json;
         };
         Relationships: [];
       };
@@ -85,6 +88,7 @@ export type Database = {
           class_type: number;
           created_at: string;
           updated_at: string;
+          layout: Json;
         };
         Insert: {
           id?: string;
@@ -96,6 +100,7 @@ export type Database = {
           class_type: number;
           created_at?: string;
           updated_at?: string;
+          layout?: Json;
         };
         Update: {
           id?: string;
@@ -107,6 +112,7 @@ export type Database = {
           class_type?: number;
           created_at?: string;
           updated_at?: string;
+          layout?: Json;
         };
         Relationships: [
           {
@@ -317,6 +323,15 @@ export interface DerivedArmorPieceJson {
   archetypeName: string | null;
   tuningHash: number | null;
   tuningName: string | null;
+  /**
+   * True when `tuningHash` was read from a currently-installed plug (committed
+   * + locked at masterwork). False when it was inferred from the reusable
+   * plug set of an empty tuning socket — the piece is destined for that
+   * tuning direction at drop time but the player hasn't slotted it yet, and
+   * the choice of which stat to debuff is still open. Optional so older
+   * cached inventory rows (pre-310 fetch) parse cleanly until next sync.
+   */
+  tuningCommitted?: boolean;
   primaryStat: ArmorStatName | null;
   secondaryStat: ArmorStatName | null;
   tertiaryStat: ArmorStatName | null;

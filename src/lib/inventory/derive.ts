@@ -90,20 +90,26 @@ export function deriveArmorPiece(
 
   const sockets =
     profile.itemComponents?.sockets?.data?.[item.itemInstanceId]?.sockets ?? [];
+  const reusablePlugs =
+    profile.itemComponents?.reusablePlugs?.data?.[item.itemInstanceId]?.plugs ??
+    {};
 
   let archetypeHash: number | null = null;
   let archetypeName: string | null = null;
   let tuningHash: number | null = null;
   let tuningName: string | null = null;
+  let tuningCommitted = false;
   // Armor 3.0 pieces have 3 hidden "armor_stats" plugs whose magnitudes (+30 /
   // +25 / +20 for Tier 5) determine the primary / secondary / tertiary stat.
   const statPlugs: Array<{ stat: ArmorStatName; value: number }> = [];
 
-  // NOTE: We intentionally do NOT filter by `socket.isVisible`. The Armor 3.0
+  // First pass — read the currently installed plug per socket. We
+  // intentionally do NOT filter by `socket.isVisible`: the Armor 3.0
   // archetype plug (e.g. "Gunner") and the 3 stat plugs are `isVisible: false`
   // because they're intrinsic, not interactive. Tuning is visible. We only
   // require an enabled plug hash.
-  for (const socket of sockets) {
+  for (let i = 0; i < sockets.length; i++) {
+    const socket = sockets[i];
     if (!socket.plugHash || !socket.isEnabled) continue;
     if (archetypeHash === null && lookups.archetypeByPlug.has(socket.plugHash)) {
       archetypeHash = lookups.archetypeByPlug.get(socket.plugHash) ?? null;
@@ -119,11 +125,39 @@ export function deriveArmorPiece(
         tuningHash !== null
           ? lookups.tuningNameByHash.get(tuningHash) ?? null
           : null;
+      tuningCommitted = true;
       continue;
     }
     const stat = lookups.statPlug.get(socket.plugHash);
     if (stat) {
       statPlugs.push(stat);
+    }
+  }
+
+  // Second pass — if no tuning is currently slotted, the piece may still have
+  // a destined tuned-stat direction baked in at drop time. Bungie exposes the
+  // socket's available reusable plugs (component 310). For an Armor 3.0
+  // tuning slot those entries are 5 variants that all share the same +stat
+  // direction (and only differ by which stat they debuff), so any one
+  // reveals the piece's tuning. Pulling this means a dropped-but-uncommitted
+  // piece still gets bucketed into the correct tuning view of the tracker.
+  if (tuningHash === null) {
+    for (let i = 0; i < sockets.length; i++) {
+      const candidates = reusablePlugs[String(i)] ?? [];
+      let found: number | null = null;
+      for (const c of candidates) {
+        const t = lookups.tuningByPlug.get(c.plugItemHash);
+        if (t !== undefined) {
+          found = t;
+          break;
+        }
+      }
+      if (found !== null) {
+        tuningHash = found;
+        tuningName = lookups.tuningNameByHash.get(found) ?? null;
+        tuningCommitted = false;
+        break;
+      }
     }
   }
 
@@ -143,6 +177,7 @@ export function deriveArmorPiece(
     archetypeName,
     tuningHash,
     tuningName,
+    tuningCommitted,
     primaryStat,
     secondaryStat,
     tertiaryStat,

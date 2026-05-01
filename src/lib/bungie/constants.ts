@@ -9,7 +9,19 @@ export function bungieIconUrl(iconPath: string): string {
   return `${BUNGIE_WWW_ORIGIN}${iconPath.startsWith("/") ? iconPath : `/${iconPath}`}`;
 }
 
-export const PROFILE_COMPONENTS = [100, 102, 200, 201, 205, 300, 305] as const;
+// Bungie profile components requested per inventory sync:
+//   100 Profiles · 102 ProfileInventories (vault) · 200 Characters
+//   201 CharacterInventories · 205 CharacterEquipment
+//   300 ItemInstances · 305 ItemSockets (currently-installed plug per socket)
+//   310 ItemReusablePlugs — lists *available* plugs per socket. Used to
+//        recover the tuned-stat direction for armor pieces whose tuning slot
+//        is dropped-but-uncommitted: the slot's reusable plugs all share the
+//        same +stat direction and only differ by which stat they debuff, so
+//        any one entry reveals the destined tuning even though no plug is
+//        currently installed.
+export const PROFILE_COMPONENTS = [
+  100, 102, 200, 201, 205, 300, 305, 310,
+] as const;
 
 /** `inventory.tierType` from manifest — Destiny.TierType.Exotic. */
 export const DESTINY_TIER_EXOTIC = 6;

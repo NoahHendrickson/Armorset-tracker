@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
 import { listViewsForUser } from "@/lib/views/queries";
+import { workspaceLayoutSchema } from "@/lib/workspace/workspace-schema";
 
 const createSchema = z.object({
   name: z.string().min(1).max(80),
@@ -11,6 +12,7 @@ const createSchema = z.object({
   tuning_hash: z.coerce.number().int(),
   // Bungie's classType convention: 0 Titan, 1 Hunter, 2 Warlock.
   class_type: z.coerce.number().int().min(0).max(2),
+  layout: workspaceLayoutSchema.optional(),
 });
 
 export async function GET() {
@@ -47,15 +49,19 @@ export async function POST(req: NextRequest) {
   }
 
   const sb = getServiceRoleClient();
+  const { layout: layoutPayload, ...createFields } = parsed.data;
   const { data, error } = await sb
     .from("views")
     .insert({
       user_id: session.userId,
-      name: parsed.data.name.trim(),
-      set_hash: parsed.data.set_hash,
-      archetype_hash: parsed.data.archetype_hash,
-      tuning_hash: parsed.data.tuning_hash,
-      class_type: parsed.data.class_type,
+      name: createFields.name.trim(),
+      set_hash: createFields.set_hash,
+      archetype_hash: createFields.archetype_hash,
+      tuning_hash: createFields.tuning_hash,
+      class_type: createFields.class_type,
+      ...(layoutPayload !== undefined
+        ? { layout: layoutPayload }
+        : {}),
     })
     .select("*")
     .single();

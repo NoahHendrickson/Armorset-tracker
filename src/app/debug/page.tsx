@@ -139,7 +139,7 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
   return (
     <>
       <AppHeader displayName={session.displayName} />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 sm:px-6 py-8">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-8 pt-[88px] sm:px-6">
         <h1 className="text-2xl font-semibold tracking-tight">Debug</h1>
 
         <h2 className="mt-6 text-lg font-semibold">Manifest table counts</h2>

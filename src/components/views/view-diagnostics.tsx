@@ -1,4 +1,5 @@
 import { Info, Warning, XCircle } from "@phosphor-icons/react/dist/ssr";
+import { inferDiagnosticsBanner } from "@/lib/views/infer-diagnostics-banner";
 import type { ViewDiagnostics } from "@/lib/views/progress";
 
 interface Props {
@@ -17,7 +18,7 @@ export function ViewDiagnosticsPanel({
   className,
 }: Props) {
   const d = diagnostics;
-  const reason = inferReason(d, className);
+  const reason = inferDiagnosticsBanner(d, className);
 
   return (
     <div
@@ -26,11 +27,11 @@ export function ViewDiagnosticsPanel({
     >
       <div className="flex items-start gap-3">
         {reason.severity === "info" ? (
-          <Info weight="fill" className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+          <Info weight="duotone" className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
         ) : reason.severity === "warning" ? (
-          <Warning weight="fill" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+          <Warning weight="duotone" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
         ) : (
-          <XCircle weight="fill" className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+          <XCircle weight="duotone" className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
         )}
         <div className="flex-1">
           <p className="font-medium">{reason.title}</p>
@@ -47,19 +48,47 @@ export function ViewDiagnosticsPanel({
         <Row label="With archetype" value={d.withAnyArchetypeHash} />
         <Row label="With tuning" value={d.withAnyTuningHash} />
         <Row label="With tertiary stat" value={d.withAnyTertiary} />
-        <Row label={`Set: ${setName}`} value={d.matchingSet} />
-        <Row label={`Archetype: ${archetypeName}`} value={d.matchingArchetype} />
-        <Row label={`Tuning: ${tuningName}`} value={d.matchingTuning} />
-        <Row label="Set + archetype" value={d.matchingSetAndArchetype} />
-        <Row label="Set + tuning" value={d.matchingSetAndTuning} />
-        <Row label="All filters" value={d.matchingAll} />
         {className ? (
-          <Row
-            label="All filters + class"
-            value={d.matchingAllInClass}
-            highlight
-          />
-        ) : null}
+          <>
+            <Row
+              label={`${setName} on ${className}`}
+              value={d.matchingSetInClass}
+            />
+            <Row
+              label={`${archetypeName} on ${className}`}
+              value={d.matchingArchetypeInClass}
+            />
+            <Row
+              label={`${tuningName} on ${className}`}
+              value={d.matchingTuningInClass}
+            />
+            <Row
+              label={`Set + archetype on ${className}`}
+              value={d.matchingSetAndArchetypeInClass}
+            />
+            <Row
+              label={`Set + tuning on ${className}`}
+              value={d.matchingSetAndTuningInClass}
+            />
+            <Row
+              label={`All filters on ${className}`}
+              value={d.matchingAllInClass}
+              highlight
+            />
+          </>
+        ) : (
+          <>
+            <Row label={`Set: ${setName}`} value={d.matchingSet} />
+            <Row
+              label={`Archetype: ${archetypeName}`}
+              value={d.matchingArchetype}
+            />
+            <Row label={`Tuning: ${tuningName}`} value={d.matchingTuning} />
+            <Row label="Set + archetype" value={d.matchingSetAndArchetype} />
+            <Row label="Set + tuning" value={d.matchingSetAndTuning} />
+            <Row label="All filters" value={d.matchingAll} highlight />
+          </>
+        )}
       </dl>
     </div>
   );
@@ -88,88 +117,4 @@ function Row({
       </dd>
     </div>
   );
-}
-
-interface Reason {
-  severity: "info" | "warning" | "error";
-  title: string;
-  detail: string;
-}
-
-function inferReason(d: ViewDiagnostics, className: string | null): Reason {
-  if (d.totalInventory === 0) {
-    return {
-      severity: "warning",
-      title: "No inventory synced yet",
-      detail:
-        "Click Refresh above to pull your gear from Bungie. If this persists, you may need to sign out and back in.",
-    };
-  }
-  if (!d.archetypePairKnown) {
-    return {
-      severity: "error",
-      title: "Archetype stat pair not in manifest",
-      detail:
-        "We don't have a primary/secondary stat pair recorded for this archetype, so we can't compute the 4 tertiary columns. Try resyncing the manifest.",
-    };
-  }
-  if (d.withAnySetHash === 0) {
-    return {
-      severity: "error",
-      title: "Inventory loaded, but no piece is mapped to a set",
-      detail:
-        "The manifest derivation didn't match any of your pieces to a known armor set. Resync the manifest from the dashboard.",
-    };
-  }
-  if (d.withAnyArchetypeHash === 0 && d.withAnyTuningHash === 0) {
-    return {
-      severity: "error",
-      title: "No archetype/tuning detected on any piece",
-      detail:
-        "We can see your armor but socket plugs aren't being classified. Resync the manifest first; if it persists, this is a derivation bug.",
-    };
-  }
-  if (d.withAnyTertiary === 0) {
-    return {
-      severity: "error",
-      title: "No tertiary stats detected",
-      detail:
-        "Stat plugs aren't being decoded. The manifest may be missing armor_stat_plugs — try resyncing.",
-    };
-  }
-  if (d.matchingSet === 0) {
-    return {
-      severity: "info",
-      title: "You don't own any pieces from this set yet",
-      detail:
-        "Pick a different set, or grind some encounters that drop this set. The view will fill in as you collect pieces.",
-    };
-  }
-  if (className && d.classFiltered > 0 && d.matchingAll > 0 && d.matchingAllInClass === 0) {
-    return {
-      severity: "info",
-      title: `You own matching rolls — but none on your ${className}`,
-      detail: `${d.matchingAll} piece(s) match the set/archetype/tuning, but none belong to your ${className}. Switch class on the view, or chase rolls on this character.`,
-    };
-  }
-  if (d.matchingSetAndArchetype === 0 && d.matchingSetAndTuning === 0) {
-    return {
-      severity: "info",
-      title: "You own this set, but with different rolls",
-      detail: `${d.matchingSet} piece(s) of this set are in your inventory — none currently have this archetype or tuning combination.`,
-    };
-  }
-  if (d.matchingAll === 0) {
-    return {
-      severity: "info",
-      title: "Almost there — you own pieces with each filter, just not all three at once",
-      detail: `${d.matchingSetAndArchetype} piece(s) match the set + archetype, ${d.matchingSetAndTuning} match the set + tuning, but none have all three filters together yet.`,
-    };
-  }
-  return {
-    severity: "info",
-    title: "Match summary",
-    detail:
-      "Counts of how many pieces in your inventory match each filter. The grid above splits matches by tertiary stat, so missing cells just mean you don't have that specific tertiary roll yet.",
-  };
 }

@@ -64,6 +64,11 @@ export function computeViewProgress(
     if (classType >= 0 && piece.classType !== classType) continue;
     if (piece.setHash !== setHash) continue;
     if (piece.archetypeHash !== archHash) continue;
+    // Strict tuning match: every Armor 3.0 drop already has a random tuning
+    // installed at drop time, so `tuningHash === null` is anomalous (typically
+    // means our derivation didn't recognize the tuning plug — e.g. a manifest
+    // sync gap). Treat null as "no match" rather than wildcarding, so the
+    // tracker only counts pieces actually committed to this view's tuning.
     if (piece.tuningHash !== tunHash) continue;
     if (!piece.tertiaryStat) continue;
     if (!tertiaryStats.includes(piece.tertiaryStat)) continue;
@@ -102,6 +107,14 @@ export interface ViewDiagnostics {
   matchingSetAndTuning: number;
   matchingAll: number;
   matchingAllInClass: number;
+  // Same counters as above, but restricted to pieces whose classType matches
+  // the view's class. For unscoped views (`class_type < 0`) these mirror the
+  // cross-class values so callers can use them unconditionally.
+  matchingSetInClass: number;
+  matchingArchetypeInClass: number;
+  matchingTuningInClass: number;
+  matchingSetAndArchetypeInClass: number;
+  matchingSetAndTuningInClass: number;
   archetypePairKnown: boolean;
 }
 
@@ -127,6 +140,11 @@ export function computeViewDiagnostics(
   let matchingSetAndTuning = 0;
   let matchingAll = 0;
   let matchingAllInClass = 0;
+  let matchingSetInClass = 0;
+  let matchingArchetypeInClass = 0;
+  let matchingTuningInClass = 0;
+  let matchingSetAndArchetypeInClass = 0;
+  let matchingSetAndTuningInClass = 0;
 
   for (const p of inventory) {
     const inClass = classType < 0 || p.classType === classType;
@@ -138,6 +156,9 @@ export function computeViewDiagnostics(
 
     const s = p.setHash === setHash;
     const a = p.archetypeHash === archHash;
+    // Strict tuning match — see `computeViewProgress` for rationale. Pieces
+    // with `tuningHash === null` are typically derivation gaps and should not
+    // count toward the diagnostics' "matching tuning" tallies.
     const t = p.tuningHash === tunHash;
     if (s) matchingSet++;
     if (a) matchingArchetype++;
@@ -146,6 +167,14 @@ export function computeViewDiagnostics(
     if (s && t) matchingSetAndTuning++;
     if (s && a && t) matchingAll++;
     if (s && a && t && inClass) matchingAllInClass++;
+
+    if (inClass) {
+      if (s) matchingSetInClass++;
+      if (a) matchingArchetypeInClass++;
+      if (t) matchingTuningInClass++;
+      if (s && a) matchingSetAndArchetypeInClass++;
+      if (s && t) matchingSetAndTuningInClass++;
+    }
   }
 
   return {
@@ -162,6 +191,11 @@ export function computeViewDiagnostics(
     matchingSetAndTuning,
     matchingAll,
     matchingAllInClass,
+    matchingSetInClass,
+    matchingArchetypeInClass,
+    matchingTuningInClass,
+    matchingSetAndArchetypeInClass,
+    matchingSetAndTuningInClass,
     archetypePairKnown,
   };
 }

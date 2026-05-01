@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
+import type { Json } from "@/lib/db/types";
+
+import { workspaceLayoutSchema } from "@/lib/workspace/workspace-schema";
 
 const updateSchema = z.object({
   name: z.string().min(1).max(80).optional(),
@@ -9,6 +12,7 @@ const updateSchema = z.object({
   archetype_hash: z.coerce.number().int().optional(),
   tuning_hash: z.coerce.number().int().optional(),
   class_type: z.coerce.number().int().min(0).max(2).optional(),
+  layout: workspaceLayoutSchema.optional(),
 });
 
 interface Params {
@@ -38,10 +42,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const sb = getServiceRoleClient();
+  const { layout: layoutPatch, ...rest } = parsed.data;
   const { data, error } = await sb
     .from("views")
     .update({
-      ...parsed.data,
+      ...rest,
+      ...(layoutPatch !== undefined
+        ? { layout: layoutPatch as Json }
+        : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", session.userId)

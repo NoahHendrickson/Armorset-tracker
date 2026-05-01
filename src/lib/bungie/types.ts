@@ -52,6 +52,15 @@ export interface ItemSocketState {
   enableFailIndexes?: number[];
 }
 
+/** One entry in `ItemReusablePlugsComponent` — a plug that *can* be slotted. */
+export interface ItemReusablePlug {
+  plugItemHash: number;
+  canInsert: boolean;
+  enabled: boolean;
+  insertFailIndices?: number[];
+  enableFailIndices?: number[];
+}
+
 export interface ProfileResponse {
   profile?: {
     data: {
@@ -71,6 +80,16 @@ export interface ProfileResponse {
   itemComponents?: {
     instances?: { data: Record<string, unknown> };
     sockets?: { data: Record<string, { sockets: ItemSocketState[] }> };
+    /**
+     * Component 310 — per-instance map of socketIndex → list of plugs that
+     * could be slotted into that socket. For an uncommitted Armor 3.0 tuning
+     * socket the 5 entries here all share the same tuned-stat direction;
+     * reading any one gives us the piece's destined tuning even though
+     * `sockets[i].plugHash` is empty.
+     */
+    reusablePlugs?: {
+      data: Record<string, { plugs: Record<string, ItemReusablePlug[]> }>;
+    };
     stats?: { data: Record<string, { stats: Record<string, { statHash: number; value: number }> }> };
   };
 }

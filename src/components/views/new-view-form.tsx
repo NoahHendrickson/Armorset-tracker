@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FloppyDisk } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { WorkspaceLayoutJson } from "@/lib/workspace/workspace-schema";
 import {
   Select,
   SelectContent,
@@ -27,6 +28,12 @@ interface NewViewFormProps {
   setsByClass: { 0: OptionItem[]; 1: OptionItem[]; 2: OptionItem[] };
   archetypes: OptionItem[];
   tunings: OptionItem[];
+  /** Dialog / canvas mode — no navigation after save. */
+  embedded?: boolean;
+  /** Persisted tracker frame on creation (canvas placement). */
+  initialLayout?: WorkspaceLayoutJson;
+  onCreated?: (viewId: string) => void;
+  onCancel?: () => void;
 }
 
 const CLASS_OPTIONS: Array<{ value: ClassValue; label: string }> = [
@@ -35,7 +42,15 @@ const CLASS_OPTIONS: Array<{ value: ClassValue; label: string }> = [
   { value: "2", label: "Warlock" },
 ];
 
-export function NewViewForm({ setsByClass, archetypes, tunings }: NewViewFormProps) {
+export function NewViewForm({
+  setsByClass,
+  archetypes,
+  tunings,
+  embedded,
+  initialLayout,
+  onCreated,
+  onCancel,
+}: NewViewFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [submitting, setSubmitting] = useState(false);
@@ -59,14 +74,6 @@ export function NewViewForm({ setsByClass, archetypes, tunings }: NewViewFormPro
     () => [...tunings].sort((a, b) => a.name.localeCompare(b.name)),
     [tunings],
   );
-
-  // If class changes and the currently-selected set isn't in the new class, clear it.
-  useEffect(() => {
-    if (!setHash) return;
-    if (!sortedSets.some((s) => String(s.hash) === setHash)) {
-      setSetHash("");
-    }
-  }, [sortedSets, setHash]);
 
   const setLabel =
     sortedSets.find((s) => String(s.hash) === setHash)?.name ?? "";
@@ -104,6 +111,7 @@ export function NewViewForm({ setsByClass, archetypes, tunings }: NewViewFormPro
           archetype_hash: Number(archetypeHash),
           tuning_hash: Number(tuningHash),
           class_type: Number(classType),
+          ...(initialLayout !== undefined ? { layout: initialLayout } : {}),
         }),
       });
       const body = (await res.json()) as {
@@ -114,8 +122,12 @@ export function NewViewForm({ setsByClass, archetypes, tunings }: NewViewFormPro
         toast.error(body.error ?? "Could not create view");
         return;
       }
-      toast.success("View created");
-      startTransition(() => router.push(`/views/${body.view!.id}`));
+      toast.success(embedded ? "Tracker created" : "View created");
+      if (onCreated) {
+        startTransition(() => onCreated(body.view!.id));
+      } else if (!embedded) {
+        startTransition(() => router.push(`/views/${body.view!.id}`));
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create view");
     } finally {
@@ -129,7 +141,16 @@ export function NewViewForm({ setsByClass, archetypes, tunings }: NewViewFormPro
         <Label htmlFor="class">Class</Label>
         <Select
           value={classType}
-          onValueChange={(v) => setClassType(v as ClassValue)}
+          onValueChange={(v) => {
+            const nv = v as ClassValue;
+            const nextSorted = setsByClass[nv];
+            setClassType(nv);
+            setSetHash((prev) =>
+              prev && nextSorted.some((s) => String(s.hash) === prev)
+                ? prev
+                : "",
+            );
+          }}
         >
           <SelectTrigger id="class" aria-label="Class">
             <SelectValue placeholder="Select a class" />
@@ -233,7 +254,7 @@ export function NewViewForm({ setsByClass, archetypes, tunings }: NewViewFormPro
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="name">View name</Label>
+        <Label htmlFor="name">{embedded ? "Tracker name" : "View name"}</Label>
         <Input
           id="name"
           value={name}
@@ -249,15 +270,26 @@ export function NewViewForm({ setsByClass, archetypes, tunings }: NewViewFormPro
       </div>
 
       <div className="flex items-center justify-between gap-3 pt-2">
-        <Button asChild variant="ghost" type="button">
-          <Link href="/dashboard">
-            <ArrowLeft />
+        {embedded && onCancel ? (
+          <Button variant="ghost" type="button" onClick={() => onCancel()}>
+            <ArrowLeft weight="duotone" />
             Cancel
-          </Link>
-        </Button>
+          </Button>
+        ) : (
+          <Button asChild variant="ghost" type="button">
+            <Link href="/dashboard">
+              <ArrowLeft weight="duotone" />
+              Cancel
+            </Link>
+          </Button>
+        )}
         <Button type="submit" disabled={!canSubmit || isPending}>
-          <FloppyDisk />
-          {submitting || isPending ? "Saving..." : "Create view"}
+          <FloppyDisk weight="duotone" />
+          {submitting || isPending
+            ? "Saving..."
+            : embedded
+              ? "Create tracker"
+              : "Create view"}
         </Button>
       </div>
     </form>

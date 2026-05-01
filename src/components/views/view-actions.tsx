@@ -2,16 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { DotsThreeVertical, Pencil, Trash } from "@phosphor-icons/react/dist/ssr";
+import { PencilSimple, Trash } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -26,9 +19,23 @@ import { Label } from "@/components/ui/label";
 interface ViewActionsProps {
   viewId: string;
   initialName: string;
+  /**
+   * Tracker surface variant — icons lay out vertically on the sidebar with a
+   * dark hover state. Default = inline (legacy dropdown-style rendering).
+   */
+  layout?: "inline" | "sidebar";
 }
 
-export function ViewActions({ viewId, initialName }: ViewActionsProps) {
+/**
+ * Exposes rename + delete affordances for a view. The `sidebar` layout matches
+ * the Figma tracker toolbar (two icon buttons stacked under the drag handle +
+ * refresh); `inline` is the dashboard row layout.
+ */
+export function ViewActions({
+  viewId,
+  initialName,
+  layout = "inline",
+}: ViewActionsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [renameOpen, setRenameOpen] = useState(false);
@@ -72,7 +79,7 @@ export function ViewActions({ viewId, initialName }: ViewActionsProps) {
       }
       toast.success("View deleted");
       setDeleteOpen(false);
-      startTransition(() => router.push("/dashboard"));
+      startTransition(() => router.refresh());
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Delete failed");
     } finally {
@@ -80,39 +87,56 @@ export function ViewActions({ viewId, initialName }: ViewActionsProps) {
     }
   }
 
+  const openRename = () => {
+    setName(initialName);
+    setRenameOpen(true);
+  };
+
+  const triggers =
+    layout === "sidebar" ? (
+      <div className="flex flex-col items-center gap-3">
+        <button
+          type="button"
+          aria-label="Rename tracker"
+          onClick={openRename}
+          className="flex h-5 w-5 items-center justify-center text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        >
+          <PencilSimple weight="duotone" className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          aria-label="Delete tracker"
+          onClick={() => setDeleteOpen(true)}
+          className="flex h-5 w-5 items-center justify-center text-white/70 transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        >
+          <Trash weight="duotone" className="h-5 w-5" />
+        </button>
+      </div>
+    ) : (
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Rename view"
+          onClick={openRename}
+        >
+          <PencilSimple weight="duotone" className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Delete view"
+          className="text-destructive hover:text-destructive"
+          onClick={() => setDeleteOpen(true)}
+        >
+          <Trash weight="duotone" className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="View options"
-            className="text-muted-foreground"
-          >
-            <DotsThreeVertical weight="bold" className="h-5 w-5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onClick={() => {
-              setName(initialName);
-              setRenameOpen(true);
-            }}
-          >
-            <Pencil className="h-4 w-4" />
-            Rename
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash className="h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {triggers}
 
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent>
@@ -136,7 +160,10 @@ export function ViewActions({ viewId, initialName }: ViewActionsProps) {
             <Button variant="ghost" onClick={() => setRenameOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={rename} disabled={!name.trim() || submitting || isPending}>
+            <Button
+              onClick={rename}
+              disabled={!name.trim() || submitting || isPending}
+            >
               {submitting || isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>

@@ -42,7 +42,8 @@ API.
    npx supabase link --project-ref <your-project-ref>
    npx supabase db push
    ```
-   Re-run `npx supabase db push` whenever a new migration lands (e.g. after
+   The same command is aliased as **`npm run db:push`**. Use **`npm run db:push:dry-run`** to see which migrations would run without applying them.
+   Re-run `npm run db:push` whenever a new migration lands (e.g. after
    pulling). If you'd rather paste SQL directly, the files in
    `supabase/migrations/` are plain Postgres SQL.
 3. Copy the **Project URL**, **anon key**, and **service_role key** from the

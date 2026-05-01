@@ -21,7 +21,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <div className="w-full max-w-2xl flex flex-col gap-10">
         <div className="flex flex-col gap-4">
           <span className="inline-flex items-center gap-2 self-start rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
-            <Sparkle className="h-3.5 w-3.5" weight="fill" />
+            <Sparkle className="h-3.5 w-3.5" weight="duotone" />
             Armor 3.0 set tracking
           </span>
           <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -39,7 +39,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             role="alert"
             className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
           >
-            <Warning weight="fill" className="mt-0.5 h-4 w-4 shrink-0" />
+            <Warning weight="duotone" className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               Couldn&rsquo;t complete sign-in: {auth_error}
             </span>
@@ -50,7 +50,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <Button asChild size="lg">
             <Link href="/api/auth/bungie/login">
               Sign in with Bungie
-              <ArrowRight />
+              <ArrowRight weight="duotone" />
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline">

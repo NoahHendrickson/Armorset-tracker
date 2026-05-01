@@ -97,3 +97,41 @@
     font-family: var(--font-mono), ui-monospace, monospace;
   }
 }
+
+@layer components {
+  /* Promote the canvas transform layer to its own GPU compositing layer so
+     pan/zoom frames don't re-rasterize tracker contents. */
+  .react-transform-component {
+    will-change: transform;
+    transform-origin: 0 0;
+    backface-visibility: hidden;
+  }
+
+  /* react-zoom-pan-pinch bakes in an `rgba(0,0,0,0.12)` dot pattern for its
+     `infinite` grid, which disappears on our #242525 canvas. The library
+     injects its own stylesheet at runtime (into <head>), so we need
+     !important + higher specificity (wrapper ancestor chain) to reliably win.
+     Attribute selector survives library CSS-module rebuilds. */
+  .react-transform-wrapper [class*="transform-component-module_infiniteGrid"] {
+    background-image: radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.07) 1px,
+      transparent 1px
+    ) !important;
+    background-size: 20px 20px !important;
+  }
+
+  /* Space-held pan mode: the surface shows a grab cursor and trackers drop
+     pointer events so clicks pass through to the library's pan handler. */
+  .canvas-space-pan .canvas-viewport-surface,
+  .canvas-space-pan .canvas-viewport-surface * {
+    cursor: grab !important;
+  }
+  .canvas-space-pan .canvas-viewport-surface:active,
+  .canvas-space-pan .canvas-viewport-surface:active * {
+    cursor: grabbing !important;
+  }
+  .canvas-space-pan .rnd-tracker {
+    pointer-events: none !important;
+  }
+}

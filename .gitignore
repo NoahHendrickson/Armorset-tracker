@@ -51,3 +51,6 @@ next-env.d.ts
 spike/manifest-cache
 
 certificates
+
+# Supabase CLI local cache (never commit)
+supabase/.temp/

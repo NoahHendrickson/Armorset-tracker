@@ -11,7 +11,7 @@ export default function ViewNotFound() {
       </p>
       <Button asChild>
         <Link href="/dashboard">
-          <ArrowLeft />
+          <ArrowLeft weight="duotone" />
           Back to dashboard
         </Link>
       </Button>

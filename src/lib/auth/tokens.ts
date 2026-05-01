@@ -62,6 +62,29 @@ export async function getValidAccessToken(userId: string): Promise<string | null
   return refreshed.access_token;
 }
 
+/**
+ * Force a token refresh regardless of the cached `expires_at`. Use when Bungie
+ * returns 401 despite our DB still considering the access token valid (Bungie
+ * can revoke tokens early — server restart, user re-auth elsewhere, etc.).
+ *
+ * Returns null when the refresh token is also dead, in which case the caller
+ * must surface a "please sign in again" prompt.
+ */
+export async function forceRefreshAccessToken(
+  userId: string,
+): Promise<string | null> {
+  const tokens = await loadTokens(userId);
+  if (!tokens) return null;
+  if (tokens.refreshExpiresAt.getTime() <= Date.now()) return null;
+  try {
+    const refreshed = await refreshTokens(tokens.refreshToken);
+    await persistTokens(userId, refreshed);
+    return refreshed.access_token;
+  } catch {
+    return null;
+  }
+}
+
 function bufferToHex(buf: Buffer): string {
   return `\\x${buf.toString("hex")}`;
 }
