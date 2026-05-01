@@ -19,7 +19,8 @@ import {
   WORKSPACE_CANVAS_HEIGHT,
   WORKSPACE_CANVAS_WIDTH,
 } from "@/lib/workspace/workspace-constants";
-import { canAttemptMerge, mergeOverlapRatio, unionBounds } from "@/lib/views/canvas-merge";
+import { canAttemptMerge, MERGE_OVERLAP_TRIGGER_RATIO, mergeOverlapRatio } from "@/lib/views/canvas-merge";
+import { mergePreviewUnionPathD } from "@/lib/views/merge-preview-outline";
 import { computeWorkspaceMinScale } from "@/lib/workspace/workspace-min-scale";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
@@ -390,7 +391,7 @@ export function CanvasWorkspace({
         t.view.layout.x,
         t.view.layout.y,
       );
-      if (ratio < 0.2) continue;
+      if (ratio < MERGE_OVERLAP_TRIGGER_RATIO) continue;
       if (!best || ratio > best.ratio) best = { id: t.view.id, ratio };
     }
     const targetId = best?.id ?? null;
@@ -528,26 +529,21 @@ export function CanvasWorkspace({
     [persistTwoLayouts],
   );
 
-  const mergePreviewBox = useMemo(() => {
+  const mergePreviewPath = useMemo(() => {
     if (!draggingId || !dragLive || !mergeDropTargetId) return null;
     const tgt = trackers.find((t) => t.view.id === mergeDropTargetId);
     if (!tgt) return null;
-    const u = unionBounds([
-      {
-        x: dragLive.x,
-        y: dragLive.y,
-        w: TRACKER_WIDTH,
-        h: TRACKER_DEFAULT_HEIGHT,
-      },
-      {
-        x: tgt.view.layout.x,
-        y: tgt.view.layout.y,
-        w: TRACKER_WIDTH,
-        h: TRACKER_DEFAULT_HEIGHT,
-      },
-    ]);
-    if (!u) return null;
-    return { ...u, valid: mergeDropValid };
+    const d = mergePreviewUnionPathD(
+      dragLive.x,
+      dragLive.y,
+      tgt.view.layout.x,
+      tgt.view.layout.y,
+      TRACKER_WIDTH,
+      TRACKER_DEFAULT_HEIGHT,
+      14,
+    );
+    if (!d) return null;
+    return { d, valid: mergeDropValid };
   }, [dragLive, draggingId, mergeDropTargetId, mergeDropValid, trackers]);
 
   const handleInteract = useCallback(
@@ -703,21 +699,25 @@ export function CanvasWorkspace({
                   position: "relative",
                 }}
               >
-                {mergePreviewBox ? (
-                  <div
-                    className={`pointer-events-none absolute rounded-lg border-4 ${
-                      mergePreviewBox.valid
-                        ? "border-[#00FF85]"
-                        : "border-destructive/80"
-                    }`}
-                    style={{
-                      left: mergePreviewBox.x,
-                      top: mergePreviewBox.y,
-                      width: mergePreviewBox.w,
-                      height: mergePreviewBox.h,
-                      zIndex: 999998,
-                    }}
-                  />
+                {mergePreviewPath ? (
+                  <svg
+                    className="pointer-events-none absolute left-0 top-0 overflow-visible"
+                    width={WORKSPACE_CANVAS_WIDTH}
+                    height={WORKSPACE_CANVAS_HEIGHT}
+                    style={{ zIndex: 999998 }}
+                    aria-hidden
+                  >
+                    <path
+                      d={mergePreviewPath.d}
+                      fill="none"
+                      stroke={
+                        mergePreviewPath.valid ? "#00FF85" : "rgb(248 113 113)"
+                      }
+                      strokeWidth={4}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 ) : null}
                 <TrackerLayer
                   trackers={trackers}

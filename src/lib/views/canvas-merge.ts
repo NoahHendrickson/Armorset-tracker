@@ -4,8 +4,12 @@ import {
   TRACKER_WIDTH,
 } from "@/lib/workspace/workspace-constants";
 
+/** Min overlap (fraction of dragged tracker area) to show merge preview and allow merge-on-drop. */
+export const MERGE_OVERLAP_TRIGGER_RATIO = 0.05;
+
 /**
- * Intersection / dragged rect area — values above ~0.2 feel like intentional overlap.
+ * Intersection area divided by dragged rect area (w×h). Compare to
+ * {@link MERGE_OVERLAP_TRIGGER_RATIO} for merge affordances.
  */
 export function mergeOverlapRatio(
   ax: number,
@@ -20,23 +24,6 @@ export function mergeOverlapRatio(
   const inter = ix * iy;
   if (inter <= 0) return 0;
   return inter / (w * h);
-}
-
-export function unionBounds(
-  rects: { x: number; y: number; w: number; h: number }[],
-): { x: number; y: number; w: number; h: number } | null {
-  if (rects.length === 0) return null;
-  let minX = rects[0].x;
-  let minY = rects[0].y;
-  let maxR = rects[0].x + rects[0].w;
-  let maxB = rects[0].y + rects[0].h;
-  for (const r of rects) {
-    minX = Math.min(minX, r.x);
-    minY = Math.min(minY, r.y);
-    maxR = Math.max(maxR, r.x + r.w);
-    maxB = Math.max(maxB, r.y + r.h);
-  }
-  return { x: minX, y: minY, w: maxR - minX, h: maxB - minY };
 }
 
 export function canAttemptMerge(
