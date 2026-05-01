@@ -1,13 +1,14 @@
 import "server-only";
 import {
   ARMOR_BUCKET_TO_SLOT,
-  SOCKET_CATEGORY_KEYWORDS,
+  DESTINY_TIER_EXOTIC,
   type ArmorSlot,
 } from "@/lib/bungie/constants";
 import { ARMOR_STAT_NAMES, type ArmorStatName } from "@/lib/db/types";
 import type {
   DerivedManifestData,
   ManifestCollectibleDefinition,
+  ManifestEquipableItemSetDefinition,
   ManifestInventoryItemDefinition,
   ManifestSocketCategoryDefinition,
   ManifestSocketTypeDefinition,
@@ -21,6 +22,7 @@ export interface DeriveInputs {
   socketTypes: Record<string, ManifestSocketTypeDefinition>;
   collectibles: Record<string, ManifestCollectibleDefinition>;
   stats: Record<string, ManifestStatDefinition>;
+  equipableItemSets: Record<string, ManifestEquipableItemSetDefinition>;
 }
 
 const SLOT_SUFFIX_PATTERNS: Array<{ slot: ArmorSlot; patterns: RegExp[] }> = [
@@ -51,26 +53,62 @@ const SLOT_SUFFIX_PATTERNS: Array<{ slot: ArmorSlot; patterns: RegExp[] }> = [
   },
 ];
 
-function nameMatchesAny(name: string | undefined, keywords: readonly string[]): boolean {
-  if (!name) return false;
-  const lower = name.toLowerCase();
-  return keywords.some((kw) => lower.includes(kw));
-}
-
+/**
+ * Armor 3.0 categories on items are keyed by `socketCategoryHash`. Bungie
+ * often labels those rows "ARMOR PERKS" / "ARMOR MODS" — not "Archetype" /
+ * "Tuning" — so we derive hashes from `DestinySocketTypeDefinition` plug
+ * whitelist identifiers instead of category display names.
+ */
 export function findCategoryHashes(
-  socketCategories: Record<string, ManifestSocketCategoryDefinition>,
+  socketTypes: Record<string, ManifestSocketTypeDefinition>,
 ): { archetype: Set<number>; tuning: Set<number> } {
   const archetype = new Set<number>();
   const tuning = new Set<number>();
-  for (const def of Object.values(socketCategories)) {
-    if (nameMatchesAny(def.displayProperties?.name, SOCKET_CATEGORY_KEYWORDS.archetype)) {
-      archetype.add(def.hash);
-    }
-    if (nameMatchesAny(def.displayProperties?.name, SOCKET_CATEGORY_KEYWORDS.tuning)) {
-      tuning.add(def.hash);
+  for (const def of Object.values(socketTypes)) {
+    const whitelist = def.plugWhitelist;
+    if (!whitelist?.length) continue;
+    for (const w of whitelist) {
+      const id = w.categoryIdentifier?.toLowerCase() ?? "";
+      if (id.includes("armor_archetypes") || id.includes("archetype")) {
+        archetype.add(def.socketCategoryHash);
+      }
+      if (
+        id.includes("tuning") ||
+        id.includes("tertiary") ||
+        id.includes("armor_tiering.plugs.tuning")
+      ) {
+        tuning.add(def.socketCategoryHash);
+      }
     }
   }
   return { archetype, tuning };
+}
+
+function equipableSetHasBonusPerks(
+  setHash: number,
+  sets: Record<string, ManifestEquipableItemSetDefinition>,
+): boolean {
+  const def = sets[String(setHash)];
+  if (!def || def.redacted) return false;
+  return Array.isArray(def.setPerks) && def.setPerks.length > 0;
+}
+
+/** Armor 3.0: both archetype and tuning / tertiary socket categories on the item. */
+function itemHasArmor30SocketCategories(
+  item: ManifestInventoryItemDefinition,
+  archetypeCategoryHashes: Set<number>,
+  tuningCategoryHashes: Set<number>,
+): boolean {
+  const categories = item.sockets?.socketCategories;
+  if (!categories?.length) return false;
+  let hasArchetype = false;
+  let hasTuning = false;
+  for (const cat of categories) {
+    const h = cat.socketCategoryHash;
+    if (archetypeCategoryHashes.has(h)) hasArchetype = true;
+    if (tuningCategoryHashes.has(h)) hasTuning = true;
+  }
+  return hasArchetype && hasTuning;
 }
 
 function categorizePlug(plug: ManifestInventoryItemDefinition): "archetype" | "tuning" | "stat" | null {
@@ -102,6 +140,46 @@ function buildStatNameByHash(
     }
   }
   return out;
+}
+
+function pickStatIconPath(dp: ManifestStatDefinition["displayProperties"]): string {
+  if (!dp) return "";
+  const a = dp.icon?.trim();
+  if (a) return a;
+  const b = dp.highResIcon?.trim();
+  if (b) return b;
+  return "";
+}
+
+function buildArmorStatIcons(
+  stats: Record<string, ManifestStatDefinition>,
+  statNameByHash: Map<number, ArmorStatName>,
+): Array<{ stat: ArmorStatName; icon_path: string }> {
+  const byStat = new Map<ArmorStatName, string>();
+
+  for (const def of Object.values(stats)) {
+    if (def.redacted) continue;
+    const statName = statNameByHash.get(def.hash);
+    if (!statName) continue;
+    const path = pickStatIconPath(def.displayProperties);
+    if (path && !byStat.has(statName)) byStat.set(statName, path);
+  }
+
+  for (const statName of ARMOR_STAT_NAMES) {
+    if (byStat.has(statName)) continue;
+    const def = Object.values(stats).find((d) => {
+      if (d.redacted) return false;
+      const n = d.displayProperties?.name?.trim();
+      return n === statName && Boolean(pickStatIconPath(d.displayProperties));
+    });
+    const path = pickStatIconPath(def?.displayProperties);
+    if (path) byStat.set(statName, path);
+  }
+
+  return ARMOR_STAT_NAMES.filter((s) => byStat.has(s)).map((stat) => ({
+    stat,
+    icon_path: byStat.get(stat)!,
+  }));
 }
 
 // Archetype plug descriptions look like:
@@ -164,12 +242,20 @@ function classifyArmorPiece(item: ManifestInventoryItemDefinition): ArmorSlot | 
 }
 
 export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
-  const { version, items, socketCategories, collectibles, stats } = inputs;
+  const {
+    version,
+    items,
+    socketTypes,
+    collectibles,
+    stats,
+    equipableItemSets,
+  } = inputs;
 
   const { archetype: archetypeCategoryHashes, tuning: tuningCategoryHashes } =
-    findCategoryHashes(socketCategories);
+    findCategoryHashes(socketTypes);
 
   const statNameByHash = buildStatNameByHash(stats);
+  const armorStatIcons = buildArmorStatIcons(stats, statNameByHash);
 
   const archetypes = new Map<number, string>();
   const archetypeStatPairs = new Map<
@@ -223,10 +309,16 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
     plugToTuning.set(item.hash, bucket.hash);
   }
 
-  // Group armor pieces by inferred set name (strip slot suffix)
-  const armorSetByName = new Map<
-    string,
-    { set_hash: number; season_id: number | null; pieces: number }
+  // Group armor by manifest equipable set hash (avoids merging unrelated rows that share a display name).
+  const armorSetByEqHash = new Map<
+    number,
+    {
+      season_id: number | null;
+      pieces: number;
+      name: string;
+      /** Every `djb2(legacyLabel)` seen for this equipable set (matches any older `views.set_hash`). */
+      legacyDjbs: Set<number>;
+    }
   >();
   const armorItems: Array<{
     item_hash: number;
@@ -239,34 +331,60 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
     if (item.redacted || item.blacklisted) continue;
     const slot = classifyArmorPiece(item);
     if (!slot) continue;
+    // Legendary (etc.) armor sets only — exotics are one-offs and clutter the set picker.
+    if (item.inventory?.tierType === DESTINY_TIER_EXOTIC) continue;
+    // Formal armor set bonus (2/4 pieces) from EquipableItemSets + Armor 3.0 sockets.
+    const eqSetHash = item.equippingBlock?.equipableItemSetHash;
+    if (!eqSetHash) continue;
+    if (!equipableSetHasBonusPerks(eqSetHash, equipableItemSets)) continue;
+    const eqDef = equipableItemSets[String(eqSetHash)];
+    // Do not filter by `setItems`: the list is not reliably complete for every
+    // item variant that still references this hash via `equipableItemSetHash`.
+    if (
+      !itemHasArmor30SocketCategories(
+        item,
+        archetypeCategoryHashes,
+        tuningCategoryHashes,
+      )
+    ) {
+      continue;
+    }
     const name = item.displayProperties?.name;
     if (!name) continue;
 
-    let setName = stripSlotSuffix(name, slot);
+    let fallbackSetName = stripSlotSuffix(name, slot);
     if (item.collectibleHash) {
       const collectible = collectibles[String(item.collectibleHash)];
       const collectibleName = collectible?.displayProperties?.name;
       if (collectibleName) {
-        setName = stripSlotSuffix(collectibleName, slot);
+        fallbackSetName = stripSlotSuffix(collectibleName, slot);
       }
     }
-    setName = setName.trim();
+    fallbackSetName = fallbackSetName.trim();
+    const setName =
+      eqDef?.displayProperties?.name?.trim() || fallbackSetName;
     if (!setName) continue;
 
-    let setEntry = armorSetByName.get(setName);
+    const legacyLabel = (fallbackSetName || setName).trim();
+    const fp = djb2(legacyLabel);
+
+    let setEntry = armorSetByEqHash.get(eqSetHash);
     if (!setEntry) {
       setEntry = {
-        set_hash: djb2(setName),
         season_id: item.seasonHash ?? null,
         pieces: 0,
+        name: setName,
+        legacyDjbs: new Set([fp]),
       };
-      armorSetByName.set(setName, setEntry);
+      armorSetByEqHash.set(eqSetHash, setEntry);
+    } else {
+      setEntry.legacyDjbs.add(fp);
     }
     setEntry.pieces++;
 
     armorItems.push({
       item_hash: item.hash,
-      set_hash: setEntry.set_hash,
+      set_hash: eqSetHash,
       slot,
       class_type: item.classType ?? 3,
     });
@@ -274,11 +392,27 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
 
   // Filter: only keep sets that have at least 2 pieces (drop noise)
   const keptSetHashes = new Set<number>();
-  const armorSets: Array<{ set_hash: number; name: string; season_id: number | null }> = [];
-  for (const [name, entry] of armorSetByName.entries()) {
+  const armorSets: Array<{
+    set_hash: number;
+    name: string;
+    season_id: number | null;
+    /** Smallest legacy fingerprint; indexed for one-off lookups. */
+    legacy_set_hash: number;
+    /** All legacy fingerprints for this equipable set (viewer may have any of these in `views.set_hash`). */
+    legacy_set_hashes: number[];
+  }> = [];
+  for (const [set_hash, entry] of armorSetByEqHash.entries()) {
     if (entry.pieces < 2) continue;
-    keptSetHashes.add(entry.set_hash);
-    armorSets.push({ set_hash: entry.set_hash, name, season_id: entry.season_id });
+    keptSetHashes.add(set_hash);
+    const legacyArr = [...entry.legacyDjbs].sort((a, b) => a - b);
+    const legacyMin = legacyArr[0] ?? 0;
+    armorSets.push({
+      set_hash,
+      name: entry.name,
+      season_id: entry.season_id,
+      legacy_set_hash: legacyMin,
+      legacy_set_hashes: legacyArr,
+    });
   }
 
   const filteredArmorItems = armorItems.filter((it) => keptSetHashes.has(it.set_hash));
@@ -316,5 +450,6 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
       stat,
       value,
     })),
+    armorStatIcons,
   };
 }

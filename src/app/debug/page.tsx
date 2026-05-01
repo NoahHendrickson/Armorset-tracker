@@ -29,8 +29,10 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
     plugTun,
     statPairs,
     statPlugs,
+    statIcons,
     sampleStatPairsRes,
     sampleStatPlugsRes,
+    sampleStatIconsRes,
     lookups,
   ] = await Promise.all([
     getCachedInventory(session.userId),
@@ -42,8 +44,10 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
     sb.from("plug_to_tuning").select("*", { count: "exact", head: true }),
     sb.from("archetype_stat_pairs").select("*", { count: "exact", head: true }),
     sb.from("armor_stat_plugs").select("*", { count: "exact", head: true }),
+    sb.from("armor_stat_icons").select("*", { count: "exact", head: true }),
     sb.from("archetype_stat_pairs").select("*").limit(10),
     sb.from("armor_stat_plugs").select("*").limit(20),
+    sb.from("armor_stat_icons").select("*").limit(20),
     getManifestLookups(),
   ]);
 
@@ -150,6 +154,7 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
               plug_to_tuning: plugTun.count ?? 0,
               archetype_stat_pairs: statPairs.count ?? 0,
               armor_stat_plugs: statPlugs.count ?? 0,
+              armor_stat_icons: statIcons.count ?? 0,
             },
             null,
             2,
@@ -161,6 +166,7 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
           {JSON.stringify(
             {
               setNameByHash: lookups.setNameByHash.size,
+              canonicalSetHashByLegacy: lookups.canonicalSetHashByLegacy.size,
               armorItemByHash: lookups.armorItemByHash.size,
               archetypeNameByHash: lookups.archetypeNameByHash.size,
               tuningNameByHash: lookups.tuningNameByHash.size,
@@ -168,6 +174,7 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
               tuningByPlug: lookups.tuningByPlug.size,
               archetypeStatPair: lookups.archetypeStatPair.size,
               statPlug: lookups.statPlug.size,
+              statIconByName: lookups.statIconByName.size,
             },
             null,
             2,
@@ -179,6 +186,9 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
 
         <h2 className="mt-6 text-lg font-semibold">armor_stat_plugs (sample)</h2>
         <Pre>{JSON.stringify(sampleStatPlugsRes.data ?? [], null, 2)}</Pre>
+
+        <h2 className="mt-6 text-lg font-semibold">armor_stat_icons (sample)</h2>
+        <Pre>{JSON.stringify(sampleStatIconsRes.data ?? [], null, 2)}</Pre>
 
         <h2 className="mt-6 text-lg font-semibold">Cached inventory shape</h2>
         <Pre>

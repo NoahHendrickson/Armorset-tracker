@@ -13,7 +13,7 @@ import {
   computeViewProgress,
   tertiaryStatsForArchetype,
 } from "@/lib/views/progress";
-import { getManifestLookups } from "@/lib/manifest/lookups";
+import { getManifestLookups, resolveViewSetHash } from "@/lib/manifest/lookups";
 import { checkManifestVersion } from "@/lib/manifest/version-check";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
@@ -59,6 +59,11 @@ export default async function DashboardPage() {
   const inventory = cached?.items ?? [];
   const syncedAt = cached?.syncedAt ?? null;
 
+  const manifestIssuesBanner =
+    !lookups.version ||
+    versionCheck.schemaOutdated ||
+    versionCheck.needsResync;
+
   return (
     <>
       <AppHeader displayName={displayName} />
@@ -75,8 +80,11 @@ export default async function DashboardPage() {
                 )}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               <RefreshButton />
+              {!manifestIssuesBanner ? (
+                <SyncManifestButton variant="secondary" label="Sync manifest" />
+              ) : null}
               <Button asChild>
                 <Link href="/views/new">
                   <Plus />
@@ -158,11 +166,16 @@ export default async function DashboardPage() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {views.map((view) => {
+                const resolvedSetHash = resolveViewSetHash(
+                  Number(view.set_hash),
+                  lookups,
+                );
+                const viewRow = { ...view, set_hash: resolvedSetHash };
                 const tertiaryStats = tertiaryStatsForArchetype(
                   lookups.archetypeStatPair.get(Number(view.archetype_hash)),
                 );
                 const progress = computeViewProgress(
-                  view,
+                  viewRow,
                   inventory,
                   tertiaryStats,
                 );
@@ -172,7 +185,7 @@ export default async function DashboardPage() {
                     view={view}
                     progress={progress}
                     setName={
-                      lookups.setNameByHash.get(Number(view.set_hash)) ??
+                      lookups.setNameByHash.get(resolvedSetHash) ??
                       "Unknown set"
                     }
                     archetypeName={

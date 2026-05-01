@@ -151,9 +151,27 @@ export type Database = {
         Relationships: [];
       };
       armor_sets: {
-        Row: { set_hash: number; name: string; season_id: number | null };
-        Insert: { set_hash: number; name: string; season_id?: number | null };
-        Update: { set_hash?: number; name?: string; season_id?: number | null };
+        Row: {
+          set_hash: number;
+          name: string;
+          season_id: number | null;
+          legacy_set_hash: number | null;
+          legacy_set_hashes: number[] | null;
+        };
+        Insert: {
+          set_hash: number;
+          name: string;
+          season_id?: number | null;
+          legacy_set_hash?: number | null;
+          legacy_set_hashes?: number[] | null;
+        };
+        Update: {
+          set_hash?: number;
+          name?: string;
+          season_id?: number | null;
+          legacy_set_hash?: number | null;
+          legacy_set_hashes?: number[] | null;
+        };
         Relationships: [];
       };
       armor_items: {
@@ -241,6 +259,12 @@ export type Database = {
         Update: { plug_hash?: number; stat?: ArmorStatName; value?: number };
         Relationships: [];
       };
+      armor_stat_icons: {
+        Row: { stat: ArmorStatName; icon_path: string };
+        Insert: { stat: ArmorStatName; icon_path: string };
+        Update: { stat?: ArmorStatName; icon_path?: string };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
@@ -268,6 +292,7 @@ export type ArchetypeRow = Tables<"archetypes">;
 export type TuningRow = Tables<"tunings">;
 export type ArchetypeStatPairRow = Tables<"archetype_stat_pairs">;
 export type ArmorStatPlugRow = Tables<"armor_stat_plugs">;
+export type ArmorStatIconRow = Tables<"armor_stat_icons">;
 
 // The 6 Armor 3.0 stats. Stored as strings everywhere because they're a
 // closed set and play nicely with JSON-encoded inventory items + UI.

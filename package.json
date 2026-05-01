@@ -7,7 +7,8 @@
     "dev:http": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "export:stat-icons": "node scripts/export-armor-stat-icons.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

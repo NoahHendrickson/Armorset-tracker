@@ -3,6 +3,8 @@ export interface DisplayProperties {
   description?: string;
   icon?: string;
   hasIcon?: boolean;
+  /** Some stats (e.g. armor 3.0) ship the usable art here when `icon` is empty. */
+  highResIcon?: string;
 }
 
 export interface ManifestInventoryItemDefinition {
@@ -36,10 +38,25 @@ export interface ManifestInventoryItemDefinition {
     value: number;
     isConditionallyActive?: boolean;
   }>;
+  /** When set, item participates in `DestinyEquipableItemSetDefinition` (2/4-piece style bonuses). */
+  equippingBlock?: {
+    equipableItemSetHash?: number;
+  };
+}
+
+/** Manifest `DestinyEquipableItemSetDefinition` — set perks at 2 / 4 pieces equipped, etc. */
+export interface ManifestEquipableItemSetDefinition {
+  hash: number;
+  redacted?: boolean;
+  displayProperties?: DisplayProperties;
+  /** Item definition hashes that belong to this set (when omitted or empty, accept any item with matching `equipableItemSetHash`). */
+  setItems?: number[];
+  setPerks?: unknown[];
 }
 
 export interface ManifestStatDefinition {
   hash: number;
+  redacted?: boolean;
   displayProperties?: DisplayProperties;
 }
 
@@ -76,7 +93,13 @@ export interface DerivedManifestData {
   version: string;
   archetypeCategoryHashes: number[];
   tuningCategoryHashes: number[];
-  armorSets: Array<{ set_hash: number; name: string; season_id: number | null }>;
+  armorSets: Array<{
+    set_hash: number;
+    name: string;
+    season_id: number | null;
+    legacy_set_hash: number;
+    legacy_set_hashes: number[];
+  }>;
   armorItems: Array<{
     item_hash: number;
     set_hash: number;
@@ -96,5 +119,10 @@ export interface DerivedManifestData {
     plug_hash: number;
     stat: ArmorStatName;
     value: number;
+  }>;
+  /** One icon path per armor stat (DestinyStatDefinition.displayProperties.icon). */
+  armorStatIcons: Array<{
+    stat: ArmorStatName;
+    icon_path: string;
   }>;
 }

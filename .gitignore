@@ -43,6 +43,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# one-off exports (e.g. npm run export:stat-icons)
+/exports/
+
 # spike artifacts
 .tokens.json
 spike/manifest-cache

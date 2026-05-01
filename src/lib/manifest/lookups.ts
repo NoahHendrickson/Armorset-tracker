@@ -9,6 +9,8 @@ export interface ManifestLookups {
   archetypeNameByHash: Map<number, string>;
   tuningNameByHash: Map<number, string>;
   setNameByHash: Map<number, string>;
+  /** Legacy `djb2` name fingerprint → current `equipableItemSetHash` (armor_sets.set_hash). */
+  canonicalSetHashByLegacy: Map<number, number>;
   archetypeByPlug: Map<number, number>;
   tuningByPlug: Map<number, number>;
   armorItemByHash: Map<number, { setHash: number; slot: ArmorSlot; classType: number }>;
@@ -17,6 +19,8 @@ export interface ManifestLookups {
     { primary: ArmorStatName; secondary: ArmorStatName }
   >;
   statPlug: Map<number, { stat: ArmorStatName; value: number }>;
+  /** Relative icon paths from DestinyStatDefinition (prefix with bungie.net). */
+  statIconByName: Map<ArmorStatName, string>;
 }
 
 let cached: { at: number; data: ManifestLookups } | null = null;
@@ -46,11 +50,21 @@ async function paginatedSelect<T>(
 }
 
 export async function getManifestLookups(force = false): Promise<ManifestLookups> {
-  if (!force && cached && Date.now() - cached.at < TTL_MS) {
-    return cached.data;
-  }
-
   const sb = getServiceRoleClient();
+  const now = Date.now();
+  const cacheFresh = Boolean(cached && now - cached.at < TTL_MS);
+
+  if (!force && cacheFresh && cached) {
+    if (cached.data.statIconByName.size > 0) {
+      return cached.data;
+    }
+    const { count: iconRows } = await sb
+      .from("armor_stat_icons")
+      .select("*", { count: "exact", head: true });
+    if ((iconRows ?? 0) === 0) {
+      return cached.data;
+    }
+  }
 
   const [
     versionRes,
@@ -62,14 +76,22 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
     plugToTuning,
     archetypeStatPairs,
     armorStatPlugs,
+    armorStatIcons,
   ] = await Promise.all([
     sb
       .from("manifest_versions")
       .select("version")
       .eq("is_active", true)
       .maybeSingle(),
-    paginatedSelect<{ set_hash: number | string; name: string }>(
-      () => sb.from("armor_sets").select("set_hash, name"),
+    paginatedSelect<{
+      set_hash: number | string;
+      name: string;
+      legacy_set_hash?: number | string | null;
+      legacy_set_hashes?: number[] | string[] | null;
+    }>(() =>
+      sb
+        .from("armor_sets")
+        .select("set_hash, name, legacy_set_hash, legacy_set_hashes"),
     ),
     paginatedSelect<{ item_hash: number | string; set_hash: number | string; slot: string; class_type: number }>(
       () => sb.from("armor_items").select("item_hash, set_hash, slot, class_type"),
@@ -98,11 +120,36 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
     paginatedSelect<{ plug_hash: number | string; stat: ArmorStatName; value: number }>(
       () => sb.from("armor_stat_plugs").select("plug_hash, stat, value"),
     ),
+    paginatedSelect<{ stat: ArmorStatName; icon_path: string }>(() =>
+      sb.from("armor_stat_icons").select("stat, icon_path"),
+    ),
   ]);
+
+  const canonicalSetHashByLegacy = new Map<number, number>();
+  for (const r of armorSets) {
+    const canon = Number(r.set_hash);
+    const rawArr = r.legacy_set_hashes;
+    const fromArray =
+      Array.isArray(rawArr) && rawArr.length > 0
+        ? rawArr.map((h) => Number(h)).filter((n) => Number.isFinite(n))
+        : [];
+    const hashes =
+      fromArray.length > 0
+        ? fromArray
+        : r.legacy_set_hash != null && r.legacy_set_hash !== ""
+          ? [Number(r.legacy_set_hash)]
+          : [];
+    for (const L of hashes) {
+      if (!canonicalSetHashByLegacy.has(L)) {
+        canonicalSetHashByLegacy.set(L, canon);
+      }
+    }
+  }
 
   const data: ManifestLookups = {
     version: versionRes.data?.version ?? null,
     setNameByHash: new Map(armorSets.map((r) => [Number(r.set_hash), r.name])),
+    canonicalSetHashByLegacy,
     armorItemByHash: new Map(
       armorItems.map((r) => [
         Number(r.item_hash),
@@ -140,6 +187,15 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
         { stat: r.stat, value: r.value },
       ]),
     ),
+    statIconByName: new Map(
+      armorStatIcons
+        .map((r) => {
+          const stat = String(r.stat).trim() as ArmorStatName;
+          const path = String(r.icon_path ?? "").trim();
+          return path ? ([stat, path] as const) : null;
+        })
+        .filter((e): e is readonly [ArmorStatName, string] => e !== null),
+    ),
   };
 
   cached = { at: Date.now(), data };
@@ -148,4 +204,13 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
 
 export function invalidateManifestLookups() {
   cached = null;
+}
+
+/** If `storedSetHash` is a pre-canonical value, return the current equipable-set hash; otherwise return it unchanged. */
+export function resolveViewSetHash(
+  storedSetHash: number,
+  lookups: ManifestLookups,
+): number {
+  if (lookups.setNameByHash.has(storedSetHash)) return storedSetHash;
+  return lookups.canonicalSetHashByLegacy.get(storedSetHash) ?? storedSetHash;
 }

@@ -28,7 +28,7 @@ export async function checkManifestVersion(force = false): Promise<CheckResult> 
   }
 
   const sb = getServiceRoleClient();
-  const [cachedRes, statPairsRes, statPlugsRes] = await Promise.all([
+  const [cachedRes, statPairsRes, statPlugsRes, statIconsRes] = await Promise.all([
     sb
       .from("manifest_versions")
       .select("version")
@@ -36,10 +36,12 @@ export async function checkManifestVersion(force = false): Promise<CheckResult> 
       .maybeSingle(),
     sb.from("archetype_stat_pairs").select("*", { count: "exact", head: true }),
     sb.from("armor_stat_plugs").select("*", { count: "exact", head: true }),
+    sb.from("armor_stat_icons").select("*", { count: "exact", head: true }),
   ]);
   const cachedVersion = cachedRes.data?.version ?? null;
   const statPairsCount = statPairsRes.count ?? 0;
   const statPlugsCount = statPlugsRes.count ?? 0;
+  const statIconsCount = statIconsRes.count ?? 0;
 
   let liveVersion: string | null = null;
   try {
@@ -52,7 +54,8 @@ export async function checkManifestVersion(force = false): Promise<CheckResult> 
   const versionMismatch =
     liveVersion !== null && cachedVersion !== null && cachedVersion !== liveVersion;
   const schemaOutdated =
-    cachedVersion !== null && (statPairsCount === 0 || statPlugsCount === 0);
+    cachedVersion !== null &&
+    (statPairsCount === 0 || statPlugsCount === 0 || statIconsCount === 0);
 
   lastCheckAt = now;
   lastResult = {

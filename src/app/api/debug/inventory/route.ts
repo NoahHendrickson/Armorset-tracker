@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
 import { getCachedInventory } from "@/lib/inventory/sync";
 import { getViewForUser } from "@/lib/views/queries";
+import { getManifestLookups, resolveViewSetHash } from "@/lib/manifest/lookups";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 
 export async function GET(req: NextRequest) {
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
     plugTun,
     statPairs,
     statPlugs,
+    statIcons,
   ] = await Promise.all([
     getCachedInventory(session.userId),
     sb.from("armor_sets").select("*", { count: "exact", head: true }),
@@ -37,6 +39,7 @@ export async function GET(req: NextRequest) {
     sb.from("plug_to_tuning").select("*", { count: "exact", head: true }),
     sb.from("archetype_stat_pairs").select("*", { count: "exact", head: true }),
     sb.from("armor_stat_plugs").select("*", { count: "exact", head: true }),
+    sb.from("armor_stat_icons").select("*", { count: "exact", head: true }),
   ]);
 
   const items = inventory ?? [];
@@ -44,6 +47,7 @@ export async function GET(req: NextRequest) {
 
   const sampleStatPairs = await sb.from("archetype_stat_pairs").select("*").limit(10);
   const sampleStatPlugs = await sb.from("armor_stat_plugs").select("*").limit(20);
+  const sampleStatIcons = await sb.from("armor_stat_icons").select("*").limit(20);
 
   // Inventory cache structure check: were the new fields written or are pieces
   // missing them entirely? If so, the cache pre-dates the schema change.
@@ -69,7 +73,9 @@ export async function GET(req: NextRequest) {
   if (viewId) {
     const view = await getViewForUser(session.userId, viewId);
     if (view) {
-      viewMatch = matchAgainstView(items, view);
+      const lookups = await getManifestLookups();
+      const resolved = resolveViewSetHash(Number(view.set_hash), lookups);
+      viewMatch = matchAgainstView(items, { ...view, set_hash: resolved });
     }
   }
 
@@ -90,8 +96,10 @@ export async function GET(req: NextRequest) {
       plugToTuning: plugTun.count ?? 0,
       archetypeStatPairs: statPairs.count ?? 0,
       armorStatPlugs: statPlugs.count ?? 0,
+      armorStatIcons: statIcons.count ?? 0,
       sampleStatPairs: sampleStatPairs.data ?? [],
       sampleStatPlugs: sampleStatPlugs.data ?? [],
+      sampleStatIcons: sampleStatIcons.data ?? [],
     },
     viewMatch,
   });

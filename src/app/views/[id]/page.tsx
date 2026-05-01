@@ -14,8 +14,9 @@ import {
   computeViewDiagnostics,
   tertiaryStatsForArchetype,
 } from "@/lib/views/progress";
-import { getManifestLookups } from "@/lib/manifest/lookups";
+import { getManifestLookups, resolveViewSetHash } from "@/lib/manifest/lookups";
 import { CLASS_NAMES } from "@/lib/bungie/constants";
+import type { ArmorStatName } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AppHeader } from "@/components/app-header";
@@ -66,15 +67,27 @@ export default async function ViewPage({ params }: ViewPageProps) {
 
   const inventory = cached?.items ?? [];
   const syncedAt = cached?.syncedAt ?? null;
+  const resolvedSetHash = resolveViewSetHash(Number(view.set_hash), lookups);
+  const viewForMatching = { ...view, set_hash: resolvedSetHash };
   const archetypePair = lookups.archetypeStatPair.get(Number(view.archetype_hash));
   const tertiaryStats = tertiaryStatsForArchetype(archetypePair);
-  const progress = computeViewProgress(view, inventory, tertiaryStats);
-  const diagnostics = computeViewDiagnostics(view, inventory, archetypePair !== undefined);
+  const progress = computeViewProgress(viewForMatching, inventory, tertiaryStats);
+  const diagnostics = computeViewDiagnostics(
+    viewForMatching,
+    inventory,
+    archetypePair !== undefined,
+  );
   const needsClass = Number(view.class_type) < 0;
   const showDiagnostics = progress.ownedCells < progress.totalCells;
 
+  const tertiaryTitleIcons: Partial<Record<ArmorStatName, string>> = {};
+  for (const t of tertiaryStats) {
+    const path = lookups.statIconByName.get(t);
+    if (path) tertiaryTitleIcons[t] = path;
+  }
+
   const setName =
-    lookups.setNameByHash.get(Number(view.set_hash)) ?? "Unknown set";
+    lookups.setNameByHash.get(resolvedSetHash) ?? "Unknown set";
   const archetypeName =
     lookups.archetypeNameByHash.get(Number(view.archetype_hash)) ??
     "Unknown archetype";
@@ -153,7 +166,11 @@ export default async function ViewPage({ params }: ViewPageProps) {
           ) : null}
 
           <div className="rounded-xl border border-border bg-card overflow-x-auto">
-            <ViewGrid progress={progress} hasInventory={cached !== null} />
+            <ViewGrid
+              progress={progress}
+              hasInventory={cached !== null}
+              tertiaryStatIconPaths={tertiaryTitleIcons}
+            />
           </div>
 
           {showDiagnostics ? (
