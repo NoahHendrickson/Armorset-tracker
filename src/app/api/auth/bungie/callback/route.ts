@@ -10,6 +10,7 @@ import {
   bungieOAuthStateCookieOptions,
 } from "@/lib/auth/bungie-oauth-cookies";
 import { bungieOAuthRedirectUri } from "@/lib/auth/bungie-redirect-uri";
+import { requestCookieValue } from "@/lib/auth/request-cookie";
 import { persistTokens } from "@/lib/auth/tokens";
 import { profilePictureRelPathFromMembership } from "@/lib/bungie/profile-picture";
 
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
-  const expectedState = req.cookies.get(BUNGIE_OAUTH_STATE_COOKIE)?.value;
+  const expectedState = requestCookieValue(req, BUNGIE_OAUTH_STATE_COOKIE);
 
   if (error) {
     return redirectWithError(req, `Bungie returned error: ${error}`);
@@ -146,9 +147,19 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const dest = new URL("/dashboard", req.url);
-  const res = NextResponse.redirect(dest, 303);
-  clearOauthStateCookie(res);
+  // 200 + Set-Cookie, then meta refresh: some clients/CDNs mishandle Set-Cookie
+  // on 3xx redirects; cookies are reliably applied on a document response.
+  const res = new NextResponse(
+    `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/dashboard"></head><body>Signing you in…</body></html>`,
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    },
+  );
   await setSessionCookieOnResponse(res, user);
+  clearOauthStateCookie(res);
   return res;
 }
