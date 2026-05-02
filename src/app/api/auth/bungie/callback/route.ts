@@ -24,7 +24,7 @@ function clearOauthStateCookie(res: NextResponse) {
 function redirectWithError(req: NextRequest, message: string) {
   const dest = new URL("/", req.url);
   dest.searchParams.set("auth_error", message);
-  const res = NextResponse.redirect(dest);
+  const res = NextResponse.redirect(dest, 303);
   clearOauthStateCookie(res);
   return res;
 }
@@ -147,7 +147,7 @@ export async function GET(req: NextRequest) {
   }
 
   const dest = new URL("/dashboard", req.url);
-  const res = NextResponse.redirect(dest);
+  const res = NextResponse.redirect(dest, 303);
   clearOauthStateCookie(res);
   await setSessionCookieOnResponse(res, user);
   return res;

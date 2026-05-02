@@ -5,6 +5,16 @@ import { NextResponse } from "next/server";
  * CSRF mitigation when session cookies use SameSite=None (needed on some
  * clients, e.g. iOS Safari, to attach cookies to same-origin fetch POST).
  */
+function forwardedPublicOrigin(req: NextRequest): string | null {
+  const host = req.headers.get("x-forwarded-host");
+  if (!host) return null;
+  const h = host.split(",")[0].trim();
+  if (!h) return null;
+  const rawProto = req.headers.get("x-forwarded-proto") ?? "https";
+  const p = rawProto.split(",")[0].trim() || "https";
+  return `${p}://${h}`;
+}
+
 export function crossSiteOriginBlockResponse(
   req: NextRequest,
 ): NextResponse | null {
@@ -19,7 +29,7 @@ export function crossSiteOriginBlockResponse(
   }
 
   const selfOrigin = new URL(req.url).origin;
-  let allowed = new Set<string>([selfOrigin]);
+  const allowed = new Set<string>([selfOrigin]);
   const pub = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (pub) {
     try {
@@ -27,6 +37,10 @@ export function crossSiteOriginBlockResponse(
     } catch {
       /* ignore invalid env */
     }
+  }
+  const fwd = forwardedPublicOrigin(req);
+  if (fwd) {
+    allowed.add(fwd);
   }
 
   const origin = req.headers.get("origin");

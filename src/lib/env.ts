@@ -51,9 +51,30 @@ const clientSchema = z.object({
 let cachedServer: z.infer<typeof serverSchema> | null = null;
 let cachedClient: z.infer<typeof clientSchema> | null = null;
 
+const ENV_TRIM_KEYS = [
+  "BUNGIE_API_KEY",
+  "BUNGIE_CLIENT_ID",
+  "BUNGIE_CLIENT_SECRET",
+  "APP_SESSION_SECRET",
+  "APP_TOKEN_ENCRYPTION_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "NEXT_PUBLIC_APP_URL",
+] as const;
+
+function envWithTrimmedSecrets(): NodeJS.ProcessEnv {
+  const out = { ...process.env };
+  for (const key of ENV_TRIM_KEYS) {
+    const v = out[key];
+    if (typeof v === "string") out[key] = v.trim();
+  }
+  return out;
+}
+
 export function serverEnv() {
   if (cachedServer) return cachedServer;
-  const parsed = serverSchema.safeParse(process.env);
+  const parsed = serverSchema.safeParse(envWithTrimmedSecrets());
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
@@ -66,10 +87,11 @@ export function serverEnv() {
 
 export function clientEnv() {
   if (cachedClient) return cachedClient;
+  const raw = envWithTrimmedSecrets();
   const parsed = clientSchema.safeParse({
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_SUPABASE_URL: raw.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: raw.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_APP_URL: raw.NEXT_PUBLIC_APP_URL,
   });
   if (!parsed.success) {
     const issues = parsed.error.issues

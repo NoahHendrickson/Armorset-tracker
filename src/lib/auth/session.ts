@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { NextRequest, NextResponse } from "next/server";
 import { jwtVerify, SignJWT } from "jose";
 import { serverEnv } from "@/lib/env";
@@ -83,7 +83,9 @@ export async function clearSessionCookie(): Promise<void> {
 async function sessionFromJwt(token: string | undefined): Promise<Session | null> {
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secret());
+    const { payload } = await jwtVerify(token, secret(), {
+      clockTolerance: 120,
+    });
     return {
       userId: payload.sub as string,
       bungieMembershipId: payload.bmid as string,
@@ -96,14 +98,40 @@ async function sessionFromJwt(token: string | undefined): Promise<Session | null
   }
 }
 
+function extractCookieFromHeader(
+  header: string | null,
+  name: string,
+): string | undefined {
+  if (!header) return undefined;
+  for (const part of header.split(";")) {
+    const s = part.trim();
+    if (!s.startsWith(`${name}=`)) continue;
+    const v = s.slice(name.length + 1);
+    try {
+      return decodeURIComponent(v);
+    } catch {
+      return v;
+    }
+  }
+  return undefined;
+}
+
 /**
- * Prefer in Route Handlers — reads the session from the incoming request’s
- * Cookie header directly (more reliable than `cookies()` for some POST paths).
+ * Prefer in Route Handlers — merges `NextRequest` cookies, raw Cookie header
+ * (Vercel/Chrome edge cases), and `cookies()` from next/headers.
  */
 export async function getSessionFromRequest(
   request: NextRequest,
 ): Promise<Session | null> {
-  return sessionFromJwt(request.cookies.get(SESSION_COOKIE)?.value);
+  const fromNext = request.cookies.get(SESSION_COOKIE)?.value;
+  const fromHeader = extractCookieFromHeader(
+    request.headers.get("cookie"),
+    SESSION_COOKIE,
+  );
+  const store = await cookies();
+  const fromStore = store.get(SESSION_COOKIE)?.value;
+  const token = fromNext ?? fromHeader ?? fromStore;
+  return sessionFromJwt(token);
 }
 
 export async function requireSessionFromRequest(
@@ -116,7 +144,10 @@ export async function requireSessionFromRequest(
 
 export async function getSession(): Promise<Session | null> {
   const c = await cookies();
-  return sessionFromJwt(c.get(SESSION_COOKIE)?.value);
+  const fromStore = c.get(SESSION_COOKIE)?.value;
+  const h = await headers();
+  const fromHeader = extractCookieFromHeader(h.get("cookie"), SESSION_COOKIE);
+  return sessionFromJwt(fromStore ?? fromHeader);
 }
 
 export async function requireSession(): Promise<Session> {
