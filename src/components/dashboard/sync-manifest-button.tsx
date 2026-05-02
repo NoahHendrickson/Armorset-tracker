@@ -31,6 +31,7 @@ export function SyncManifestButton({
     try {
       const res = await fetch("/api/admin/manifest/sync?force=1", {
         method: "POST",
+        credentials: "include",
       });
       const body = (await res.json()) as {
         error?: string;

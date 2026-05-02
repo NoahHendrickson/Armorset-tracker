@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getSession } from "@/lib/auth/session";
+import { getSessionFromRequest } from "@/lib/auth/session";
 import {
   syncUserInventory,
   InventoryNotReady,
@@ -9,7 +9,7 @@ import { BungieApiError } from "@/lib/bungie/client";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
-  const session = await getSession();
+  const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }

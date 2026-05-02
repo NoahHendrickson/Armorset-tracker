@@ -28,7 +28,10 @@ export function RefreshButton({
     if (isLoading) return;
     setIsLoading(true);
     try {
-      const res = await fetch("/api/inventory/sync?force=1", { method: "POST" });
+      const res = await fetch("/api/inventory/sync?force=1", {
+        method: "POST",
+        credentials: "include",
+      });
       const body = (await res.json()) as { error?: string; itemCount?: number };
       if (!res.ok) {
         toast.error(body.error ?? "Refresh failed");

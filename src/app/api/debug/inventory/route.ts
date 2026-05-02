@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireSession } from "@/lib/auth/session";
+import { requireSessionFromRequest } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
 import { getCachedInventory } from "@/lib/inventory/sync";
 import { getViewForUser } from "@/lib/views/queries";
@@ -9,7 +9,7 @@ import type { DerivedArmorPieceJson } from "@/lib/db/types";
 export async function GET(req: NextRequest) {
   let session;
   try {
-    session = await requireSession();
+    session = await requireSessionFromRequest(req);
   } catch {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }

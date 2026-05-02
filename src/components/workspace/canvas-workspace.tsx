@@ -367,6 +367,7 @@ export function CanvasWorkspace({
     try {
       await fetch("/api/me/workspace", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ camera }),
       });
@@ -380,6 +381,7 @@ export function CanvasWorkspace({
       try {
         const res = await fetch(`/api/views/${viewId}`, {
           method: "PATCH",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ layout }),
         });
@@ -406,6 +408,7 @@ export function CanvasWorkspace({
         try {
           const res = await fetch(`/api/views/${id}`, {
             method: "PATCH",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ layout }),
           });

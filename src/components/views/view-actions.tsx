@@ -49,6 +49,7 @@ export function ViewActions({
     try {
       const res = await fetch(`/api/views/${viewId}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim() }),
       });
@@ -71,7 +72,10 @@ export function ViewActions({
     if (submitting) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/views/${viewId}`, { method: "DELETE" });
+      const res = await fetch(`/api/views/${viewId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
       const body = (await res.json()) as { error?: string };
       if (!res.ok) {
         toast.error(body.error ?? "Delete failed");

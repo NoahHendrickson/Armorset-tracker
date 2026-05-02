@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { getSession } from "@/lib/auth/session";
+import { getSessionFromRequest } from "@/lib/auth/session";
 import type { ViewRow } from "@/lib/db/types";
 import { getServiceRoleClient } from "@/lib/db/server";
 import { getCachedInventoryWithSyncedAt } from "@/lib/inventory/sync";
@@ -19,8 +19,8 @@ const createSchema = z.object({
   layout: workspaceLayoutSchema.optional(),
 });
 
-export async function GET() {
-  const session = await getSession();
+export async function GET(req: NextRequest) {
+  const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
@@ -29,7 +29,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getSession();
+  const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }

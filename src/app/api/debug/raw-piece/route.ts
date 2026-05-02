@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth/session";
+import { NextResponse, type NextRequest } from "next/server";
+import { requireSessionFromRequest } from "@/lib/auth/session";
 import { getValidAccessToken } from "@/lib/auth/tokens";
 import { getProfile } from "@/lib/bungie/client";
 import { ARMOR_BUCKET_TO_SLOT, PROFILE_COMPONENTS } from "@/lib/bungie/constants";
@@ -13,10 +13,10 @@ import type {
 
 export const maxDuration = 60;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   let session;
   try {
-    session = await requireSession();
+    session = await requireSessionFromRequest(req);
   } catch {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }

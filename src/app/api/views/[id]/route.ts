@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { getSession } from "@/lib/auth/session";
+import { getSessionFromRequest } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
 import type { Json } from "@/lib/db/types";
 
@@ -23,7 +23,7 @@ interface Params {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const session = await getSession();
+  const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
@@ -69,8 +69,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   return NextResponse.json({ view: data });
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
-  const session = await getSession();
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }

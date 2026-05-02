@@ -2,14 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { syncManifest } from "@/lib/manifest/sync";
 import { invalidateManifestLookups } from "@/lib/manifest/lookups";
 import { invalidateManifestVersionCheck } from "@/lib/manifest/version-check";
-import { requireSession } from "@/lib/auth/session";
+import { requireSessionFromRequest } from "@/lib/auth/session";
 import { BungieApiError } from "@/lib/bungie/client";
 
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   try {
-    await requireSession();
+    await requireSessionFromRequest(req);
   } catch {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }

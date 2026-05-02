@@ -1,6 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
-import type { NextResponse } from "next/server";
+import type { NextRequest, NextResponse } from "next/server";
 import { jwtVerify, SignJWT } from "jose";
 import { serverEnv } from "@/lib/env";
 import { getServiceRoleClient } from "@/lib/db/server";
@@ -73,9 +73,7 @@ export async function clearSessionCookie(): Promise<void> {
   });
 }
 
-export async function getSession(): Promise<Session | null> {
-  const c = await cookies();
-  const token = c.get(SESSION_COOKIE)?.value;
+async function sessionFromJwt(token: string | undefined): Promise<Session | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
@@ -89,6 +87,29 @@ export async function getSession(): Promise<Session | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Prefer in Route Handlers — reads the session from the incoming request’s
+ * Cookie header directly (more reliable than `cookies()` for some POST paths).
+ */
+export async function getSessionFromRequest(
+  request: NextRequest,
+): Promise<Session | null> {
+  return sessionFromJwt(request.cookies.get(SESSION_COOKIE)?.value);
+}
+
+export async function requireSessionFromRequest(
+  request: NextRequest,
+): Promise<Session> {
+  const session = await getSessionFromRequest(request);
+  if (!session) throw new Error("UNAUTHENTICATED");
+  return session;
+}
+
+export async function getSession(): Promise<Session | null> {
+  const c = await cookies();
+  return sessionFromJwt(c.get(SESSION_COOKIE)?.value);
 }
 
 export async function requireSession(): Promise<Session> {

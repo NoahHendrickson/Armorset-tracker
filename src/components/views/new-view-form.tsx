@@ -168,6 +168,7 @@ export function NewViewForm({
         (initialLayout !== undefined ? initialLayout : undefined);
       const res = await fetch("/api/views", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
