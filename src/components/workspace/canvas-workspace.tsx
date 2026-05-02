@@ -677,7 +677,7 @@ export function CanvasWorkspace({
   );
 
   const handleUnmergeAnchor = useCallback(
-    async (anchorViewId: string) => {
+    (anchorViewId: string) => {
       const current = trackersRef.current;
       const anchor = current.find((t) => t.view.id === anchorViewId);
       const partnerId = anchor?.view.layout.mergedWith;
@@ -701,7 +701,18 @@ export function CanvasWorkspace({
         w: TRACKER_WIDTH,
         h: TRACKER_DEFAULT_HEIGHT,
       };
-      await persistTwoLayouts([
+      setTrackers((prev) =>
+        prev.map((p) => {
+          if (p.view.id === anchorViewId) {
+            return { ...p, view: { ...p.view, layout: nextAnchor } };
+          }
+          if (p.view.id === partnerId) {
+            return { ...p, view: { ...p.view, layout: nextPartner } };
+          }
+          return p;
+        }),
+      );
+      void persistTwoLayouts([
         { id: anchorViewId, layout: nextAnchor },
         { id: partnerId, layout: nextPartner },
       ]);
