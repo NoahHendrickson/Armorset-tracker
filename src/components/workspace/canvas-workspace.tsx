@@ -34,7 +34,6 @@ import {
   type WorkspaceCameraJson,
   type WorkspaceLayoutJson,
 } from "@/lib/workspace/workspace-schema";
-import { Button } from "@/components/ui/button";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
 import {
   NewTrackerDialog,
@@ -942,37 +941,31 @@ export function CanvasWorkspace({
 
             {/* Zoom + recenter — bottom right */}
             <div className="pointer-events-none absolute bottom-6 right-6 z-30 flex gap-2">
-              <Button
+              <button
                 type="button"
-                size="sm"
-                variant="outline"
-                className="pointer-events-auto shadow-md"
                 aria-label="Recenter workspace and trackers"
                 disabled={trackers.length === 0 || draggingId !== null}
                 onClick={() => void handleRecenterWorkspace()}
+                className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center border border-white/10 bg-[#2d2e32] text-white/80 shadow-lg transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
               >
-                <Crosshair className="h-4 w-4" weight="duotone" />
-              </Button>
-              <Button
+                <Crosshair className="h-5 w-5" weight="duotone" />
+              </button>
+              <button
                 type="button"
-                size="sm"
-                variant="outline"
-                className="pointer-events-auto shadow-md"
                 aria-label="Zoom out"
                 onClick={() => twRef.current?.zoomOut(0.2)}
+                className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center border border-white/10 bg-[#2d2e32] text-white/80 shadow-lg transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
               >
-                <MagnifyingGlassMinus className="h-4 w-4" weight="duotone" />
-              </Button>
-              <Button
+                <MagnifyingGlassMinus className="h-5 w-5" weight="duotone" />
+              </button>
+              <button
                 type="button"
-                size="sm"
-                variant="outline"
-                className="pointer-events-auto shadow-md"
                 aria-label="Zoom in"
                 onClick={() => twRef.current?.zoomIn(0.2)}
+                className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center border border-white/10 bg-[#2d2e32] text-white/80 shadow-lg transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
               >
-                <MagnifyingGlassPlus className="h-4 w-4" weight="duotone" />
-              </Button>
+                <MagnifyingGlassPlus className="h-5 w-5" weight="duotone" />
+              </button>
             </div>
 
             {/* Sticky primary action — bottom-center of the canvas */}

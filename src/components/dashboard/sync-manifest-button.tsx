@@ -96,7 +96,7 @@ export function SyncManifestButton({
           isLoading ? "Syncing Bungie manifest" : "Sync Bungie manifest"
         }
         title="Sync Bungie manifest"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-none border-2 border-white/15 bg-[#2e2f2f] text-white transition-colors hover:bg-[#353636] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:opacity-60"
+        className="flex h-10 w-10 shrink-0 items-center justify-center border border-white/10 bg-[#2d2e32] text-white/80 shadow-lg transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
       >
         {isLoading ? (
           <ArrowsClockwise weight="duotone" className="h-5 w-5 animate-spin" />
