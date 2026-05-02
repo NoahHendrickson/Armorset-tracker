@@ -66,9 +66,15 @@ export async function setSessionCookieOnResponse(
 ): Promise<void> {
   const jwt = await signSessionJwt(user);
   const isProd = process.env.NODE_ENV === "production";
-  const sameSite = isProd ? "None" : "Lax";
+  // SameSite=Lax (not None): browsers store Lax cookies set on top-level
+  // navigations (which the OAuth callback redirect is) without the
+  // tracking-suspicion heuristics that apply to SameSite=None. Lax also
+  // attaches on every request the app actually makes — the site is
+  // navigated to top-level (clicks/typed URL/redirects) and only ever
+  // calls its own /api/* via same-origin fetch, both of which carry Lax
+  // cookies. None was leftover from a misdiagnosed iOS Safari issue.
   const secureFlag = isProd ? "; Secure" : "";
-  const setCookie = `${SESSION_COOKIE}=${jwt}; Path=/; Max-Age=${SESSION_TTL_SECONDS}${secureFlag}; HttpOnly; SameSite=${sameSite}`;
+  const setCookie = `${SESSION_COOKIE}=${jwt}; Path=/; Max-Age=${SESSION_TTL_SECONDS}${secureFlag}; HttpOnly; SameSite=Lax`;
   response.headers.append("Set-Cookie", setCookie);
 }
 
