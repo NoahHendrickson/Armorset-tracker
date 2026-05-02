@@ -73,11 +73,20 @@ function MergeHalfSquare({
     return (
       <div
         className={cn(
-          "flex h-full w-1/2 items-center justify-center bg-white/[0.06]",
+          "relative flex h-full w-1/2 items-center justify-center bg-white/[0.08]",
           outerRounded,
         )}
+        style={{ boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.12)" }}
         title="Not applicable for this tracker"
-      />
+      >
+        <span
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute inset-0 shadow-[inset_0_-4px_6px_-2px_rgba(0,0,0,0.18)]",
+            outerRounded,
+          )}
+        />
+      </div>
     );
   }
 
