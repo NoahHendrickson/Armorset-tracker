@@ -137,7 +137,7 @@
   }
 
   /* react-zoom-pan-pinch bakes in an `rgba(0,0,0,0.12)` dot pattern for its
-     `infinite` grid, which disappears on our #242525 canvas. The library
+     `infinite` grid, which disappears on our #1a1b1b canvas. The library
      injects its own stylesheet at runtime (into <head>), so we need
      !important + higher specificity (wrapper ancestor chain) to reliably win.
      Attribute selector survives library CSS-module rebuilds.

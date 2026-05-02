@@ -30,6 +30,7 @@ import {
 import { unionTertiaryStats } from "@/lib/views/merge-compare";
 import { mergePreviewUnionPathD } from "@/lib/views/merge-preview-outline";
 import { computeWorkspaceMinScale } from "@/lib/workspace/workspace-min-scale";
+import { clampWorkspacePan } from "@/lib/workspace/clamp-pan";
 import { computeRecenterTranslation } from "@/lib/workspace/recenter-trackers";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
@@ -357,15 +358,23 @@ export function CanvasWorkspace({
   }, []);
 
   useEffect(() => {
-    if (viewportPx.w <= 0) return;
+    if (viewportPx.w <= 0 || viewportPx.h <= 0) return;
     const api = twRef.current;
     if (!api?.setTransform) return;
     const lo = viewportMinScale;
     const { scale, positionX, positionY } = api.state;
-    if (scale < lo - 1e-9) {
-      api.setTransform(positionX, positionY, lo, 0);
+    const nextScale = scale < lo - 1e-9 ? lo : scale;
+    const clamped = clampWorkspacePan({
+      positionX,
+      positionY,
+      scale: nextScale,
+      viewportWidth: viewportPx.w,
+      viewportHeight: viewportPx.h,
+    });
+    if (nextScale !== scale || clamped.changed) {
+      api.setTransform(clamped.positionX, clamped.positionY, nextScale, 0);
     }
-  }, [viewportMinScale, viewportPx.w]);
+  }, [viewportMinScale, viewportPx.w, viewportPx.h]);
   const persistCamera = useCallback(async (camera: WorkspaceCameraJson) => {
     try {
       await fetch("/api/me/workspace", {
@@ -635,7 +644,16 @@ export function CanvasWorkspace({
           positionY: py,
         });
         if (pan.didPan) {
-          api.setTransform(pan.positionX, pan.positionY, scale, 0);
+          const clamped = clampWorkspacePan({
+            positionX: pan.positionX,
+            positionY: pan.positionY,
+            scale,
+            viewportWidth: surfaceEl.clientWidth,
+            viewportHeight: surfaceEl.clientHeight,
+          });
+          if (clamped.positionX !== px || clamped.positionY !== py) {
+            api.setTransform(clamped.positionX, clamped.positionY, scale, 0);
+          }
         }
       }
 
@@ -950,7 +968,7 @@ export function CanvasWorkspace({
       ) : null}
 
       <div
-        className={`relative min-h-0 flex-1 overflow-hidden bg-[#242525] ${
+        className={`relative min-h-0 flex-1 overflow-hidden bg-[#1a1b1b] ${
           spacePan ? "canvas-space-pan" : ""
         }`}
       >
@@ -962,7 +980,7 @@ export function CanvasWorkspace({
           initialPositionY={initialCamera.panY}
           minScale={viewportMinScale}
           maxScale={6}
-          limitToBounds={false}
+          limitToBounds={true}
           centerZoomedOut={false}
           smooth={false}
           panning={{

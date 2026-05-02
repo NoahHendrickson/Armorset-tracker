@@ -1,4 +1,5 @@
 import type { ReactZoomPanPinchContentRef } from "react-zoom-pan-pinch";
+import { clampWorkspacePan } from "@/lib/workspace/clamp-pan";
 
 const LINE_HEIGHT = 16;
 
@@ -163,9 +164,16 @@ export function attachCanvasViewportWheel(
       const mouseContentY = (e.clientY - contentRect.top) / scale;
 
       const scaleDiff = nextScale - scale;
+      const clamped = clampWorkspacePan({
+        positionX: px - mouseContentX * scaleDiff,
+        positionY: py - mouseContentY * scaleDiff,
+        scale: nextScale,
+        viewportWidth: surface.clientWidth,
+        viewportHeight: surface.clientHeight,
+      });
       api.setTransform(
-        px - mouseContentX * scaleDiff,
-        py - mouseContentY * scaleDiff,
+        clamped.positionX,
+        clamped.positionY,
         nextScale,
         0,
       );
@@ -175,7 +183,14 @@ export function attachCanvasViewportWheel(
     if (dx === 0 && dy === 0) return;
     // No modifier → pan. Browsers already swap dx/dy when shift is held on
     // a vertical wheel, so we don't need to re-swap here.
-    api.setTransform(px - dx, py - dy, scale, 0);
+    const clampedPan = clampWorkspacePan({
+      positionX: px - dx,
+      positionY: py - dy,
+      scale,
+      viewportWidth: surface.clientWidth,
+      viewportHeight: surface.clientHeight,
+    });
+    api.setTransform(clampedPan.positionX, clampedPan.positionY, scale, 0);
   };
 
   const opts: AddEventListenerOptions = { passive: false, capture: true };

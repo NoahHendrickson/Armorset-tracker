@@ -1,6 +1,6 @@
 /** Logical size of the pannable workspace (content layer beneath zoom). */
-export const WORKSPACE_CANVAS_WIDTH = 7200;
-export const WORKSPACE_CANVAS_HEIGHT = 5400;
+export const WORKSPACE_CANVAS_WIDTH = 16000;
+export const WORKSPACE_CANVAS_HEIGHT = 12000;
 
 /** Target for pan/zoom math and debugging — the bounded tracker layer. */
 export const WORKSPACE_CANVAS_ELEMENT_ID = "workspace-canvas-root";
