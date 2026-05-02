@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DraggableEvent } from "react-draggable";
 import { Rnd } from "react-rnd";
 import {
@@ -25,10 +25,7 @@ import {
   TRACKER_WIDTH,
   trackerWidthForTertiaryColumns,
 } from "@/lib/workspace/workspace-constants";
-import {
-  parseWorkspaceLayout,
-  type WorkspaceLayoutJson,
-} from "@/lib/workspace/workspace-schema";
+import type { WorkspaceLayoutJson } from "@/lib/workspace/workspace-schema";
 import { cn } from "@/lib/utils";
 
 export type TrackerMergeRole = "solo" | "anchor" | "mergedPartner";
@@ -120,10 +117,6 @@ export function TrackerPanel({
 }: TrackerPanelProps) {
   const { view } = payload;
   const [layout, setLayout] = useState<WorkspaceLayoutJson>(view.layout);
-  /** Latest layout during drag — avoids stale React state in `onDragStop`. */
-  const layoutLiveRef = useRef<WorkspaceLayoutJson>(
-    parseWorkspaceLayout(view.layout),
-  );
   const merged = Boolean(view.layout.mergedWith) && mergePartnerPayload !== null;
 
   const panelWidth =
@@ -136,8 +129,7 @@ export function TrackerPanel({
   useEffect(
     () => {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- keep Rnd state aligned after server refresh
-      layoutLiveRef.current = parseWorkspaceLayout(view.layout);
-      setLayout(parseWorkspaceLayout(view.layout));
+      setLayout(view.layout);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- layout scalars; `view.layout` identity churns with parent payloads
     [
@@ -216,19 +208,16 @@ export function TrackerPanel({
       size={{ width: panelWidth, height: TRACKER_DEFAULT_HEIGHT }}
       onDrag={(e, d) => {
         onDragPosition?.(view.id, d.x, d.y, e);
-        const next = { ...layoutLiveRef.current, x: d.x, y: d.y };
-        layoutLiveRef.current = next;
-        setLayout(next);
+        setLayout((prev) => ({ ...prev, x: d.x, y: d.y }));
       }}
       onDragStop={(_e, d) => {
         const next: WorkspaceLayoutJson = {
-          ...layoutLiveRef.current,
+          ...layout,
           x: d.x,
           y: d.y,
           w: panelWidth,
           h: TRACKER_DEFAULT_HEIGHT,
         };
-        layoutLiveRef.current = next;
         setLayout(next);
         onDragLayoutEnd(view.id, next);
       }}

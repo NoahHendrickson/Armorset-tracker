@@ -22,10 +22,7 @@ import {
   WORKSPACE_CANVAS_HEIGHT,
   WORKSPACE_CANVAS_WIDTH,
 } from "@/lib/workspace/workspace-constants";
-import {
-  canAttemptMerge,
-  pickMergeDropTarget,
-} from "@/lib/views/canvas-merge";
+import { canAttemptMerge, MERGE_OVERLAP_TRIGGER_RATIO, mergeOverlapRatio } from "@/lib/views/canvas-merge";
 import { unionTertiaryStats } from "@/lib/views/merge-compare";
 import { mergePreviewUnionPathD } from "@/lib/views/merge-preview-outline";
 import { computeWorkspaceMinScale } from "@/lib/workspace/workspace-min-scale";
@@ -406,38 +403,30 @@ export function CanvasWorkspace({
 
   const persistTwoLayouts = useCallback(
     async (updates: { id: string; layout: WorkspaceLayoutJson }[]) => {
-      if (updates.length === 0) return;
-      try {
-        const results = await Promise.all(
-          updates.map(async ({ id, layout }) => {
-            const res = await fetch(`/api/views/${id}`, {
-              method: "PATCH",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ layout }),
-            });
-            if (!res.ok) return { id, layout: undefined as WorkspaceLayoutJson | undefined };
-            const body = (await res.json()) as { view?: { layout?: unknown } };
-            const lo = body.view?.layout as WorkspaceLayoutJson | undefined;
-            return { id, layout: lo };
-          }),
-        );
-        if (results.some((r) => !r.layout)) {
-          router.refresh();
-          return;
+      for (const { id, layout } of updates) {
+        try {
+          const res = await fetch(`/api/views/${id}`, {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ layout }),
+          });
+          if (!res.ok) continue;
+          const body = (await res.json()) as { view?: { layout?: unknown } };
+          const lo = body.view?.layout as WorkspaceLayoutJson | undefined;
+          if (lo) {
+            setTrackers((prev) =>
+              prev.map((p) =>
+                p.view.id === id ? { ...p, view: { ...p.view, layout: lo } } : p,
+              ),
+            );
+          }
+        } catch {
+          /* non-fatal */
         }
-        const byId = new Map(results.map((r) => [r.id, r.layout!]));
-        setTrackers((prev) =>
-          prev.map((p) => {
-            const lo = byId.get(p.view.id);
-            return lo ? { ...p, view: { ...p.view, layout: lo } } : p;
-          }),
-        );
-      } catch {
-        router.refresh();
       }
     },
-    [router],
+    [],
   );
 
   const handleRecenterWorkspace = useCallback(async () => {
@@ -552,16 +541,32 @@ export function CanvasWorkspace({
       setDragLive({ x, y });
       const current = trackersRef.current;
       const self = current.find((t) => t.view.id === viewId);
-      const selfLo = self ? parseWorkspaceLayout(self.view.layout) : null;
-      const dragFootprint = selfLo
-        ? { w: selfLo.w, h: selfLo.h }
-        : { w: TRACKER_WIDTH, h: TRACKER_DEFAULT_HEIGHT };
+      const partnerId = self
+        ? (parseWorkspaceLayout(self.view.layout).mergedWith ?? null)
+        : null;
 
-      const { targetId, valid } = pickMergeDropTarget(
-        viewId,
-        { x, y, w: dragFootprint.w, h: dragFootprint.h },
-        current,
-      );
+      let best: { id: string; ratio: number } | null = null;
+      for (const t of current) {
+        if (t.view.id === viewId) continue;
+        // Stacked merged partner shares x/y — ignore as merge target so moves
+        // don't show merge chrome or block until the pointer leaves the union.
+        if (partnerId !== null && t.view.id === partnerId) continue;
+        const ratio = mergeOverlapRatio(
+          x,
+          y,
+          t.view.layout.x,
+          t.view.layout.y,
+        );
+        if (ratio < MERGE_OVERLAP_TRIGGER_RATIO) continue;
+        if (!best || ratio > best.ratio) best = { id: t.view.id, ratio };
+      }
+      const targetId = best?.id ?? null;
+      let valid = false;
+      if (targetId) {
+        const src = current.find((t) => t.view.id === viewId);
+        const tgt = current.find((t) => t.view.id === targetId);
+        if (src && tgt) valid = canAttemptMerge(src, tgt);
+      }
       mergeHoverRef.current = { targetId, valid };
       setMergeDropTargetId(targetId);
       setMergeDropValid(valid);
@@ -571,6 +576,7 @@ export function CanvasWorkspace({
 
   const handleLayoutDragEnd = useCallback(
     (viewId: string, layout: WorkspaceLayoutJson) => {
+      const hover = mergeHoverRef.current;
       mergeHoverRef.current = { targetId: null, valid: false };
       setDraggingId(null);
       setDragLive(null);
@@ -588,25 +594,13 @@ export function CanvasWorkspace({
         h,
       };
 
-      const mergePick = pickMergeDropTarget(
-        viewId,
-        {
-          x: normalized.x,
-          y: normalized.y,
-          w: normalized.w,
-          h: normalized.h,
-        },
-        current,
-      );
-
       if (
-        mergePick.targetId &&
-        mergePick.valid &&
-        mergePick.targetId !== viewId &&
-        (normalized.mergedWith ?? selfLo.mergedWith ?? null) !==
-          mergePick.targetId
+        hover.targetId &&
+        hover.valid &&
+        hover.targetId !== viewId &&
+        selfLo.mergedWith !== hover.targetId
       ) {
-        const tgt = current.find((t) => t.view.id === mergePick.targetId);
+        const tgt = current.find((t) => t.view.id === hover.targetId);
         if (!tgt || !canAttemptMerge(self, tgt)) {
           void persistLayoutPatch(viewId, normalized);
           return;
@@ -645,8 +639,7 @@ export function CanvasWorkspace({
         return;
       }
 
-      const partnerId =
-        (normalized.mergedWith ?? selfLo.mergedWith) ?? null;
+      const partnerId = selfLo.mergedWith ?? null;
       if (partnerId) {
         const partner = current.find((t) => t.view.id === partnerId);
         if (partner) {
