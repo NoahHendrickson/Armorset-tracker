@@ -5,22 +5,20 @@ import { getServiceRoleClient } from "@/lib/db/server";
 import {
   setSessionCookieOnResponse,
 } from "@/lib/auth/session";
-import { BUNGIE_OAUTH_STATE_COOKIE } from "@/lib/auth/bungie-oauth-cookies";
+import {
+  BUNGIE_OAUTH_STATE_COOKIE,
+  bungieOAuthStateCookieOptions,
+} from "@/lib/auth/bungie-oauth-cookies";
+import { bungieOAuthRedirectUri } from "@/lib/auth/bungie-redirect-uri";
 import { persistTokens } from "@/lib/auth/tokens";
 import { profilePictureRelPathFromMembership } from "@/lib/bungie/profile-picture";
 
-const oauthStateOpts = {
-  path: "/",
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-};
-
 function clearOauthStateCookie(res: NextResponse) {
-  res.cookies.set(BUNGIE_OAUTH_STATE_COOKIE, "", {
-    ...oauthStateOpts,
-    maxAge: 0,
-  });
+  res.cookies.set(
+    BUNGIE_OAUTH_STATE_COOKIE,
+    "",
+    bungieOAuthStateCookieOptions(0),
+  );
 }
 
 function redirectWithError(req: NextRequest, message: string) {
@@ -51,9 +49,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const redirectUri = bungieOAuthRedirectUri(req);
+
   let tokens;
   try {
-    tokens = await exchangeAuthorizationCode(code);
+    tokens = await exchangeAuthorizationCode(code, redirectUri);
   } catch (err) {
     return redirectWithError(
       req,

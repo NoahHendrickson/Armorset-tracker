@@ -1,21 +1,22 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { buildAuthorizeUrl } from "@/lib/bungie/oauth";
 import {
   BUNGIE_OAUTH_STATE_COOKIE,
   BUNGIE_OAUTH_STATE_TTL_SECONDS,
+  bungieOAuthStateCookieOptions,
 } from "@/lib/auth/bungie-oauth-cookies";
+import { bungieOAuthRedirectUri } from "@/lib/auth/bungie-redirect-uri";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const state = randomBytes(24).toString("hex");
-  const dest = buildAuthorizeUrl(state);
+  const redirectUri = bungieOAuthRedirectUri(req);
+  const dest = buildAuthorizeUrl(state, redirectUri);
   const res = NextResponse.redirect(dest);
-  res.cookies.set(BUNGIE_OAUTH_STATE_COOKIE, state, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: BUNGIE_OAUTH_STATE_TTL_SECONDS,
-  });
+  res.cookies.set(
+    BUNGIE_OAUTH_STATE_COOKIE,
+    state,
+    bungieOAuthStateCookieOptions(BUNGIE_OAUTH_STATE_TTL_SECONDS),
+  );
   return res;
 }

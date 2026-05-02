@@ -3,23 +3,26 @@ import { BUNGIE_AUTH_URL, BUNGIE_TOKEN_URL } from "./constants";
 import { serverEnv } from "@/lib/env";
 import type { OAuthTokenResponse } from "./types";
 
-export function buildAuthorizeUrl(state: string): string {
+export function buildAuthorizeUrl(state: string, redirectUri: string): string {
   const env = serverEnv();
   const url = new URL(BUNGIE_AUTH_URL);
   url.searchParams.set("client_id", env.BUNGIE_CLIENT_ID);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", state);
+  url.searchParams.set("redirect_uri", redirectUri);
   return url.toString();
 }
 
 export async function exchangeAuthorizationCode(
   code: string,
+  redirectUri: string,
 ): Promise<OAuthTokenResponse> {
   const env = serverEnv();
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     code,
     client_id: env.BUNGIE_CLIENT_ID,
+    redirect_uri: redirectUri,
   });
   if (env.BUNGIE_CLIENT_SECRET) {
     body.set("client_secret", env.BUNGIE_CLIENT_SECRET);
