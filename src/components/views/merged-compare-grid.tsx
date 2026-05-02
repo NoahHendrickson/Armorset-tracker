@@ -15,6 +15,7 @@ import {
   type MergeCompareCellState,
 } from "@/lib/views/merge-compare";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
+import { cn } from "@/lib/utils";
 
 function matchSummary(match: DerivedArmorPieceJson): string {
   const locationLabel =
@@ -65,11 +66,16 @@ function MergeHalfSquare({
   const count = side === "green" ? state.greenCount : state.blueCount;
   const isDuplicate = applicable && owned && count > 1;
   const loading = applicable && !hasInventory;
+  const outerRounded =
+    side === "green" ? "rounded-l-[4px]" : "rounded-r-[4px]";
 
   if (!applicable) {
     return (
       <div
-        className="flex h-full w-1/2 items-center justify-center bg-white/[0.06]"
+        className={cn(
+          "flex h-full w-1/2 items-center justify-center bg-white/[0.06]",
+          outerRounded,
+        )}
         title="Not applicable for this tracker"
       />
     );
@@ -78,7 +84,10 @@ function MergeHalfSquare({
   if (loading) {
     return (
       <div
-        className="flex h-full w-1/2 items-center justify-center border border-white/35"
+        className={cn(
+          "flex h-full w-1/2 items-center justify-center border border-white/35",
+          outerRounded,
+        )}
         title="Loading inventory…"
       >
         <span
@@ -92,7 +101,10 @@ function MergeHalfSquare({
   if (!owned) {
     return (
       <div
-        className="flex h-full w-1/2 items-center justify-center border border-white/40"
+        className={cn(
+          "flex h-full w-1/2 items-center justify-center border border-white/40",
+          outerRounded,
+        )}
         title="0 matching pieces"
       />
     );
@@ -100,7 +112,10 @@ function MergeHalfSquare({
 
   return (
     <div
-      className="relative flex h-full w-1/2 items-center justify-center"
+      className={cn(
+        "relative flex h-full w-1/2 items-center justify-center",
+        outerRounded,
+      )}
       style={{
         boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.2)`,
         backgroundColor: accent,
@@ -109,7 +124,10 @@ function MergeHalfSquare({
     >
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_1px_0_rgba(255,255,255,0.25),inset_0_-4px_6px_-2px_rgba(0,0,0,0.2)]"
+        className={cn(
+          "pointer-events-none absolute inset-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),inset_0_-4px_6px_-2px_rgba(0,0,0,0.2)]",
+          outerRounded,
+        )}
       />
       {isDuplicate ? (
         <span
