@@ -21,10 +21,17 @@ function secret(): Uint8Array {
   return new TextEncoder().encode(serverEnv().APP_SESSION_SECRET);
 }
 
+/**
+ * Production uses SameSite=None so iOS Safari reliably attaches this cookie to
+ * same-origin fetch() POST (Lax alone often omits it). Secure is required.
+ * CSRF is mitigated via {@link crossSiteOriginBlockResponse} on mutating routes.
+ */
 const sessionCookieBase = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
+  sameSite: (process.env.NODE_ENV === "production" ? "none" : "lax") as
+    | "none"
+    | "lax",
   path: "/",
 };
 

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { crossSiteOriginBlockResponse } from "@/lib/auth/api-origin-check";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
 import type { Json } from "@/lib/db/types";
@@ -23,6 +24,9 @@ interface Params {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const blocked = crossSiteOriginBlockResponse(req);
+  if (blocked) return blocked;
+
   const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -70,6 +74,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
+  const blocked = crossSiteOriginBlockResponse(req);
+  if (blocked) return blocked;
+
   const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });

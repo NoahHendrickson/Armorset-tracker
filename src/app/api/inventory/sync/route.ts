@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { crossSiteOriginBlockResponse } from "@/lib/auth/api-origin-check";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import {
   syncUserInventory,
@@ -9,6 +10,9 @@ import { BungieApiError } from "@/lib/bungie/client";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
+  const blocked = crossSiteOriginBlockResponse(req);
+  if (blocked) return blocked;
+
   const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });

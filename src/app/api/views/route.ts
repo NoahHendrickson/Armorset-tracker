@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { crossSiteOriginBlockResponse } from "@/lib/auth/api-origin-check";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import type { ViewRow } from "@/lib/db/types";
 import { getServiceRoleClient } from "@/lib/db/server";
@@ -29,6 +30,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = crossSiteOriginBlockResponse(req);
+  if (blocked) return blocked;
+
   const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });

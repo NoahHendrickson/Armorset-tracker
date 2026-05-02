@@ -2,12 +2,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import { syncManifest } from "@/lib/manifest/sync";
 import { invalidateManifestLookups } from "@/lib/manifest/lookups";
 import { invalidateManifestVersionCheck } from "@/lib/manifest/version-check";
+import { crossSiteOriginBlockResponse } from "@/lib/auth/api-origin-check";
 import { requireSessionFromRequest } from "@/lib/auth/session";
 import { BungieApiError } from "@/lib/bungie/client";
 
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
+  const blocked = crossSiteOriginBlockResponse(req);
+  if (blocked) return blocked;
+
   try {
     await requireSessionFromRequest(req);
   } catch {

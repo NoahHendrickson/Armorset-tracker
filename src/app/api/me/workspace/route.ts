@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { crossSiteOriginBlockResponse } from "@/lib/auth/api-origin-check";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
 import type { Json } from "@/lib/db/types";
@@ -10,6 +11,9 @@ const patchSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest) {
+  const blocked = crossSiteOriginBlockResponse(req);
+  if (blocked) return blocked;
+
   const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
