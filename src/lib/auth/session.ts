@@ -51,16 +51,25 @@ async function signSessionJwt(user: UserRow): Promise<string> {
 /**
  * Prefer this in Route Handlers that return NextResponse.redirect — mutating
  * `cookies()` does not reliably attach Set-Cookie to a new Response object.
+ *
+ * Emits Set-Cookie via raw header append rather than NextResponse.cookies.set:
+ * the latter auto-adds an `Expires=` attribute alongside `Max-Age=` once the
+ * lifetime is large, and that two-attribute Set-Cookie format wasn't being
+ * persisted by Chrome on the OAuth callback redirect even though the
+ * single-attribute test cookie with the same Secure/HttpOnly/SameSite=None
+ * combo persisted fine. Hand-crafted Set-Cookie matches the test-cookie shape
+ * exactly.
  */
 export async function setSessionCookieOnResponse(
   response: NextResponse,
   user: UserRow,
 ): Promise<void> {
   const jwt = await signSessionJwt(user);
-  response.cookies.set(SESSION_COOKIE, jwt, {
-    ...sessionCookieBase,
-    maxAge: SESSION_TTL_SECONDS,
-  });
+  const isProd = process.env.NODE_ENV === "production";
+  const sameSite = isProd ? "None" : "Lax";
+  const secureFlag = isProd ? "; Secure" : "";
+  const setCookie = `${SESSION_COOKIE}=${jwt}; Path=/; Max-Age=${SESSION_TTL_SECONDS}${secureFlag}; HttpOnly; SameSite=${sameSite}`;
+  response.headers.append("Set-Cookie", setCookie);
 }
 
 export function clearSessionCookieOnResponse(response: NextResponse): void {
