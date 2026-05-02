@@ -148,12 +148,15 @@ export async function GET(req: NextRequest) {
   }
 
   // Canonical OAuth callback: 303 See Other → /dashboard with Set-Cookie.
-  // The browser commits Set-Cookie on redirect responses before issuing the
-  // GET to the new location, so /dashboard's SSR sees the session.
+  // We deliberately emit only ONE Set-Cookie on this response (the session)
+  // rather than additionally clearing the OAuth state cookie here — multiple
+  // Set-Cookie headers on a 3xx redirect were getting mangled in transit on
+  // Vercel and the session cookie wasn't landing. The state cookie's
+  // 30-minute Max-Age handles cleanup; the login route also overwrites it
+  // by name on the next sign-in.
   const dest = new URL("/dashboard", req.url);
   const res = NextResponse.redirect(dest, 303);
   res.headers.set("Cache-Control", "no-store");
   await setSessionCookieOnResponse(res, user);
-  clearOauthStateCookie(res);
   return res;
 }
