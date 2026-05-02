@@ -147,18 +147,12 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // 200 + Set-Cookie, then meta refresh: some clients/CDNs mishandle Set-Cookie
-  // on 3xx redirects; cookies are reliably applied on a document response.
-  const res = new NextResponse(
-    `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/dashboard"></head><body>Signing you in…</body></html>`,
-    {
-      status: 200,
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
-    },
-  );
+  // Canonical OAuth callback: 303 See Other → /dashboard with Set-Cookie.
+  // The browser commits Set-Cookie on redirect responses before issuing the
+  // GET to the new location, so /dashboard's SSR sees the session.
+  const dest = new URL("/dashboard", req.url);
+  const res = NextResponse.redirect(dest, 303);
+  res.headers.set("Cache-Control", "no-store");
   await setSessionCookieOnResponse(res, user);
   clearOauthStateCookie(res);
   return res;
