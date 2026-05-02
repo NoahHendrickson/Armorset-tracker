@@ -7,7 +7,7 @@ import { getServiceRoleClient } from "@/lib/db/server";
 import type { UserRow } from "@/lib/db/types";
 
 export const SESSION_COOKIE = "armor_checklist_session";
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 export interface Session {
   userId: string;
@@ -35,7 +35,7 @@ const sessionCookieBase = {
   path: "/",
 };
 
-async function signSessionJwt(user: UserRow): Promise<string> {
+export async function signSessionJwt(user: UserRow): Promise<string> {
   return new SignJWT({
     bmid: user.bungie_membership_id,
     bmt: user.bungie_membership_type,

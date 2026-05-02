@@ -2,9 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { exchangeAuthorizationCode } from "@/lib/bungie/oauth";
 import { getMembershipDataForCurrentUser } from "@/lib/bungie/client";
 import { getServiceRoleClient } from "@/lib/db/server";
-import {
-  setSessionCookieOnResponse,
-} from "@/lib/auth/session";
+import { signSessionJwt } from "@/lib/auth/session";
 import {
   BUNGIE_OAUTH_STATE_COOKIE,
   bungieOAuthStateCookieOptions,
@@ -147,16 +145,49 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Mirror the login route's redirect shape, which is known to land its
-  // Set-Cookie reliably on Vercel: default status (307) + single Set-Cookie.
-  // 303 was producing a redirect response on which the session cookie wasn't
-  // being persisted by the browser. For a GET-from-GET hop, 307 and 303 are
-  // functionally equivalent — both result in a fresh GET to /dashboard.
-  // The state cookie's 30-min Max-Age handles cleanup; the login route also
-  // overwrites it by name on the next sign-in.
-  const dest = new URL("/dashboard", req.url);
-  const res = NextResponse.redirect(dest);
-  res.headers.set("Cache-Control", "no-store");
-  await setSessionCookieOnResponse(res, user);
-  return res;
+  // Cookie cannot be set directly on this response: empirically, Chrome
+  // refuses to persist Set-Cookie set on a callback response that was
+  // reached via cross-site top-level navigation from bungie.net, even with
+  // canonical attributes (verified end-to-end via /api/debug/auth across
+  // SameSite=None/Lax, 200/303/307, single/multi Set-Cookie, with/without
+  // Expires). The state cookie set by /api/auth/bungie/login persists fine
+  // because that request is initiated by an in-origin click.
+  //
+  // Workaround: render an HTML interstitial that POSTs the freshly-signed
+  // JWT to /api/auth/install via same-origin fetch. The install route's
+  // Set-Cookie is on a same-origin AJAX response, which the browser stores
+  // without any cross-site/redirect heuristic interference. The page then
+  // navigates to /dashboard.
+  const jwt = await signSessionJwt(user);
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Signing you in</title>
+<meta name="robots" content="noindex,nofollow">
+<style>html,body{margin:0;height:100%;background:#0b0b0c;color:#e6e6e6;font-family:system-ui,-apple-system,sans-serif}body{display:flex;align-items:center;justify-content:center}p{font-size:14px;opacity:.7}</style>
+</head>
+<body>
+<p>Signing you in&hellip;</p>
+<script>
+(function(){
+  var t=${JSON.stringify(jwt)};
+  fetch("/api/auth/install",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({t:t})})
+    .then(function(r){
+      if(r.ok){location.replace("/dashboard");return;}
+      r.text().then(function(b){location.replace("/?auth_error="+encodeURIComponent("Install failed: "+r.status+" "+b));});
+    })
+    .catch(function(e){location.replace("/?auth_error="+encodeURIComponent(String(e&&e.message||e)));});
+})();
+</script>
+<noscript><p>JavaScript is required to complete sign-in. <a style="color:#9bf" href="/api/auth/bungie/login">Try again</a>.</p></noscript>
+</body>
+</html>`;
+  return new NextResponse(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
 }
