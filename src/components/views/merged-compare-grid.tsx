@@ -117,7 +117,11 @@ function MergeHalfSquare({
         outerRounded,
       )}
       style={{
-        boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.2)`,
+        boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.2), 0 0 10px -1px ${
+          side === "green"
+            ? "rgba(0, 255, 133, 0.45)"
+            : "rgba(56, 189, 248, 0.45)"
+        }`,
         backgroundColor: accent,
       }}
       title={halfTitle(hasInventory, applicable, owned, count, matches)}
@@ -259,7 +263,7 @@ export function MergedCompareGrid({
                       i < SLOT_ORDER.length - 1 ? "border-b border-white/10" : ""
                     }`}
                   >
-                    <div className="flex size-6 shrink-0 overflow-hidden rounded-[5px] border border-white/15">
+                    <div className="flex size-6 shrink-0 rounded-[5px] border border-white/15">
                       <MergeHalfSquare
                         hasInventory={hasInventory}
                         state={st}
