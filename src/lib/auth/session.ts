@@ -98,22 +98,46 @@ async function sessionFromJwt(token: string | undefined): Promise<Session | null
   }
 }
 
-function extractCookieFromHeader(
+function nonEmptyCandidates(...values: (string | undefined)[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const v of values) {
+    if (typeof v !== "string" || v.length === 0) continue;
+    if (seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
+async function firstVerifiedSession(
+  tokens: string[],
+): Promise<Session | null> {
+  for (const t of tokens) {
+    const s = await sessionFromJwt(t);
+    if (s) return s;
+  }
+  return null;
+}
+
+/** Every value for `name` in the header (browsers may send duplicates). */
+function extractAllCookieValuesFromHeader(
   header: string | null,
   name: string,
-): string | undefined {
-  if (!header) return undefined;
+): string[] {
+  if (!header) return [];
+  const out: string[] = [];
   for (const part of header.split(";")) {
     const s = part.trim();
     if (!s.startsWith(`${name}=`)) continue;
     const v = s.slice(name.length + 1);
     try {
-      return decodeURIComponent(v);
+      out.push(decodeURIComponent(v));
     } catch {
-      return v;
+      out.push(v);
     }
   }
-  return undefined;
+  return out;
 }
 
 /**
@@ -123,15 +147,18 @@ function extractCookieFromHeader(
 export async function getSessionFromRequest(
   request: NextRequest,
 ): Promise<Session | null> {
-  const fromNext = request.cookies.get(SESSION_COOKIE)?.value;
-  const fromHeader = extractCookieFromHeader(
+  // Prefer raw Cookie header first (browser source of truth). Try every
+  // non-empty candidate: a bad parse/empty cookie value must not shadow a valid JWT.
+  const headerValues = extractAllCookieValuesFromHeader(
     request.headers.get("cookie"),
     SESSION_COOKIE,
   );
+  const fromNext = request.cookies.get(SESSION_COOKIE)?.value;
   const store = await cookies();
   const fromStore = store.get(SESSION_COOKIE)?.value;
-  const token = fromNext ?? fromHeader ?? fromStore;
-  return sessionFromJwt(token);
+  return firstVerifiedSession(
+    nonEmptyCandidates(...headerValues, fromNext, fromStore),
+  );
 }
 
 export async function requireSessionFromRequest(
@@ -146,8 +173,13 @@ export async function getSession(): Promise<Session | null> {
   const c = await cookies();
   const fromStore = c.get(SESSION_COOKIE)?.value;
   const h = await headers();
-  const fromHeader = extractCookieFromHeader(h.get("cookie"), SESSION_COOKIE);
-  return sessionFromJwt(fromStore ?? fromHeader);
+  const headerValues = extractAllCookieValuesFromHeader(
+    h.get("cookie"),
+    SESSION_COOKIE,
+  );
+  return firstVerifiedSession(
+    nonEmptyCandidates(...headerValues, fromStore),
+  );
 }
 
 export async function requireSession(): Promise<Session> {
