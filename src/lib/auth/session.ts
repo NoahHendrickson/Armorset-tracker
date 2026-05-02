@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import { jwtVerify, SignJWT } from "jose";
 import { serverEnv } from "@/lib/env";
 import { getServiceRoleClient } from "@/lib/db/server";
@@ -20,8 +21,15 @@ function secret(): Uint8Array {
   return new TextEncoder().encode(serverEnv().APP_SESSION_SECRET);
 }
 
-export async function createSessionCookie(user: UserRow): Promise<void> {
-  const jwt = await new SignJWT({
+const sessionCookieBase = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+};
+
+async function signSessionJwt(user: UserRow): Promise<string> {
+  return new SignJWT({
     bmid: user.bungie_membership_id,
     bmt: user.bungie_membership_type,
     name: user.display_name,
@@ -31,16 +39,27 @@ export async function createSessionCookie(user: UserRow): Promise<void> {
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
     .sign(secret());
+}
 
-  const c = await cookies();
-  c.set({
-    name: SESSION_COOKIE,
-    value: jwt,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
+/**
+ * Prefer this in Route Handlers that return NextResponse.redirect — mutating
+ * `cookies()` does not reliably attach Set-Cookie to a new Response object.
+ */
+export async function setSessionCookieOnResponse(
+  response: NextResponse,
+  user: UserRow,
+): Promise<void> {
+  const jwt = await signSessionJwt(user);
+  response.cookies.set(SESSION_COOKIE, jwt, {
+    ...sessionCookieBase,
     maxAge: SESSION_TTL_SECONDS,
+  });
+}
+
+export function clearSessionCookieOnResponse(response: NextResponse): void {
+  response.cookies.set(SESSION_COOKIE, "", {
+    ...sessionCookieBase,
+    maxAge: 0,
   });
 }
 
@@ -49,10 +68,7 @@ export async function clearSessionCookie(): Promise<void> {
   c.set({
     name: SESSION_COOKIE,
     value: "",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
+    ...sessionCookieBase,
     maxAge: 0,
   });
 }

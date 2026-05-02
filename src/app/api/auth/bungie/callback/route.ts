@@ -1,33 +1,54 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { cookies } from "next/headers";
 import { exchangeAuthorizationCode } from "@/lib/bungie/oauth";
 import { getMembershipDataForCurrentUser } from "@/lib/bungie/client";
 import { getServiceRoleClient } from "@/lib/db/server";
-import { createSessionCookie } from "@/lib/auth/session";
+import {
+  setSessionCookieOnResponse,
+} from "@/lib/auth/session";
+import { BUNGIE_OAUTH_STATE_COOKIE } from "@/lib/auth/bungie-oauth-cookies";
 import { persistTokens } from "@/lib/auth/tokens";
-import { clientEnv } from "@/lib/env";
 import { profilePictureRelPathFromMembership } from "@/lib/bungie/profile-picture";
 
-const STATE_COOKIE = "armor_checklist_oauth_state";
+const oauthStateOpts = {
+  path: "/",
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+};
+
+function clearOauthStateCookie(res: NextResponse) {
+  res.cookies.set(BUNGIE_OAUTH_STATE_COOKIE, "", {
+    ...oauthStateOpts,
+    maxAge: 0,
+  });
+}
+
+function redirectWithError(req: NextRequest, message: string) {
+  const dest = new URL("/", req.url);
+  dest.searchParams.set("auth_error", message);
+  const res = NextResponse.redirect(dest);
+  clearOauthStateCookie(res);
+  return res;
+}
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
-
-  const c = await cookies();
-  const expectedState = c.get(STATE_COOKIE)?.value;
-  c.set({ name: STATE_COOKIE, value: "", path: "/", maxAge: 0 });
+  const expectedState = req.cookies.get(BUNGIE_OAUTH_STATE_COOKIE)?.value;
 
   if (error) {
-    return redirectWithError(`Bungie returned error: ${error}`);
+    return redirectWithError(req, `Bungie returned error: ${error}`);
   }
   if (!code || !state) {
-    return redirectWithError("Missing code or state in OAuth callback");
+    return redirectWithError(req, "Missing code or state in OAuth callback");
   }
   if (!expectedState || expectedState !== state) {
-    return redirectWithError("OAuth state mismatch — possible CSRF, please try again");
+    return redirectWithError(
+      req,
+      "OAuth state mismatch — possible CSRF, please try again",
+    );
   }
 
   let tokens;
@@ -35,6 +56,7 @@ export async function GET(req: NextRequest) {
     tokens = await exchangeAuthorizationCode(code);
   } catch (err) {
     return redirectWithError(
+      req,
       err instanceof Error ? err.message : "Token exchange failed",
     );
   }
@@ -44,6 +66,7 @@ export async function GET(req: NextRequest) {
     membership = await getMembershipDataForCurrentUser(tokens.access_token);
   } catch (err) {
     return redirectWithError(
+      req,
       err instanceof Error ? err.message : "Failed to load Bungie membership",
     );
   }
@@ -55,6 +78,7 @@ export async function GET(req: NextRequest) {
 
   if (!primary) {
     return redirectWithError(
+      req,
       "No Destiny memberships are linked to this Bungie account.",
     );
   }
@@ -85,6 +109,7 @@ export async function GET(req: NextRequest) {
       .single();
     if (insertErr || !inserted) {
       return redirectWithError(
+        req,
         `Failed to create user: ${insertErr?.message ?? "unknown"}`,
       );
     }
@@ -116,17 +141,14 @@ export async function GET(req: NextRequest) {
     await persistTokens(user.id, tokens);
   } catch (err) {
     return redirectWithError(
+      req,
       err instanceof Error ? err.message : "Failed to store tokens",
     );
   }
 
-  await createSessionCookie(user);
-  return NextResponse.redirect(new URL("/dashboard", clientEnv().NEXT_PUBLIC_APP_URL));
-}
-
-function redirectWithError(message: string) {
-  const env = clientEnv();
-  const dest = new URL("/", env.NEXT_PUBLIC_APP_URL);
-  dest.searchParams.set("auth_error", message);
-  return NextResponse.redirect(dest);
+  const dest = new URL("/dashboard", req.url);
+  const res = NextResponse.redirect(dest);
+  clearOauthStateCookie(res);
+  await setSessionCookieOnResponse(res, user);
+  return res;
 }

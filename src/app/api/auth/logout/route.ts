@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
-import { clearSessionCookie } from "@/lib/auth/session";
-import { clientEnv } from "@/lib/env";
+import { type NextRequest, NextResponse } from "next/server";
+import { clearSessionCookie, clearSessionCookieOnResponse } from "@/lib/auth/session";
 
-export async function GET() {
-  await clearSessionCookie();
-  return NextResponse.redirect(new URL("/", clientEnv().NEXT_PUBLIC_APP_URL));
+export async function GET(req: NextRequest) {
+  const res = NextResponse.redirect(new URL("/", req.url));
+  clearSessionCookieOnResponse(res);
+  return res;
 }
 
 export async function POST() {
