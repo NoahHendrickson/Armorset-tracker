@@ -4,6 +4,7 @@ import {
   Crosshair,
   MagnifyingGlassMinus,
   MagnifyingGlassPlus,
+  SquaresFour,
 } from "@phosphor-icons/react/dist/ssr";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -528,6 +529,96 @@ export function CanvasWorkspace({
     }
   }, [draggingId, viewportMinScale, persistCamera, router]);
 
+  const handleArrangeGrid = useCallback(async () => {
+    if (draggingId !== null) return;
+    const surface = viewportSurfaceRef.current;
+    if (!surface) return;
+    const list = trackersRef.current;
+    if (list.length === 0) return;
+
+    const COLS = 5;
+    const GAP = 40;
+    const SLOT_W = TRACKER_WIDTH + GAP;
+    const SLOT_H = TRACKER_DEFAULT_HEIGHT + GAP;
+
+    const visited = new Set<string>();
+    const groups: string[][] = [];
+    for (const t of list) {
+      if (visited.has(t.view.id)) continue;
+      const partnerId = t.view.layout.mergedWith ?? null;
+      if (partnerId && list.some((p) => p.view.id === partnerId)) {
+        groups.push([t.view.id, partnerId]);
+        visited.add(t.view.id);
+        visited.add(partnerId);
+      } else {
+        groups.push([t.view.id]);
+        visited.add(t.view.id);
+      }
+    }
+
+    const rows = Math.ceil(groups.length / COLS);
+    const gridW = Math.min(groups.length, COLS) * SLOT_W - GAP;
+    const gridH = rows * SLOT_H - GAP;
+    const startX = WORKSPACE_CANVAS_WIDTH / 2 - gridW / 2;
+    const startY = WORKSPACE_CANVAS_HEIGHT / 2 - gridH / 2;
+
+    const updates: { id: string; layout: WorkspaceLayoutJson }[] = [];
+    groups.forEach((g, idx) => {
+      const col = idx % COLS;
+      const row = Math.floor(idx / COLS);
+      const x = startX + col * SLOT_W;
+      const y = startY + row * SLOT_H;
+      for (const id of g) {
+        const tracker = list.find((t) => t.view.id === id);
+        if (!tracker) continue;
+        const lo = parseWorkspaceLayout(tracker.view.layout);
+        updates.push({ id, layout: { ...lo, x, y } });
+      }
+    });
+
+    const layoutById = new Map(
+      updates.map((u): [string, WorkspaceLayoutJson] => [u.id, u.layout]),
+    );
+    setTrackers((prev) =>
+      prev.map((p) => {
+        const lo = layoutById.get(p.view.id);
+        return lo ? { ...p, view: { ...p.view, layout: lo } } : p;
+      }),
+    );
+
+    const scale = Math.max(1, viewportMinScale);
+    const vw = surface.clientWidth;
+    const vh = surface.clientHeight;
+    const positionX = vw / 2 - scale * (WORKSPACE_CANVAS_WIDTH / 2);
+    const positionY = vh / 2 - scale * (WORKSPACE_CANVAS_HEIGHT / 2);
+    const camera: WorkspaceCameraJson = {
+      zoom: scale,
+      panX: positionX,
+      panY: positionY,
+    };
+    twRef.current?.setTransform(positionX, positionY, scale, 260);
+    await persistCamera(camera);
+
+    const results = await Promise.all(
+      updates.map(async ({ id, layout }) => {
+        try {
+          const res = await fetch(`/api/views/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ layout }),
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      }),
+    );
+    if (results.some((ok) => !ok)) {
+      router.refresh();
+    }
+  }, [draggingId, viewportMinScale, persistCamera, router]);
+
   const onDragPosition = useCallback(
     (viewId: string, x: number, y: number, dragEvent: DraggableEvent) => {
       const api = twRef.current;
@@ -981,6 +1072,15 @@ export function CanvasWorkspace({
 
             {/* Zoom + recenter — bottom right */}
             <div className="pointer-events-none absolute bottom-6 right-6 z-30 flex gap-2">
+              <button
+                type="button"
+                aria-label="Arrange trackers in a 5×5 grid"
+                disabled={trackers.length === 0 || draggingId !== null}
+                onClick={() => void handleArrangeGrid()}
+                className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center border border-white/10 bg-[#2d2e32] text-white/80 shadow-lg transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+              >
+                <SquaresFour className="h-5 w-5" weight="duotone" />
+              </button>
               <button
                 type="button"
                 aria-label="Recenter workspace and trackers"
