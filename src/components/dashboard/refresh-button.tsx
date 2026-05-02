@@ -32,11 +32,7 @@ export function RefreshButton({
         method: "POST",
         credentials: "include",
       });
-      const body = (await res.json()) as {
-        error?: string;
-        itemCount?: number;
-        warnings?: string[];
-      };
+      const body = (await res.json()) as { error?: string; itemCount?: number };
       if (!res.ok) {
         toast.error(body.error ?? "Refresh failed");
         return;
@@ -44,11 +40,6 @@ export function RefreshButton({
       toast.success(
         `Inventory refreshed${typeof body.itemCount === "number" ? ` — ${body.itemCount} pieces` : ""}.`,
       );
-      if (Array.isArray(body.warnings)) {
-        for (const w of body.warnings) {
-          toast.warning(w, { duration: 14_000 });
-        }
-      }
       startTransition(() => router.refresh());
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Refresh failed");

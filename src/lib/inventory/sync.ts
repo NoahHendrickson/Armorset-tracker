@@ -10,26 +10,7 @@ import {
 import { getManifestLookups } from "@/lib/manifest/lookups";
 import type { Session } from "@/lib/auth/session";
 import type { DerivedArmorPieceJson, InventoryCacheRow, Json } from "@/lib/db/types";
-import type { ProfileResponse } from "@/lib/bungie/types";
 import { deriveAllArmorPieces } from "./derive";
-
-/** Raw item counts from GetProfile — used to detect withheld inventory components. */
-function rawInventoryItemCounts(profile: ProfileResponse): {
-  profileItems: number;
-  characterBagItems: number;
-  equippedItems: number;
-} {
-  const profileItems = profile.profileInventory?.data?.items?.length ?? 0;
-  let characterBagItems = 0;
-  for (const inv of Object.values(profile.characterInventories?.data ?? {})) {
-    characterBagItems += inv.items?.length ?? 0;
-  }
-  let equippedItems = 0;
-  for (const eq of Object.values(profile.characterEquipment?.data ?? {})) {
-    equippedItems += eq.items?.length ?? 0;
-  }
-  return { profileItems, characterBagItems, equippedItems };
-}
 
 export const INVENTORY_TTL_MS = 5 * 60 * 1000;
 
@@ -142,19 +123,6 @@ export async function syncUserInventory(
     } else {
       throw err;
     }
-  }
-
-  const rawCounts = rawInventoryItemCounts(profile);
-  if (
-    rawCounts.profileItems === 0 &&
-    rawCounts.characterBagItems === 0 &&
-    rawCounts.equippedItems > 0
-  ) {
-    warnings.push(
-      "Bungie returned equipped items only (vault and character inventories were empty). " +
-        "To sync vault and unequipped armor, register your app at bungie.net/en/Application with scope ReadDestinyInventoryAndVault, then sign out and sign in again. " +
-        "If scope is already set, check Bungie.net privacy settings for inventory visibility.",
-    );
   }
 
   const items = deriveAllArmorPieces(profile, lookups);
