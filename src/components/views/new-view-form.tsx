@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import type { WorkspaceLayoutJson } from "@/lib/workspace/workspace-schema";
 import {
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ArmorSetCombobox } from "@/components/views/armor-set-combobox";
 
 export interface OptionItem {
   hash: number;
@@ -37,6 +39,11 @@ interface NewViewFormProps {
   externalSubmit?: boolean;
   /** Persisted tracker frame on creation (canvas placement). */
   initialLayout?: WorkspaceLayoutJson;
+  /**
+   * When set, called at submit time to build `layout` for the create request
+   * (e.g. from the current viewport). Overrides {@link initialLayout}.
+   */
+  resolveLayoutOnSubmit?: () => WorkspaceLayoutJson;
   /** Includes `tracker` when the API returns workspace payload so the dashboard can merge without refetching. */
   onCreated?: (viewId: string, tracker?: SerializableTrackerPayload) => void;
   onCancel?: () => void;
@@ -59,6 +66,7 @@ export function NewViewForm({
   formId,
   externalSubmit,
   initialLayout,
+  resolveLayoutOnSubmit,
   onCreated,
   onCancel,
   onBusyChange,
@@ -77,10 +85,19 @@ export function NewViewForm({
   const [setHash, setSetHash] = useState<string>("");
   const [archetypeHash, setArchetypeHash] = useState<string>("");
   const [tuningHash, setTuningHash] = useState<string>("");
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const sortedSets = useMemo(() => {
-    if (classType === "") return [];
-    return setsByClass[Number(classType) as 0 | 1 | 2];
+    if (classType !== "") {
+      return setsByClass[Number(classType) as 0 | 1 | 2];
+    }
+    const byHash = new Map<number, OptionItem>();
+    for (const clazz of [0, 1, 2] as const) {
+      for (const s of setsByClass[clazz]) {
+        if (!byHash.has(s.hash)) byHash.set(s.hash, s);
+      }
+    }
+    return [...byHash.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [classType, setsByClass]);
 
   const sortedArchetypes = useMemo(
@@ -109,9 +126,27 @@ export function NewViewForm({
 
   const canSubmitWithTransition = canSubmit && !isPending;
 
+  const sharpMenus = Boolean(embedded);
+
   useEffect(() => {
     onCanSubmitChange?.(canSubmitWithTransition);
   }, [canSubmitWithTransition, onCanSubmitChange]);
+
+  useEffect(() => {
+    if (canSubmit) setSubmitAttempted(false);
+  }, [canSubmit]);
+
+  const fieldErrorOutline =
+    "border-2 border-destructive focus-visible:ring-2 focus-visible:ring-destructive/90";
+
+  const showClassError = submitAttempted && classType === "";
+  const showSetError =
+    submitAttempted && setHash === "" && sortedSets.length > 0;
+  const showArchetypeError =
+    submitAttempted && archetypeHash === "" && sortedArchetypes.length > 0;
+  const showTuningError =
+    submitAttempted && tuningHash === "" && sortedTunings.length > 0;
+  const showNameError = submitAttempted && name.trim() === "";
 
   function autoFillName() {
     if (!name && setLabel && archetypeLabel && classLabel) {
@@ -121,10 +156,16 @@ export function NewViewForm({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit) {
+      setSubmitAttempted(true);
+      return;
+    }
 
     setSubmitting(true);
     try {
+      const layoutForRequest =
+        resolveLayoutOnSubmit?.() ??
+        (initialLayout !== undefined ? initialLayout : undefined);
       const res = await fetch("/api/views", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -134,7 +175,7 @@ export function NewViewForm({
           archetype_hash: Number(archetypeHash),
           tuning_hash: Number(tuningHash),
           class_type: Number(classType),
-          ...(initialLayout !== undefined ? { layout: initialLayout } : {}),
+          ...(layoutForRequest !== undefined ? { layout: layoutForRequest } : {}),
         }),
       });
       const body = (await res.json()) as {
@@ -160,7 +201,12 @@ export function NewViewForm({
   }
 
   return (
-    <form id={formId} onSubmit={onSubmit} className="flex flex-col gap-6">
+    <form
+      id={formId}
+      onSubmit={onSubmit}
+      className="flex flex-col gap-6"
+      noValidate
+    >
       <div className="grid gap-2">
         <Label htmlFor="class">Class</Label>
         <Select
@@ -176,12 +222,21 @@ export function NewViewForm({
             );
           }}
         >
-          <SelectTrigger id="class" aria-label="Class">
+          <SelectTrigger
+            id="class"
+            aria-label="Class"
+            aria-invalid={showClassError}
+            className={cn("rounded-none", showClassError && fieldErrorOutline)}
+          >
             <SelectValue placeholder="Select a class" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className={sharpMenus ? "rounded-none" : undefined}>
             {CLASS_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
+              <SelectItem
+                key={opt.value}
+                value={opt.value}
+                className={sharpMenus ? "rounded-none" : undefined}
+              >
                 {opt.label}
               </SelectItem>
             ))}
@@ -191,36 +246,16 @@ export function NewViewForm({
 
       <div className="grid gap-2">
         <Label htmlFor="set">Armor set</Label>
-        <Select
+        <ArmorSetCombobox
+          id="set"
+          options={sortedSets}
           value={setHash}
-          onValueChange={(v) => setSetHash(v)}
-          disabled={classType === ""}
-        >
-          <SelectTrigger id="set" aria-label="Armor set">
-            <SelectValue
-              placeholder={
-                classType === ""
-                  ? "Pick a class first"
-                  : "Select an armor set"
-              }
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {sortedSets.length === 0 ? (
-              <div className="px-2 py-3 text-sm text-muted-foreground">
-                {classType === ""
-                  ? "Pick a class first."
-                  : "No sets available — sync the manifest first."}
-              </div>
-            ) : (
-              sortedSets.map((s) => (
-                <SelectItem key={s.hash} value={String(s.hash)}>
-                  {s.name}
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
+          onValueChange={setSetHash}
+          aria-label="Armor set"
+          placeholder="Select an armor set"
+          sharpCorners={sharpMenus}
+          invalid={showSetError}
+        />
       </div>
 
       <div className="grid gap-2">
@@ -231,17 +266,26 @@ export function NewViewForm({
             setArchetypeHash(v);
           }}
         >
-          <SelectTrigger id="archetype" aria-label="Archetype">
+          <SelectTrigger
+            id="archetype"
+            aria-label="Archetype"
+            aria-invalid={showArchetypeError}
+            className={cn("rounded-none", showArchetypeError && fieldErrorOutline)}
+          >
             <SelectValue placeholder="Select an archetype" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className={sharpMenus ? "rounded-none" : undefined}>
             {sortedArchetypes.length === 0 ? (
               <div className="px-2 py-3 text-sm text-muted-foreground">
                 No archetypes available — sync the manifest first.
               </div>
             ) : (
               sortedArchetypes.map((a) => (
-                <SelectItem key={a.hash} value={String(a.hash)}>
+                <SelectItem
+                  key={a.hash}
+                  value={String(a.hash)}
+                  className={sharpMenus ? "rounded-none" : undefined}
+                >
                   {a.name}
                 </SelectItem>
               ))
@@ -258,17 +302,26 @@ export function NewViewForm({
             setTuningHash(v);
           }}
         >
-          <SelectTrigger id="tuning" aria-label="Tuning stat">
+          <SelectTrigger
+            id="tuning"
+            aria-label="Tuning stat"
+            aria-invalid={showTuningError}
+            className={cn("rounded-none", showTuningError && fieldErrorOutline)}
+          >
             <SelectValue placeholder="Select a tuning stat" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className={sharpMenus ? "rounded-none" : undefined}>
             {sortedTunings.length === 0 ? (
               <div className="px-2 py-3 text-sm text-muted-foreground">
                 No tunings available — sync the manifest first.
               </div>
             ) : (
               sortedTunings.map((t) => (
-                <SelectItem key={t.hash} value={String(t.hash)}>
+                <SelectItem
+                  key={t.hash}
+                  value={String(t.hash)}
+                  className={sharpMenus ? "rounded-none" : undefined}
+                >
                   {t.name}
                 </SelectItem>
               ))
@@ -286,7 +339,11 @@ export function NewViewForm({
           onFocus={autoFillName}
           placeholder='e.g. "Warlock Ferropotent — Gunner"'
           maxLength={80}
-          required
+          aria-invalid={showNameError}
+          className={cn(
+            "rounded-none",
+            showNameError && fieldErrorOutline,
+          )}
         />
         <p className="text-xs text-muted-foreground">
           Shown on your dashboard. Defaults to class + set + archetype.

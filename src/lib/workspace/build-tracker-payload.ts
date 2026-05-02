@@ -5,9 +5,7 @@ import type { DerivedArmorPieceJson, ViewRow } from "@/lib/db/types";
 import type { ManifestLookups } from "@/lib/manifest/lookups";
 import { resolveViewSetHash } from "@/lib/manifest/lookups";
 import type { ViewProgress } from "@/lib/views/progress";
-import { inferDiagnosticsBanner } from "@/lib/views/infer-diagnostics-banner";
 import {
-  computeViewDiagnostics,
   computeViewProgress,
   tertiaryStatsForArchetype,
 } from "@/lib/views/progress";
@@ -53,11 +51,6 @@ export function buildSerializableTrackerPayload(
     inventory,
     tertiaryStats,
   );
-  const diagnostics = computeViewDiagnostics(
-    viewForMatching,
-    inventory,
-    archetypePair !== undefined,
-  );
 
   const tertiaryStatIconPaths: Partial<Record<ArmorStatName, string>> = {};
   for (const t of tertiaryStats) {
@@ -91,9 +84,6 @@ export function buildSerializableTrackerPayload(
   };
 
   const needsClass = Number(viewRow.class_type) < 0;
-  const diagBanner = inferDiagnosticsBanner(diagnostics, className);
-  const showDiagnostics =
-    progress.ownedCells < progress.totalCells && !diagBanner.omitTrackerPanel;
 
   const layout = parseWorkspaceLayout(viewRow.layout);
 
@@ -103,7 +93,6 @@ export function buildSerializableTrackerPayload(
       layout,
     },
     progress,
-    diagnostics,
     setName,
     archetypeName,
     tuningName,
@@ -114,7 +103,6 @@ export function buildSerializableTrackerPayload(
       : null,
     tertiaryStatIconPaths: tertiaryStatIconPaths as Record<string, string>,
     needsClass,
-    showDiagnostics,
     resolvedSetHash,
   };
 }

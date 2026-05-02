@@ -54,10 +54,10 @@ export function OwnershipIcon({ state, count }: OwnershipIconProps) {
   return (
     <span
       role="img"
-      aria-label="Not owned"
+      aria-label="0 matching pieces"
       className={`${baseSquare} border-[1.5px] border-white/40`}
     >
-      <span className="sr-only">Not owned</span>
+      <span className="sr-only">0 matching pieces</span>
     </span>
   );
 }

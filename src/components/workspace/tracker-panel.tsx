@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { DraggableEvent } from "react-draggable";
 import { Rnd } from "react-rnd";
 import {
   DotsSixVertical,
@@ -8,19 +9,24 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
 import { ViewActions } from "@/components/views/view-actions";
-import { ViewDiagnosticsPanel } from "@/components/views/view-diagnostics";
 import { MergedCompareGrid } from "@/components/views/merged-compare-grid";
 import { TuningHeaderGlyph } from "@/components/views/tuning-header-glyph";
 import { ViewGrid } from "@/components/views/view-grid";
 import type { ArmorStatName } from "@/lib/db/types";
 import type { ViewProgress } from "@/lib/views/progress";
-import { MERGE_ACCENT_BLUE, MERGE_ACCENT_GREEN } from "@/lib/views/merge-compare";
+import {
+  MERGE_ACCENT_BLUE,
+  MERGE_ACCENT_GREEN,
+  unionTertiaryStats,
+} from "@/lib/views/merge-compare";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
   TRACKER_DEFAULT_HEIGHT,
   TRACKER_WIDTH,
+  trackerWidthForTertiaryColumns,
 } from "@/lib/workspace/workspace-constants";
 import type { WorkspaceLayoutJson } from "@/lib/workspace/workspace-schema";
+import { cn } from "@/lib/utils";
 
 export type TrackerMergeRole = "solo" | "anchor" | "mergedPartner";
 
@@ -35,12 +41,19 @@ interface TrackerPanelProps {
    */
   scale: number;
   onInteract: (viewId: string) => void;
-  onDragPosition?: (viewId: string, x: number, y: number) => void;
+  onDragPosition?: (
+    viewId: string,
+    x: number,
+    y: number,
+    dragEvent: DraggableEvent,
+  ) => void;
   onDragLayoutEnd: (viewId: string, layout: WorkspaceLayoutJson) => void;
   mergeRole: TrackerMergeRole;
   mergePartnerPayload: SerializableTrackerPayload | null;
   mergeDropHighlight: "none" | "valid" | "invalid";
   onUnmerge?: () => void;
+  /** Brief light-blue frame after the tracker is created on the canvas. */
+  spawnHighlight?: boolean;
 }
 
 /**
@@ -100,10 +113,18 @@ export function TrackerPanel({
   mergePartnerPayload,
   mergeDropHighlight,
   onUnmerge,
+  spawnHighlight = false,
 }: TrackerPanelProps) {
   const { view } = payload;
   const [layout, setLayout] = useState<WorkspaceLayoutJson>(view.layout);
   const merged = Boolean(view.layout.mergedWith) && mergePartnerPayload !== null;
+
+  const panelWidth =
+    merged && mergePartnerPayload
+      ? trackerWidthForTertiaryColumns(
+          unionTertiaryStats(payload, mergePartnerPayload).length,
+        )
+      : TRACKER_WIDTH;
 
   useEffect(
     () => {
@@ -161,21 +182,17 @@ export function TrackerPanel({
   if (isGhostPartner) {
     return (
       <Rnd
-        className="rnd-tracker pointer-events-none"
+        className="rnd-tracker rnd-tracker-ghost pointer-events-none"
         bounds="parent"
         scale={scale}
         position={{ x: layout.x, y: layout.y }}
-        size={{ width: TRACKER_WIDTH, height: TRACKER_DEFAULT_HEIGHT }}
+        size={{ width: panelWidth, height: TRACKER_DEFAULT_HEIGHT }}
         enableResizing={false}
         enableDragging={false}
         style={{ zIndex: layout.z }}
         cancel=".no-drag"
       >
-        <div
-          id={`tracker-${view.id}`}
-          aria-hidden
-          className="h-full w-full opacity-0"
-        />
+        <div id={`tracker-${view.id}`} aria-hidden className="h-full w-full" />
       </Rnd>
     );
   }
@@ -186,20 +203,19 @@ export function TrackerPanel({
       dragHandleClassName="tracker-drag"
       bounds="parent"
       scale={scale}
-      position={{ x: layout.x, y: layout.y }}
-      size={{ width: TRACKER_WIDTH, height: TRACKER_DEFAULT_HEIGHT }}
       enableResizing={false}
-      style={{ zIndex: layout.z }}
-      onDragStart={() => onInteract(view.id)}
-      onDrag={(_e, d) => {
-        onDragPosition?.(view.id, d.x, d.y);
+      position={{ x: layout.x, y: layout.y }}
+      size={{ width: panelWidth, height: TRACKER_DEFAULT_HEIGHT }}
+      onDrag={(e, d) => {
+        onDragPosition?.(view.id, d.x, d.y, e);
+        setLayout((prev) => ({ ...prev, x: d.x, y: d.y }));
       }}
       onDragStop={(_e, d) => {
         const next: WorkspaceLayoutJson = {
           ...layout,
           x: d.x,
           y: d.y,
-          w: TRACKER_WIDTH,
+          w: panelWidth,
           h: TRACKER_DEFAULT_HEIGHT,
         };
         setLayout(next);
@@ -211,7 +227,10 @@ export function TrackerPanel({
         id={`tracker-${view.id}`}
         role="region"
         aria-label={ariaRegionLabel}
-        className="flex h-full overflow-hidden"
+        className={cn(
+          "flex h-full overflow-hidden",
+          spawnHighlight && "tracker-spawn-highlight",
+        )}
       >
         <aside
           aria-label="Tracker actions"
@@ -314,8 +333,7 @@ export function TrackerPanel({
 
           <div
             className={`no-drag flex min-h-0 flex-1 flex-col gap-4 border-t border-[#424347] px-4 pt-4 pb-2 ${
-              !showMergedGrid &&
-              (payload.needsClass || payload.showDiagnostics)
+              !showMergedGrid && payload.needsClass
                 ? "overflow-y-auto"
                 : "overflow-hidden"
             }`}
@@ -346,16 +364,6 @@ export function TrackerPanel({
                 tertiaryStatIconPaths={tertiaryPaths}
               />
             )}
-
-            {payload.showDiagnostics ? (
-              <ViewDiagnosticsPanel
-                diagnostics={payload.diagnostics}
-                setName={payload.setName}
-                archetypeName={payload.archetypeName}
-                tuningName={payload.tuningName}
-                className={payload.className}
-              />
-            ) : null}
           </div>
         </div>
       </div>

@@ -18,6 +18,7 @@ export type Database = {
           bungie_membership_id: string;
           bungie_membership_type: number;
           display_name: string;
+          profile_picture_path: string | null;
           created_at: string;
           updated_at: string;
           workspace_camera: Json;
@@ -27,6 +28,7 @@ export type Database = {
           bungie_membership_id: string;
           bungie_membership_type: number;
           display_name: string;
+          profile_picture_path?: string | null;
           created_at?: string;
           updated_at?: string;
           workspace_camera?: Json;
@@ -36,6 +38,7 @@ export type Database = {
           bungie_membership_id?: string;
           bungie_membership_type?: number;
           display_name?: string;
+          profile_picture_path?: string | null;
           created_at?: string;
           updated_at?: string;
           workspace_camera?: Json;

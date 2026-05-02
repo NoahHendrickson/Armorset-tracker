@@ -11,9 +11,10 @@ interface RefreshButtonProps {
    * `button`      = outlined button with label (dashboards / older headers).
    * `icon`        = 20px icon-only trigger styled for the tracker sidebar.
    * `header-icon` = 40px icon button styled for the top app header.
+   * `header-large` = compact square nav control (inventory refresh).
    * `fab`         = circular floating-action icon for the canvas bottom bar.
    */
-  variant?: "button" | "icon" | "header-icon" | "fab";
+  variant?: "button" | "icon" | "header-icon" | "header-large" | "fab";
 }
 
 export function RefreshButton({
@@ -74,6 +75,26 @@ export function RefreshButton({
         }
         title="Refresh inventory"
         className="flex h-10 w-10 items-center justify-center border border-white/10 bg-white/5 text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+      >
+        <ArrowsCounterClockwise
+          weight="duotone"
+          className={`h-5 w-5 ${isLoading ? "animate-spin" : ""}`}
+        />
+      </button>
+    );
+  }
+
+  if (variant === "header-large") {
+    return (
+      <button
+        type="button"
+        onClick={refresh}
+        disabled={isLoading}
+        aria-label={
+          isLoading ? "Refreshing inventory" : "Refresh inventory from Bungie"
+        }
+        title="Refresh inventory"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-none border-2 border-white/15 bg-[#2e2f2f] text-white transition-colors hover:bg-[#353636] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:opacity-60"
       >
         <ArrowsCounterClockwise
           weight="duotone"

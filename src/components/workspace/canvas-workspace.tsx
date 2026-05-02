@@ -7,6 +7,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { DraggableEvent } from "react-draggable";
 import type { ReactZoomPanPinchContentRef } from "react-zoom-pan-pinch";
 import {
   TransformWrapper,
@@ -16,17 +17,20 @@ import {
 import {
   TRACKER_DEFAULT_HEIGHT,
   TRACKER_WIDTH,
+  trackerWidthForTertiaryColumns,
   WORKSPACE_CANVAS_ELEMENT_ID,
   WORKSPACE_CANVAS_HEIGHT,
   WORKSPACE_CANVAS_WIDTH,
 } from "@/lib/workspace/workspace-constants";
 import { canAttemptMerge, MERGE_OVERLAP_TRIGGER_RATIO, mergeOverlapRatio } from "@/lib/views/canvas-merge";
+import { unionTertiaryStats } from "@/lib/views/merge-compare";
 import { mergePreviewUnionPathD } from "@/lib/views/merge-preview-outline";
 import { computeWorkspaceMinScale } from "@/lib/workspace/workspace-min-scale";
 import { computeRecenterTranslation } from "@/lib/workspace/recenter-trackers";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
   parseWorkspaceLayout,
+  preferredTrackerTopLeftForViewportCenter,
   type WorkspaceCameraJson,
   type WorkspaceLayoutJson,
 } from "@/lib/workspace/workspace-schema";
@@ -40,6 +44,10 @@ import {
   TrackerPanel,
   type TrackerMergeRole,
 } from "@/components/workspace/tracker-panel";
+import {
+  clientPointFromDragEvent,
+  computeDragEdgePanFromPointer,
+} from "@/components/workspace/canvas-drag-edge-pan";
 import { attachCanvasViewportWheel } from "@/components/workspace/canvas-viewport-wheel";
 
 function useDebouncedCamera(
@@ -117,17 +125,24 @@ function TrackerLayer({
   mergeDropTargetId,
   mergeDropValid,
   onUnmergeAnchor,
+  spawnHighlightId,
 }: {
   trackers: SerializableTrackerPayload[];
   hasInventory: boolean;
   initialScale: number;
-  onDragPosition: (viewId: string, x: number, y: number) => void;
+  onDragPosition: (
+    viewId: string,
+    x: number,
+    y: number,
+    dragEvent: DraggableEvent,
+  ) => void;
   onDragLayoutEnd: (viewId: string, layout: WorkspaceLayoutJson) => void;
   onInteract: (viewId: string) => void;
   draggingId: string | null;
   mergeDropTargetId: string | null;
   mergeDropValid: boolean;
   onUnmergeAnchor: (anchorViewId: string) => void;
+  spawnHighlightId: string | null;
 }) {
   const [scale, setScale] = useState(initialScale);
   useTransformEffect((ref) => {
@@ -165,6 +180,7 @@ function TrackerLayer({
                 ? () => onUnmergeAnchor(t.view.id)
                 : undefined
             }
+            spawnHighlight={spawnHighlightId === t.view.id}
           />
         );
       })}
@@ -220,6 +236,45 @@ export function CanvasWorkspace({
     null,
   );
   const [mergeDropValid, setMergeDropValid] = useState(false);
+  const [spawnHighlightId, setSpawnHighlightId] = useState<string | null>(null);
+  const spawnHighlightTimeoutRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  const scheduleSpawnHighlight = useCallback((viewId: string) => {
+    if (spawnHighlightTimeoutRef.current) {
+      clearTimeout(spawnHighlightTimeoutRef.current);
+      spawnHighlightTimeoutRef.current = null;
+    }
+    setSpawnHighlightId(viewId);
+    spawnHighlightTimeoutRef.current = setTimeout(() => {
+      spawnHighlightTimeoutRef.current = null;
+      setSpawnHighlightId((cur) => (cur === viewId ? null : cur));
+    }, 3500);
+  }, []);
+
+  const getPreferredTrackerTopLeft = useCallback(() => {
+    const surface = viewportSurfaceRef.current;
+    const api = twRef.current;
+    if (!surface || !api) return null;
+    return preferredTrackerTopLeftForViewportCenter(
+      surface.clientWidth,
+      surface.clientHeight,
+      {
+        zoom: api.state.scale,
+        panX: api.state.positionX,
+        panY: api.state.positionY,
+      },
+    );
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (spawnHighlightTimeoutRef.current) {
+        clearTimeout(spawnHighlightTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resync trackers after router.refresh()
@@ -460,41 +515,62 @@ export function CanvasWorkspace({
     }
   }, [draggingId, viewportMinScale, persistCamera, router]);
 
-  const onDragPosition = useCallback((viewId: string, x: number, y: number) => {
-    setDraggingId(viewId);
-    setDragLive({ x, y });
-    const current = trackersRef.current;
-    const self = current.find((t) => t.view.id === viewId);
-    const partnerId = self
-      ? (parseWorkspaceLayout(self.view.layout).mergedWith ?? null)
-      : null;
+  const onDragPosition = useCallback(
+    (viewId: string, x: number, y: number, dragEvent: DraggableEvent) => {
+      const api = twRef.current;
+      const surfaceEl = viewportSurfaceRef.current;
+      const pt = clientPointFromDragEvent(dragEvent);
 
-    let best: { id: string; ratio: number } | null = null;
-    for (const t of current) {
-      if (t.view.id === viewId) continue;
-      // Stacked merged partner shares x/y — ignore as merge target so moves
-      // don't show merge chrome or block until the pointer leaves the union.
-      if (partnerId !== null && t.view.id === partnerId) continue;
-      const ratio = mergeOverlapRatio(
-        x,
-        y,
-        t.view.layout.x,
-        t.view.layout.y,
-      );
-      if (ratio < MERGE_OVERLAP_TRIGGER_RATIO) continue;
-      if (!best || ratio > best.ratio) best = { id: t.view.id, ratio };
-    }
-    const targetId = best?.id ?? null;
-    let valid = false;
-    if (targetId) {
-      const src = current.find((t) => t.view.id === viewId);
-      const tgt = current.find((t) => t.view.id === targetId);
-      if (src && tgt) valid = canAttemptMerge(src, tgt);
-    }
-    mergeHoverRef.current = { targetId, valid };
-    setMergeDropTargetId(targetId);
-    setMergeDropValid(valid);
-  }, []);
+      if (api?.setTransform && surfaceEl && pt) {
+        const { positionX: px, positionY: py, scale } = api.state;
+        const pan = computeDragEdgePanFromPointer({
+          pointerX: pt.x,
+          pointerY: pt.y,
+          viewportRect: surfaceEl.getBoundingClientRect(),
+          positionX: px,
+          positionY: py,
+        });
+        if (pan.didPan) {
+          api.setTransform(pan.positionX, pan.positionY, scale, 0);
+        }
+      }
+
+      setDraggingId(viewId);
+      setDragLive({ x, y });
+      const current = trackersRef.current;
+      const self = current.find((t) => t.view.id === viewId);
+      const partnerId = self
+        ? (parseWorkspaceLayout(self.view.layout).mergedWith ?? null)
+        : null;
+
+      let best: { id: string; ratio: number } | null = null;
+      for (const t of current) {
+        if (t.view.id === viewId) continue;
+        // Stacked merged partner shares x/y — ignore as merge target so moves
+        // don't show merge chrome or block until the pointer leaves the union.
+        if (partnerId !== null && t.view.id === partnerId) continue;
+        const ratio = mergeOverlapRatio(
+          x,
+          y,
+          t.view.layout.x,
+          t.view.layout.y,
+        );
+        if (ratio < MERGE_OVERLAP_TRIGGER_RATIO) continue;
+        if (!best || ratio > best.ratio) best = { id: t.view.id, ratio };
+      }
+      const targetId = best?.id ?? null;
+      let valid = false;
+      if (targetId) {
+        const src = current.find((t) => t.view.id === viewId);
+        const tgt = current.find((t) => t.view.id === targetId);
+        if (src && tgt) valid = canAttemptMerge(src, tgt);
+      }
+      mergeHoverRef.current = { targetId, valid };
+      setMergeDropTargetId(targetId);
+      setMergeDropValid(valid);
+    },
+    [],
+  );
 
   const handleLayoutDragEnd = useCallback(
     (viewId: string, layout: WorkspaceLayoutJson) => {
@@ -510,11 +586,9 @@ export function CanvasWorkspace({
       if (!self) return;
 
       const selfLo = parseWorkspaceLayout(self.view.layout);
-      const w = TRACKER_WIDTH;
       const h = TRACKER_DEFAULT_HEIGHT;
       const normalized: WorkspaceLayoutJson = {
         ...layout,
-        w,
         h,
       };
 
@@ -535,11 +609,14 @@ export function CanvasWorkspace({
         const tgtLo = parseWorkspaceLayout(tgt.view.layout);
         const snapX = tgtLo.x;
         const snapY = tgtLo.y;
+        const mergedW = trackerWidthForTertiaryColumns(
+          unionTertiaryStats(self, tgt).length,
+        );
         const sourceLayout: WorkspaceLayoutJson = {
           ...selfLo,
           x: snapX,
           y: snapY,
-          w,
+          w: mergedW,
           h,
           z: maxZ + 2,
           mergedWith: tgt.view.id,
@@ -548,7 +625,7 @@ export function CanvasWorkspace({
           ...tgtLo,
           x: snapX,
           y: snapY,
-          w,
+          w: mergedW,
           h,
           z: maxZ + 1,
           mergedWith: self.view.id,
@@ -573,7 +650,7 @@ export function CanvasWorkspace({
             ...partnerLo,
             x: normalized.x,
             y: normalized.y,
-            w,
+            w: normalized.w,
             h,
             mergedWith: viewId,
           };
@@ -604,12 +681,16 @@ export function CanvasWorkspace({
       const nextAnchor: WorkspaceLayoutJson = {
         ...anchorLo,
         mergedWith: null,
+        w: TRACKER_WIDTH,
+        h: TRACKER_DEFAULT_HEIGHT,
       };
       const nextPartner: WorkspaceLayoutJson = {
         ...partnerLo,
         x: partnerLo.x + nudge,
         y: partnerLo.y + nudge,
         mergedWith: null,
+        w: TRACKER_WIDTH,
+        h: TRACKER_DEFAULT_HEIGHT,
       };
       await persistTwoLayouts([
         { id: anchorViewId, layout: nextAnchor },
@@ -719,7 +800,7 @@ export function CanvasWorkspace({
   return (
     <div className={`flex min-h-0 flex-1 flex-col ${className}`}>
       {hasTopMessage ? (
-        <div className="shrink-0 pt-[68px]">
+        <div className="shrink-0 pt-[76px]">
           {banners ? (
             <div className="space-y-2 border-b border-border bg-background px-4 py-3 sm:px-6">
               {banners}
@@ -784,7 +865,7 @@ export function CanvasWorkspace({
             >
               <div
                 id={WORKSPACE_CANVAS_ELEMENT_ID}
-                className="workspace-canvas-bounds relative isolate"
+                className="workspace-canvas-bounds relative"
                 style={{
                   width: WORKSPACE_CANVAS_WIDTH,
                   height: WORKSPACE_CANVAS_HEIGHT,
@@ -805,7 +886,6 @@ export function CanvasWorkspace({
                     fill="none"
                     stroke="currentColor"
                     strokeWidth={1}
-                    vectorEffect="nonScalingStroke"
                   />
                 </svg>
                 {mergePreviewPath ? (
@@ -839,19 +919,19 @@ export function CanvasWorkspace({
                   mergeDropTargetId={mergeDropTargetId}
                   mergeDropValid={mergeDropValid}
                   onUnmergeAnchor={handleUnmergeAnchor}
+                  spawnHighlightId={spawnHighlightId}
                 />
               </div>
             </TransformComponent>
 
             {trackers.length === 0 ? (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center">
-                <div>
-                  <p className="text-lg font-medium text-foreground">
-                    Workspace is empty
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-8">
+                <div className="flex max-w-lg flex-col items-center text-center">
+                  <p className="text-[20px] font-normal leading-normal tracking-tight text-white">
+                    Welcome to ASB+TT
                   </p>
-                  <p className="text-muted-foreground mt-2 max-w-sm text-sm">
-                    Use <span className="font-medium">New tracker</span> below
-                    to add your first checklist.
+                  <p className="mt-2 max-w-xl text-sm font-normal leading-snug text-white/50">
+                    Create a tracker by class, armor set, archetype, and tuning.
                   </p>
                 </div>
               </div>
@@ -906,10 +986,12 @@ export function CanvasWorkspace({
                         ? prev
                         : [...prev, tracker],
                     );
+                    scheduleSpawnHighlight(tracker.view.id);
                   } else {
                     router.refresh();
                   }
                 }}
+                getPreferredTrackerTopLeft={getPreferredTrackerTopLeft}
               />
               <div className="pointer-events-auto">
                 <RefreshButton variant="fab" />

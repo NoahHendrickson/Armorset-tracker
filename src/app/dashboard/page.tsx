@@ -16,6 +16,7 @@ import { buildSerializableTrackerPayload } from "@/lib/workspace/build-tracker-p
 import { CanvasWorkspace } from "@/components/workspace/canvas-workspace";
 import { manifestSelectorsFromLookups } from "@/lib/views/manifest-selectors-from-lookup";
 import { parseWorkspaceCamera } from "@/lib/workspace/workspace-schema";
+import { bungieIconUrl } from "@/lib/bungie/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -37,10 +38,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const sb = getServiceRoleClient();
   const { data: userRow } = await sb
     .from("users")
-    .select("display_name, workspace_camera")
+    .select("display_name, workspace_camera, profile_picture_path")
     .eq("id", session.userId)
     .maybeSingle();
   const displayName = userRow?.display_name ?? session.displayName;
+  const profilePictureUrl =
+    userRow?.profile_picture_path &&
+    userRow.profile_picture_path.trim().length > 0
+      ? bungieIconUrl(userRow.profile_picture_path.trim())
+      : null;
   const initialCamera = parseWorkspaceCamera(userRow?.workspace_camera ?? null);
 
   let syncWarning: string | null = null;
@@ -135,7 +141,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   return (
     <>
-      <AppHeader displayName={displayName} />
+      <AppHeader displayName={displayName} profilePictureUrl={profilePictureUrl} />
 
       <CanvasWorkspace
         banners={banners}

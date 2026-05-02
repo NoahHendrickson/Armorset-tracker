@@ -43,7 +43,7 @@ function cellTitle(
   matches: DerivedArmorPieceJson[],
 ): string {
   if (state === "loading") return "Loading inventory…";
-  if (state === "missing") return "Not owned";
+  if (state === "missing") return "0 matching pieces";
   if (matches.length === 1) return `Owned — ${matchSummary(matches[0])}`;
   return `Owned (${matches.length})\n${matches.map((m) => `• ${matchSummary(m)}`).join("\n")}`;
 }

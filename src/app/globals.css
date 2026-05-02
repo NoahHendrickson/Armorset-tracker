@@ -99,26 +99,53 @@
 }
 
 @layer components {
-  /* Promote the canvas transform layer to its own GPU compositing layer so
-     pan/zoom frames don't re-rasterize tracker contents. */
+  /* Avoid will-change/backface on the zoomed layer: at min zoom Chrome/WebKit
+     can leave stale compositor tiles or mis-sized layers, showing “shredded”
+     tracker fragments. The library already updates transform every frame. */
   .react-transform-component {
-    will-change: transform;
     transform-origin: 0 0;
-    backface-visibility: hidden;
+  }
+
+  /* Invisible merge partner shell — opacity alone can still antialias/composite
+     at extreme zoom; visibility skips painting the subtree. */
+  .rnd-tracker-ghost {
+    visibility: hidden !important;
+  }
+
+  /* New tracker: light sky ring ~3s, then ease out (see reduced motion below). */
+  .tracker-spawn-highlight {
+    outline: 2px solid rgba(125, 211, 252, 0.95);
+    outline-offset: -2px;
+    animation: tracker-spawn-highlight-fade 3.5s ease-out forwards;
+  }
+
+  @keyframes tracker-spawn-highlight-fade {
+    0%,
+    85.714% {
+      outline-color: rgba(125, 211, 252, 0.95);
+    }
+    100% {
+      outline-color: transparent;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tracker-spawn-highlight {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
   }
 
   /* react-zoom-pan-pinch bakes in an `rgba(0,0,0,0.12)` dot pattern for its
      `infinite` grid, which disappears on our #242525 canvas. The library
      injects its own stylesheet at runtime (into <head>), so we need
      !important + higher specificity (wrapper ancestor chain) to reliably win.
-     Attribute selector survives library CSS-module rebuilds. */
+     Attribute selector survives library CSS-module rebuilds.
+     Per-tile SVG so we get small squares only — paired linear-gradients read
+     as full graph-paper lines and feel too loud. */
   .react-transform-wrapper [class*="transform-component-module_infiniteGrid"] {
-    background-image: radial-gradient(
-      circle,
-      rgba(255, 255, 255, 0.04) 1.25px,
-      transparent 1.25px
-    ) !important;
-    background-size: 24px 24px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Crect fill='%23fff' opacity='0.055' x='16' y='16' width='4' height='4'/%3E%3C/svg%3E") !important;
+    background-size: 36px 36px !important;
   }
 
   /* Space-held pan mode: the surface shows a grab cursor and trackers drop
@@ -186,11 +213,11 @@
       0 0 14px rgb(0 255 133 / 0.45),
       inset 0 0 10px rgb(255 255 255 / 0.12);
     transform-origin: center;
-    animation: new-tracker-create-ring-pulse 0.92s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    animation: new-tracker-create-ring-pulse 2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
   }
 
   .new-tracker-create-ring--delayed {
-    animation-delay: 0.46s;
+    animation-delay: 1s;
   }
 
   @media (prefers-reduced-motion: reduce) {

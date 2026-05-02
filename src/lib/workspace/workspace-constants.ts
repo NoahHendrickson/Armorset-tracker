@@ -1,6 +1,6 @@
 /** Logical size of the pannable workspace (content layer beneath zoom). */
-export const WORKSPACE_CANVAS_WIDTH = 4800;
-export const WORKSPACE_CANVAS_HEIGHT = 3600;
+export const WORKSPACE_CANVAS_WIDTH = 7200;
+export const WORKSPACE_CANVAS_HEIGHT = 5400;
 
 /** Target for pan/zoom math and debugging — the bounded tracker layer. */
 export const WORKSPACE_CANVAS_ELEMENT_ID = "workspace-canvas-root";
@@ -12,6 +12,22 @@ export const WORKSPACE_CANVAS_ELEMENT_ID = "workspace-canvas-root";
  * user-resizable, width does not.
  */
 export const TRACKER_WIDTH = 590;
+
+/** Horizontal chrome around the stat table: sidebar, main border, body padding. */
+export const TRACKER_PANEL_CHROME_WIDTH = TRACKER_WIDTH - 120 - 4 * 100;
+
+/**
+ * Tracker shell width for a given number of tertiary stat columns (120px slot
+ * column + 100px × stats). Used for merged views whose union has more than
+ * four tertiaries so the grid does not need horizontal scrolling.
+ */
+export function trackerWidthForTertiaryColumns(tertiaryColumnCount: number): number {
+  return (
+    TRACKER_PANEL_CHROME_WIDTH +
+    120 +
+    Math.max(0, tertiaryColumnCount) * 100
+  );
+}
 
 /**
  * Fixed tracker height — sized to hug the header + full stat grid with no

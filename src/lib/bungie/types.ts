@@ -8,7 +8,14 @@ export interface BungieResponse<T> {
 }
 
 export interface MembershipData {
-  bungieNetUser: { membershipId: string; displayName: string };
+  bungieNetUser: {
+    membershipId: string;
+    displayName: string;
+    /** Square / standard profile image path on www.bungie.net */
+    profilePicturePath?: string;
+    /** Wide banner-style path; preferred for small avatars when set */
+    profilePictureWidePath?: string;
+  };
   destinyMemberships: Array<{
     membershipId: string;
     membershipType: number;

@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
 import { getCachedInventory } from "@/lib/inventory/sync";
 import { getManifestLookups } from "@/lib/manifest/lookups";
-import { CLASS_NAMES } from "@/lib/bungie/constants";
+import { CLASS_NAMES, bungieIconUrl } from "@/lib/bungie/constants";
 import { AppHeader } from "@/components/app-header";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +16,21 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
   const session = await getSession();
   if (!session) redirect("/");
 
+  const sb = getServiceRoleClient();
+  const { data: headerUser } = await sb
+    .from("users")
+    .select("display_name, profile_picture_path")
+    .eq("id", session.userId)
+    .maybeSingle();
+  const headerDisplayName = headerUser?.display_name ?? session.displayName;
+  const profilePictureUrl =
+    headerUser?.profile_picture_path &&
+    headerUser.profile_picture_path.trim().length > 0
+      ? bungieIconUrl(headerUser.profile_picture_path.trim())
+      : null;
+
   const { set: setFilter, class: classFilter } = await searchParams;
 
-  const sb = getServiceRoleClient();
   const [
     inventory,
     sets,
@@ -138,8 +150,11 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
 
   return (
     <>
-      <AppHeader displayName={session.displayName} />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-8 pt-[88px] sm:px-6">
+      <AppHeader
+        displayName={headerDisplayName}
+        profilePictureUrl={profilePictureUrl}
+      />
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-8 pt-[92px] sm:px-6">
         <h1 className="text-2xl font-semibold tracking-tight">Debug</h1>
 
         <h2 className="mt-6 text-lg font-semibold">Manifest table counts</h2>

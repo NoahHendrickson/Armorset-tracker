@@ -6,6 +6,7 @@ import { getServiceRoleClient } from "@/lib/db/server";
 import { createSessionCookie } from "@/lib/auth/session";
 import { persistTokens } from "@/lib/auth/tokens";
 import { clientEnv } from "@/lib/env";
+import { profilePictureRelPathFromMembership } from "@/lib/bungie/profile-picture";
 
 const STATE_COOKIE = "armor_checklist_oauth_state";
 
@@ -58,6 +59,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const profilePicturePath = profilePictureRelPathFromMembership(membership);
+
   const sb = getServiceRoleClient();
   const { data: existing } = await sb
     .from("users")
@@ -76,6 +79,7 @@ export async function GET(req: NextRequest) {
           primary.bungieGlobalDisplayName ??
           primary.displayName ??
           membership.bungieNetUser.displayName,
+        profile_picture_path: profilePicturePath,
       })
       .select("*")
       .single();
@@ -90,15 +94,19 @@ export async function GET(req: NextRequest) {
       primary.bungieGlobalDisplayName ??
       primary.displayName ??
       membership.bungieNetUser.displayName;
+    const picChanged =
+      (user.profile_picture_path ?? null) !== (profilePicturePath ?? null);
     if (
       user.display_name !== newName ||
-      user.bungie_membership_type !== primary.membershipType
+      user.bungie_membership_type !== primary.membershipType ||
+      picChanged
     ) {
       await sb
         .from("users")
         .update({
           display_name: newName,
           bungie_membership_type: primary.membershipType,
+          profile_picture_path: profilePicturePath,
         })
         .eq("id", user.id);
     }

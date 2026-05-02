@@ -71,3 +71,141 @@ export function centeredTrackerLayout(z: number): WorkspaceLayoutJson {
     z,
   };
 }
+
+const PLACE_STEP = 48;
+const PLACE_OVERLAP_GAP = 8;
+const CANVAS_EDGE_MARGIN = 8;
+
+function rectsOverlapWithGap(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number },
+  gap: number,
+): boolean {
+  return (
+    a.x < b.x + b.w + gap &&
+    a.x + a.w + gap > b.x &&
+    a.y < b.y + b.h + gap &&
+    a.y + a.h + gap > b.y
+  );
+}
+
+function clampTrackerXY(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): { x: number; y: number } {
+  return {
+    x: Math.max(
+      CANVAS_EDGE_MARGIN,
+      Math.min(x, WORKSPACE_CANVAS_WIDTH - w - CANVAS_EDGE_MARGIN),
+    ),
+    y: Math.max(
+      CANVAS_EDGE_MARGIN,
+      Math.min(y, WORKSPACE_CANVAS_HEIGHT - h - CANVAS_EDGE_MARGIN),
+    ),
+  };
+}
+
+/**
+ * Top-left for a default-size tracker whose frame is centered on the viewport
+ * center (canvas coordinates). Matches react-zoom-pan-pinch: at the middle of
+ * the transform wrapper, content x is `(viewportMidX - panX) / zoom`.
+ */
+export function preferredTrackerTopLeftForViewportCenter(
+  viewportWidth: number,
+  viewportHeight: number,
+  camera: { zoom: number; panX: number; panY: number },
+): { x: number; y: number } {
+  const { zoom: scale, panX, panY } = camera;
+  if (viewportWidth <= 0 || viewportHeight <= 0 || !(scale > 0)) {
+    const o = centeredTrackerLayout(0);
+    return { x: o.x, y: o.y };
+  }
+  const cx = (viewportWidth / 2 - panX) / scale;
+  const cy = (viewportHeight / 2 - panY) / scale;
+  return clampTrackerXY(
+    cx - TRACKER_WIDTH / 2,
+    cy - TRACKER_DEFAULT_HEIGHT / 2,
+    TRACKER_WIDTH,
+    TRACKER_DEFAULT_HEIGHT,
+  );
+}
+
+/**
+ * Same defaults as {@link centeredTrackerLayout}, but shifts x/y (in rings
+ * around center) until the rect does not overlap existing tracker bounds.
+ */
+export function layoutForNewTrackerAvoidingOverlap(
+  z: number,
+  existingRects: readonly { x: number; y: number; w: number; h: number }[],
+  options?: {
+    /** Clamped to canvas; ring search still avoids overlaps. */
+    preferredTopLeft?: { x: number; y: number };
+  },
+): WorkspaceLayoutJson {
+  const template = centeredTrackerLayout(z);
+  const seed = options?.preferredTopLeft
+    ? clampTrackerXY(
+        options.preferredTopLeft.x,
+        options.preferredTopLeft.y,
+        template.w,
+        template.h,
+      )
+    : { x: template.x, y: template.y };
+  const base: WorkspaceLayoutJson = {
+    ...template,
+    x: seed.x,
+    y: seed.y,
+    z,
+  };
+  const candidateRect = (cx: number, cy: number) => ({
+    x: cx,
+    y: cy,
+    w: base.w,
+    h: base.h,
+  });
+
+  const hitsExisting = (cx: number, cy: number) => {
+    const r = candidateRect(cx, cy);
+    return existingRects.some((b) =>
+      rectsOverlapWithGap(r, b, PLACE_OVERLAP_GAP),
+    );
+  };
+
+  const tryXY = (cx: number, cy: number): WorkspaceLayoutJson | null => {
+    const { x, y } = clampTrackerXY(cx, cy, base.w, base.h);
+    if (hitsExisting(x, y)) return null;
+    return { ...base, x, y, z };
+  };
+
+  const centered = tryXY(base.x, base.y);
+  if (centered) return centered;
+
+  for (let n = 1; n <= 48; n++) {
+    const d = n * PLACE_STEP;
+    const offsets: [number, number][] = [
+      [d, 0],
+      [-d, 0],
+      [0, d],
+      [0, -d],
+      [d, d],
+      [-d, d],
+      [d, -d],
+      [-d, -d],
+    ];
+    for (const [ox, oy] of offsets) {
+      const placed = tryXY(base.x + ox, base.y + oy);
+      if (placed) return placed;
+    }
+  }
+
+  const stair = existingRects.length;
+  const { x, y } = clampTrackerXY(
+    base.x + (stair * 36) % 480,
+    base.y + Math.floor((stair * 36) / 480) * 36,
+    base.w,
+    base.h,
+  );
+  return { ...base, x, y, z };
+}

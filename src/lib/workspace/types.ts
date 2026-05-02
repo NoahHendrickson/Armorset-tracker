@@ -2,7 +2,7 @@ import type {
   DerivedArmorPieceJson,
   ViewRow,
 } from "@/lib/db/types";
-import type { ViewDiagnostics, ViewProgress } from "@/lib/views/progress";
+import type { ViewProgress } from "@/lib/views/progress";
 import type { WorkspaceLayoutJson } from "@/lib/workspace/workspace-schema";
 
 /** Strip Map-based cells → JSON-safe structure for passing RSC → client. */
@@ -16,7 +16,6 @@ export interface SerializableTrackerPayload {
   progress: Omit<ViewProgress, "cells"> & {
     cells: SerializableViewProgressCells;
   };
-  diagnostics: ViewDiagnostics;
   setName: string;
   archetypeName: string;
   tuningName: string;
@@ -30,6 +29,5 @@ export interface SerializableTrackerPayload {
   /** Icon for the tuning +stat (+Weapons, …) when parsing succeeds. */
   tuningStatIconPath: string | null;
   needsClass: boolean;
-  showDiagnostics: boolean;
   resolvedSetHash: number;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Plus, Warning, X } from "@phosphor-icons/react/dist/ssr";
 import { NewViewForm } from "@/components/views/new-view-form";
@@ -11,7 +11,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import type { TrackerOptionItem } from "@/lib/views/tracker-option";
-import { centeredTrackerLayout } from "@/lib/workspace/workspace-schema";
+import { layoutForNewTrackerAvoidingOverlap } from "@/lib/workspace/workspace-schema";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 
 const WORKSPACE_NEW_TRACKER_FORM_ID = "workspace-new-tracker-form";
@@ -29,6 +29,11 @@ interface NewTrackerDialogProps {
   trackers: SerializableTrackerPayload[];
   selectors: TrackerFormSelectors;
   onCreated: (tracker?: SerializableTrackerPayload) => void;
+  /**
+   * Canvas-space top-left seed (viewport-centered when implemented). If omitted
+   * or null, placement uses workspace geometric center.
+   */
+  getPreferredTrackerTopLeft?: () => { x: number; y: number } | null;
 }
 
 const FAB_CLASSES =
@@ -49,22 +54,32 @@ export function NewTrackerDialog({
   trackers,
   selectors,
   onCreated,
+  getPreferredTrackerTopLeft,
 }: NewTrackerDialogProps) {
   const fabShellRef = useRef<HTMLDivElement>(null);
   const [submitBusy, setSubmitBusy] = useState(false);
   const [canSubmitForm, setCanSubmitForm] = useState(false);
 
-  const showCreateReadyRing =
-    open && canSubmitForm && !submitBusy && !selectors.manifestEmpty;
-  const initialLayout = useMemo(() => {
+  const resolveLayoutOnSubmit = useCallback(() => {
     const maxZ = trackers.length
       ? Math.max(...trackers.map((t) => t.view.layout.z))
       : -1;
-    return centeredTrackerLayout(maxZ + 1);
-  }, [trackers]);
+    const existingRects = trackers.map((t) => ({
+      x: t.view.layout.x,
+      y: t.view.layout.y,
+      w: t.view.layout.w,
+      h: t.view.layout.h,
+    }));
+    const preferred = getPreferredTrackerTopLeft?.() ?? null;
+    return layoutForNewTrackerAvoidingOverlap(maxZ + 1, existingRects, {
+      preferredTopLeft: preferred ?? undefined,
+    });
+  }, [trackers, getPreferredTrackerTopLeft]);
 
   const label = submitBusy ? "Saving..." : open ? "Create" : "New tracker";
   const aria = open ? "Create tracker (submit)" : "New tracker";
+  const showCreateReadyRing =
+    open && canSubmitForm && !submitBusy && !selectors.manifestEmpty;
 
   return (
     <Popover
@@ -112,7 +127,7 @@ export function NewTrackerDialog({
         align="center"
         sideOffset={10}
         collisionPadding={16}
-        className="max-w-lg"
+        className="max-w-lg border-[#424347] bg-[#2d2e32] p-8 text-white shadow-xl [&_.text-muted-foreground]:text-white/65"
         onPointerDownOutside={(e) => {
           const target = e.detail.originalEvent.target;
           if (isFromFabShell(fabShellRef.current, target)) e.preventDefault();
@@ -125,12 +140,12 @@ export function NewTrackerDialog({
           <div className="min-w-0 space-y-1 pr-2">
             <h2 className="text-lg font-semibold leading-none tracking-tight">New tracker</h2>
             <p className="text-sm text-muted-foreground">
-              Pick class, armor set, archetype, and tuning — then arrange it on the canvas.
+              Choose class, armor set, archetype, and tuning — then arrange it on the canvas.
             </p>
           </div>
           <PopoverClose
             type="button"
-            className="shrink-0 rounded-none p-1.5 text-muted-foreground opacity-80 ring-offset-background transition-opacity hover:bg-muted hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="shrink-0 rounded-none p-1.5 text-white/70 opacity-90 ring-offset-[#2d2e32] transition-opacity hover:bg-white/10 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-[#2d2e32]"
             aria-label="Close"
           >
             <X weight="duotone" className="h-4 w-4" />
@@ -159,7 +174,7 @@ export function NewTrackerDialog({
           embedded
           formId={WORKSPACE_NEW_TRACKER_FORM_ID}
           externalSubmit
-          initialLayout={initialLayout}
+          resolveLayoutOnSubmit={resolveLayoutOnSubmit}
           onBusyChange={setSubmitBusy}
           onCanSubmitChange={setCanSubmitForm}
           onCancel={() => onOpenChange(false)}

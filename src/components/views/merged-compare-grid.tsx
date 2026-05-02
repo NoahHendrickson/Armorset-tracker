@@ -41,7 +41,7 @@ function halfTitle(
 ): string {
   if (!applicable) return "Tracker — stat not used for this archetype";
   if (!hasInventory) return "Loading inventory…";
-  if (!owned) return "Not owned";
+  if (!owned) return "0 matching pieces";
   if (matches.length === 1)
     return `Owned — ${matchSummary(matches[0])}`;
   return `Owned (${matches.length})\n${matches.map((m) => `• ${matchSummary(m)}`).join("\n")}`;
@@ -93,7 +93,7 @@ function MergeHalfSquare({
     return (
       <div
         className="flex h-full w-1/2 items-center justify-center border border-white/40"
-        title="Not owned"
+        title="0 matching pieces"
       />
     );
   }
@@ -162,7 +162,7 @@ export function MergedCompareGrid({
   const complete = isUnionGridComplete(greenPayload, bluePayload);
 
   return (
-    <div className="min-h-0 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch]">
+    <div className="min-h-0 overflow-hidden">
       {complete ? (
         <p className="mb-2 text-xs font-medium text-[#00FF85]/90">
           Combined inventory fills every applicable cell for this overlay.
