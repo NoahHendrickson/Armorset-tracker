@@ -638,6 +638,17 @@ export function CanvasWorkspace({
           z: maxZ + 1,
           mergedWith: self.view.id,
         };
+        setTrackers((prev) =>
+          prev.map((p) => {
+            if (p.view.id === self.view.id) {
+              return { ...p, view: { ...p.view, layout: sourceLayout } };
+            }
+            if (p.view.id === tgt.view.id) {
+              return { ...p, view: { ...p.view, layout: targetLayout } };
+            }
+            return p;
+          }),
+        );
         void persistTwoLayouts([
           { id: self.view.id, layout: sourceLayout },
           { id: tgt.view.id, layout: targetLayout },
@@ -663,6 +674,17 @@ export function CanvasWorkspace({
             h,
             mergedWith: viewId,
           };
+          setTrackers((prev) =>
+            prev.map((p) => {
+              if (p.view.id === viewId) {
+                return { ...p, view: { ...p.view, layout: nextSelf } };
+              }
+              if (p.view.id === partnerId) {
+                return { ...p, view: { ...p.view, layout: nextPartner } };
+              }
+              return p;
+            }),
+          );
           void persistTwoLayouts([
             { id: viewId, layout: nextSelf },
             { id: partnerId, layout: nextPartner },
