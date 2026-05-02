@@ -54,14 +54,16 @@ export function AppHeader({ displayName, profilePictureUrl }: AppHeaderProps) {
               {displayName}
             </span>
           </div>
-          <Link
-            href="/api/auth/logout"
-            aria-label="Sign out"
-            title="Sign out"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-none border-l border-white/15 text-white/75 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/35"
-          >
-            <SignOut weight="duotone" className="h-5 w-5" />
-          </Link>
+          <form action="/api/auth/logout" method="POST" className="contents">
+            <button
+              type="submit"
+              aria-label="Sign out"
+              title="Sign out"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-none border-l border-white/15 text-white/75 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/35"
+            >
+              <SignOut weight="duotone" className="h-5 w-5" />
+            </button>
+          </form>
         </div>
       </div>
     </header>
