@@ -195,6 +195,47 @@ function mergedGroupBucketKey(
   return labels.join(" | ") || "__empty";
 }
 
+/**
+ * Lowest index among class labels appearing in key (merged keys join with `|`).
+ */
+function destinyClassPreferenceIndex(
+  mergedBucketLabel: string,
+  preferredLeftToRight: readonly string[],
+): number {
+  if (preferredLeftToRight.length === 0)
+    return Number.POSITIVE_INFINITY;
+  const indexByLabel = new Map(
+    preferredLeftToRight.map((label, idx) => [label, idx] as const),
+  );
+  const parts = mergedBucketLabel
+    .split(/\s*\|\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  let best = Number.POSITIVE_INFINITY;
+  for (const part of parts) {
+    const i = indexByLabel.get(part);
+    if (i !== undefined && i < best) best = i;
+  }
+  return best;
+}
+
+/** Sort primary bucket labels; uses class column order only when clustering by class label. */
+function comparePrimaryMergeBucketKeys(
+  a: string,
+  b: string,
+  preferredClassColumnOrder?: readonly string[] | null,
+): number {
+  if (preferredClassColumnOrder && preferredClassColumnOrder.length > 0) {
+    const sentinel = preferredClassColumnOrder.length + 10;
+    const ia = destinyClassPreferenceIndex(a, preferredClassColumnOrder);
+    const ib = destinyClassPreferenceIndex(b, preferredClassColumnOrder);
+    const fa = ia === Number.POSITIVE_INFINITY ? sentinel : ia;
+    const fb = ib === Number.POSITIVE_INFINITY ? sentinel : ib;
+    if (fa !== fb) return fa - fb;
+  }
+  return a.localeCompare(b);
+}
+
 function compareMergedGroups(
   idsA: readonly string[],
   idsB: readonly string[],
@@ -281,6 +322,7 @@ function computeNestedPrimarySecondaryLayouts(
   sort: ArrangeSortMode,
   idToPayload: Map<string, SerializableTrackerPayload>,
   listIndex: Map<string, number>,
+  primaryClassColumnOrder?: readonly string[] | null,
 ): ArrangeGridComputation {
   const tree = new Map<string, Map<string, string[][]>>();
   for (const g of mergeGroups) {
@@ -292,7 +334,11 @@ function computeNestedPrimarySecondaryLayouts(
     sub.get(sk)!.push(g);
   }
 
-  const primaryKeys = [...tree.keys()].sort((a, b) => a.localeCompare(b));
+  const prefOrder =
+    primary === "class_name" ? primaryClassColumnOrder : null;
+  const primaryKeys = [...tree.keys()].sort((a, b) =>
+    comparePrimaryMergeBucketKeys(a, b, prefOrder),
+  );
   const pillars: PillarWithStacksDesc[] = primaryKeys.map((pk) => {
     const sub = tree.get(pk)!;
     const secKeys = [...sub.keys()].sort((a, b) => a.localeCompare(b));
@@ -382,6 +428,8 @@ export function computeWorkspaceGridLayouts(
     groupBy: ArrangeGroupMode;
     /** When set with a primary cluster, subdivides each primary pillar vertically. */
     groupBySecondary?: ArrangeGroupMode | null;
+    /** Left-to-right order for Destiny class pillar labels (`Titan`, `Hunter`, `Warlock`). */
+    classColumnOrder?: readonly string[] | null;
   },
 ): ArrangeGridComputation {
   const idToPayload = new Map(list.map((t): [string, SerializableTrackerPayload] => [t.view.id, t]));
@@ -416,6 +464,7 @@ export function computeWorkspaceGridLayouts(
       options.sort,
       idToPayload,
       listIndex,
+      options.classColumnOrder ?? null,
     );
   }
 
@@ -427,7 +476,11 @@ export function computeWorkspaceGridLayouts(
     else buckets.set(key, [g]);
   }
 
-  const bucketKeys = [...buckets.keys()].sort((a, b) => a.localeCompare(b));
+  const classOrderPref =
+    options.groupBy === "class_name" ? options.classColumnOrder : null;
+  const bucketKeys = [...buckets.keys()].sort((a, b) =>
+    comparePrimaryMergeBucketKeys(a, b, classOrderPref),
+  );
   const orderedBuckets: string[][][] = [];
   for (const bk of bucketKeys) {
     const inner = buckets.get(bk)!;

@@ -37,15 +37,25 @@ import { clampWorkspacePan } from "@/lib/workspace/clamp-pan";
 import { computeRecenterTranslation } from "@/lib/workspace/recenter-trackers";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
+  arrangePrefsFromPickOrder,
+  clusterPickOrderFromArrangePrefs,
+  normalizeWorkspaceArrangePrefs,
+  parseWorkspaceCamera,
   parseWorkspaceLayout,
   preferredTrackerTopLeftForViewportCenter,
+  workspaceCameraPersistPayload,
+  WORKSPACE_CLASS_COLUMN_ORDER_OPTIONS,
+  WORKSPACE_CLUSTER_DIMENSIONS,
+  type WorkspaceArrangePrefsJson,
   type WorkspaceCameraJson,
+  type WorkspaceClusterDimension,
   type WorkspaceLayoutJson,
 } from "@/lib/workspace/workspace-schema";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
@@ -62,7 +72,6 @@ import {
   computeDragEdgePanFromPointer,
 } from "@/components/workspace/canvas-drag-edge-pan";
 import { attachCanvasViewportWheel } from "@/components/workspace/canvas-viewport-wheel";
-import { cn } from "@/lib/utils";
 import {
   computeWorkspaceGridLayouts,
   type ArrangeGroupMode,
@@ -76,60 +85,56 @@ type ArrangeRecipe = {
   groupBySecondary: ArrangeGroupMode | null;
 };
 
+type WorkspaceViewportPanZoom = Pick<
+  WorkspaceCameraJson,
+  "zoom" | "panX" | "panY"
+>;
+
 const DEFAULT_ARRANGE: ArrangeRecipe = {
   sort: "canvas_order",
   groupBy: "none",
   groupBySecondary: null,
 };
 
-/** Figma-aligned: horizontal clustering is class-only toggles off by default; vertical subdivides pillars. */
-function ClassClusterChipVisual() {
-  return (
-    <span className="flex items-center gap-1.5" aria-hidden>
-      {/* eslint-disable-next-line @next/next/no-img-element -- small static glyphs */}
-      <img src="/class-icons/titan.svg" alt="" className="h-4 w-auto" />
-      {/* eslint-disable-next-line @next/next/no-img-element -- small static glyphs */}
-      <img src="/class-icons/hunter.svg" alt="" className="h-3.5 w-auto" />
-      {/* eslint-disable-next-line @next/next/no-img-element -- small static glyphs */}
-      <img src="/class-icons/warlock.svg" alt="" className="h-4 w-auto" />
-    </span>
-  );
+function prefsToArrangeRecipe(prefs: WorkspaceArrangePrefsJson): ArrangeRecipe {
+  const p = normalizeWorkspaceArrangePrefs(prefs);
+  return {
+    sort: DEFAULT_ARRANGE.sort,
+    groupBy: (p.primaryCluster ?? "none") as ArrangeGroupMode,
+    groupBySecondary: p.secondaryCluster,
+  };
 }
 
-const CLUSTER_VERTICAL_DIMS = [
-  "tuning",
-  "armor_set",
-  "archetype",
-] as const satisfies readonly ArrangeGroupMode[];
-
-function verticalClusterCaption(
-  mode: (typeof CLUSTER_VERTICAL_DIMS)[number],
-): string {
-  switch (mode) {
-    case "tuning":
-      return "Tuning";
+function clusterDimensionLabel(dim: WorkspaceClusterDimension): string {
+  switch (dim) {
+    case "class_name":
+      return "Class";
     case "armor_set":
       return "Armor set";
     case "archetype":
       return "Archetype";
-    default:
-      return mode;
+    case "tuning":
+      return "Tuning";
   }
 }
 
-/** Compact chip row (text ~11px, ~36px min height). */
-const CLUSTER_CHIP_BASE =
-  "[&_span.absolute.left-2]:hidden flex min-h-9 w-[4.75rem] max-w-[5.5rem] shrink-0 cursor-pointer items-center justify-center rounded-none border border-neutral-500 bg-[#2d2e32] px-1 py-1.5 text-center text-[11px] font-medium leading-snug text-white outline-none focus-visible:ring-2 focus-visible:ring-white/35 data-[disabled]:opacity-35 data-[highlighted]:bg-white/10 data-[state=checked]:border-white data-[state=checked]:bg-white/[0.12]";
+function computeNextClusterPicks(
+  prev: readonly WorkspaceClusterDimension[],
+  dim: WorkspaceClusterDimension,
+  checked: boolean,
+): WorkspaceClusterDimension[] {
+  if (!checked) return [...prev].filter((d) => d !== dim);
+  const cur = [...prev];
+  if (cur.includes(dim)) return cur;
+  if (cur.length < 2) return [...cur, dim];
+  /* Keep outer grouping stable; swapping in a third dimension replaces the nested one. */
+  return [cur[0]!, dim];
+}
 
-const CLUSTER_CHIP_CLASS_ROW = cn(
-  CLUSTER_CHIP_BASE,
-  "max-w-none min-w-[6.25rem] justify-center px-2",
-);
-
-function useDebouncedCamera(
-  onSave: (c: WorkspaceCameraJson) => void,
+function useDebouncedViewport(
+  onSave: (c: WorkspaceViewportPanZoom) => void,
   ms: number,
-): (c: WorkspaceCameraJson) => void {
+): (c: WorkspaceViewportPanZoom) => void {
   const t = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cb = useRef(onSave);
   useEffect(() => {
@@ -137,11 +142,11 @@ function useDebouncedCamera(
   }, [onSave]);
 
   return useCallback(
-    (cam: WorkspaceCameraJson) => {
+    (slice: WorkspaceViewportPanZoom) => {
       if (t.current) clearTimeout(t.current);
       t.current = setTimeout(() => {
         t.current = null;
-        cb.current(cam);
+        cb.current(slice);
       }, ms);
     },
     [ms],
@@ -149,11 +154,11 @@ function useDebouncedCamera(
 }
 
 function CameraPersist({
-  onDebouncedCamera,
+  onDebouncedViewport,
 }: {
-  onDebouncedCamera: (c: WorkspaceCameraJson) => void;
+  onDebouncedViewport: (c: WorkspaceViewportPanZoom) => void;
 }) {
-  const debounced = useDebouncedCamera(onDebouncedCamera, 450);
+  const debounced = useDebouncedViewport(onDebouncedViewport, 450);
   useTransformEffect((refCtx) => {
     debounced({
       zoom: refCtx.state.scale,
@@ -323,6 +328,28 @@ export function CanvasWorkspace({
     durationMs: number;
   } | null>(null);
 
+  const workspaceHydrateBootstrap = parseWorkspaceCamera(initialCamera);
+  const workspacePersistTimerRef = useRef<number | null>(null);
+  const workspaceSnapshotRef = useRef(workspaceHydrateBootstrap);
+  const arrangeMenuRecipeRef = useRef<ArrangeRecipe>(
+    prefsToArrangeRecipe(workspaceHydrateBootstrap.arrange),
+  );
+
+  const [clusterDimPickOrder, setClusterDimPickOrder] = useState<
+    WorkspaceClusterDimension[]
+  >(() => clusterPickOrderFromArrangePrefs(workspaceHydrateBootstrap.arrange));
+
+  useEffect(() => {
+    const cam = parseWorkspaceCamera(initialCamera);
+    workspaceSnapshotRef.current = cam;
+    const recipe = prefsToArrangeRecipe(cam.arrange);
+    arrangeMenuRecipeRef.current = recipe;
+    const picks = clusterPickOrderFromArrangePrefs(cam.arrange);
+    queueMicrotask(() => {
+      setClusterDimPickOrder(picks);
+    });
+  }, [initialCamera]);
+
   const scheduleSpawnHighlight = useCallback((viewId: string) => {
     if (spawnHighlightTimeoutRef.current) {
       clearTimeout(spawnHighlightTimeoutRef.current);
@@ -461,18 +488,55 @@ export function CanvasWorkspace({
       api.setTransform(clamped.positionX, clamped.positionY, nextScale, 0);
     }
   }, [viewportMinScale, viewportPx.w, viewportPx.h]);
-  const persistCamera = useCallback(async (camera: WorkspaceCameraJson) => {
+
+  const persistWorkspaceSnapshotNow = useCallback(async (): Promise<boolean> => {
+    if (workspacePersistTimerRef.current !== null) {
+      window.clearTimeout(workspacePersistTimerRef.current);
+      workspacePersistTimerRef.current = null;
+    }
     try {
-      await fetch("/api/me/workspace", {
+      const res = await fetch("/api/me/workspace", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ camera }),
+        body: JSON.stringify({
+          camera: workspaceCameraPersistPayload(workspaceSnapshotRef.current),
+        }),
       });
+      return res.ok;
     } catch {
-      /* non-fatal */
+      return false;
     }
   }, []);
+
+  const scheduleWorkspaceSnapshotPersistDebounced = useCallback(() => {
+    if (workspacePersistTimerRef.current !== null) {
+      window.clearTimeout(workspacePersistTimerRef.current);
+    }
+    workspacePersistTimerRef.current = window.setTimeout(() => {
+      workspacePersistTimerRef.current = null;
+      void persistWorkspaceSnapshotNow();
+    }, 450);
+  }, [persistWorkspaceSnapshotNow]);
+
+  useEffect(() => {
+    return () => {
+      if (workspacePersistTimerRef.current !== null) {
+        window.clearTimeout(workspacePersistTimerRef.current);
+      }
+    };
+  }, []);
+
+  const debouncedPersistViewportSlice = useCallback(
+    (slice: WorkspaceViewportPanZoom) => {
+      workspaceSnapshotRef.current = {
+        ...workspaceSnapshotRef.current,
+        ...slice,
+      };
+      scheduleWorkspaceSnapshotPersistDebounced();
+    },
+    [scheduleWorkspaceSnapshotPersistDebounced],
+  );
 
   const persistLayoutPatch = useCallback(
     async (viewId: string, layout: WorkspaceLayoutJson) => {
@@ -593,13 +657,14 @@ export function CanvasWorkspace({
     const canvasCy = WORKSPACE_CANVAS_HEIGHT / 2;
     const positionX = vw / 2 - scale * canvasCx;
     const positionY = vh / 2 - scale * canvasCy;
-    const camera: WorkspaceCameraJson = {
+    workspaceSnapshotRef.current = {
+      ...workspaceSnapshotRef.current,
       zoom: scale,
       panX: positionX,
       panY: positionY,
     };
     twRef.current?.setTransform(positionX, positionY, scale, 260);
-    await persistCamera(camera);
+    await persistWorkspaceSnapshotNow();
 
     if (!layoutChanged || updates.length === 0) return;
 
@@ -622,7 +687,7 @@ export function CanvasWorkspace({
     if (results.some((ok) => !ok)) {
       router.refresh();
     }
-  }, [draggingId, viewportMinScale, persistCamera, router]);
+  }, [draggingId, viewportMinScale, persistWorkspaceSnapshotNow, router]);
 
   const handleArrangeGrid = useCallback(
     async (
@@ -638,18 +703,25 @@ export function CanvasWorkspace({
       const list = trackersRef.current;
       if (list.length === 0) return;
 
-      const sort = opts?.sort ?? DEFAULT_ARRANGE.sort;
-      const groupBy = opts?.groupBy ?? DEFAULT_ARRANGE.groupBy;
+      const sort = opts?.sort ?? arrangeMenuRecipeRef.current.sort;
+      const groupBy = opts?.groupBy ?? arrangeMenuRecipeRef.current.groupBy;
       const groupBySecondary =
-        opts?.groupBySecondary ?? DEFAULT_ARRANGE.groupBySecondary ?? null;
+        opts?.groupBySecondary ?? arrangeMenuRecipeRef.current.groupBySecondary ?? null;
 
       const adjustViewport = opts?.adjustViewport ?? true;
       const animateLayouts = opts?.animateLayouts === true;
+
+      const usesClassColumns =
+        groupBy === "class_name" || groupBySecondary === "class_name";
 
       const { updates } = computeWorkspaceGridLayouts(list, {
         sort,
         groupBy,
         groupBySecondary,
+        classColumnOrder:
+          usesClassColumns ?
+            [...WORKSPACE_CLASS_COLUMN_ORDER_OPTIONS]
+          : undefined,
       });
 
       if (animateLayouts) {
@@ -683,13 +755,14 @@ export function CanvasWorkspace({
         const vh = surface.clientHeight;
         const positionX = vw / 2 - scale * (WORKSPACE_CANVAS_WIDTH / 2);
         const positionY = vh / 2 - scale * (WORKSPACE_CANVAS_HEIGHT / 2);
-        const camera: WorkspaceCameraJson = {
+        workspaceSnapshotRef.current = {
+          ...workspaceSnapshotRef.current,
           zoom: scale,
           panX: positionX,
           panY: positionY,
         };
         twRef.current?.setTransform(positionX, positionY, scale, 260);
-        await persistCamera(camera);
+        await persistWorkspaceSnapshotNow();
       }
 
       const results = await Promise.all(
@@ -711,52 +784,34 @@ export function CanvasWorkspace({
         router.refresh();
       }
     },
-    [draggingId, viewportMinScale, persistCamera, router],
+    [
+      draggingId,
+      viewportMinScale,
+      persistWorkspaceSnapshotNow,
+      router,
+    ],
   );
 
-  const arrangeMenuRecipeRef = useRef<ArrangeRecipe>({ ...DEFAULT_ARRANGE });
-  const [arrangeRecipe, setArrangeRecipe] = useState<ArrangeRecipe>(() => ({
-    ...DEFAULT_ARRANGE,
-  }));
-
-  const applyArrangeRecipe = useCallback(
-    (patch: Partial<Pick<ArrangeRecipe, "groupBy" | "groupBySecondary">>) => {
-      const merged: ArrangeRecipe = {
-        ...arrangeMenuRecipeRef.current,
-        ...patch,
+  const commitClusterPickOrder = useCallback(
+    (nextPicks: WorkspaceClusterDimension[]) => {
+      const prefs = arrangePrefsFromPickOrder(nextPicks);
+      const recipe = prefsToArrangeRecipe(prefs);
+      arrangeMenuRecipeRef.current = recipe;
+      workspaceSnapshotRef.current = {
+        ...workspaceSnapshotRef.current,
+        arrange: prefs,
       };
-      /* UI only exposes class clustering horizontally; coerce legacy presets. */
-      if (merged.groupBy !== "none" && merged.groupBy !== "class_name") {
-        merged.groupBy = "none";
-      }
-      if (
-        merged.groupBySecondary !== null &&
-        merged.groupBySecondary !== "tuning" &&
-        merged.groupBySecondary !== "armor_set" &&
-        merged.groupBySecondary !== "archetype"
-      ) {
-        merged.groupBySecondary = null;
-      }
-      if (merged.groupBy === "none") {
-        merged.groupBySecondary = null;
-      }
-      if (
-        merged.groupBySecondary !== null &&
-        merged.groupBySecondary === merged.groupBy
-      ) {
-        merged.groupBySecondary = null;
-      }
-      arrangeMenuRecipeRef.current = merged;
-      setArrangeRecipe(merged);
+      setClusterDimPickOrder(clusterPickOrderFromArrangePrefs(prefs));
+      scheduleWorkspaceSnapshotPersistDebounced();
       void handleArrangeGrid({
-        sort: merged.sort,
-        groupBy: merged.groupBy,
-        groupBySecondary: merged.groupBySecondary,
+        sort: recipe.sort,
+        groupBy: recipe.groupBy,
+        groupBySecondary: recipe.groupBySecondary,
         adjustViewport: false,
         animateLayouts: true,
       });
     },
-    [handleArrangeGrid],
+    [handleArrangeGrid, scheduleWorkspaceSnapshotPersistDebounced],
   );
 
   const arrangeDisabled =
@@ -1141,7 +1196,7 @@ export function CanvasWorkspace({
           wheel={{ disabled: true }}
           doubleClick={{ mode: "reset" }}
         >
-          <CameraPersist onDebouncedCamera={persistCamera} />
+          <CameraPersist onDebouncedViewport={debouncedPersistViewportSlice} />
           <div
             ref={viewportSurfaceRef}
             className="canvas-viewport-surface relative h-full w-full"
@@ -1253,72 +1308,34 @@ export function CanvasWorkspace({
                     align="end"
                     side="top"
                     sideOffset={8}
-                    className="w-[min(17.5rem,calc(100vw-1.25rem))] rounded-none border border-white/15 bg-[#2d2e32] px-3 py-2.5 text-white shadow-xl"
+                    className="min-w-[14rem] rounded-none border border-white/15 bg-[#2d2e32] py-2 text-white shadow-xl"
                   >
-                    <div className="space-y-3.5">
-                      <section>
-                        <p className="mb-1.5 text-xs font-semibold tracking-tight text-white/90">
-                          Cluster horizontally
-                        </p>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <DropdownMenuCheckboxItem
-                            className={CLUSTER_CHIP_CLASS_ROW}
-                            checked={
-                              arrangeRecipe.groupBy === "class_name"
-                            }
-                            onCheckedChange={(checked) =>
-                              applyArrangeRecipe({
-                                groupBy: checked ? "class_name" : "none",
-                              })
-                            }
-                          >
-                            <span className="sr-only">
-                              Cluster into class columns (Titan, Hunter,
-                              Warlock)
-                            </span>
-                            <ClassClusterChipVisual />
-                          </DropdownMenuCheckboxItem>
-                        </div>
-                      </section>
-
-                      <fieldset
-                        className={cn(
-                          arrangeRecipe.groupBy === "none" &&
-                            "pointer-events-none opacity-40",
-                        )}
-                        disabled={arrangeRecipe.groupBy === "none"}
+                    <DropdownMenuLabel className="max-w-[16rem] px-3 pb-2 pt-1.5 text-xs font-normal leading-snug text-white/65">
+                      Pick up to two: first groups the workspace, second nests inside
+                      each group.
+                    </DropdownMenuLabel>
+                    {WORKSPACE_CLUSTER_DIMENSIONS.map((dim) => (
+                      <DropdownMenuCheckboxItem
+                        key={dim}
+                        disabled={arrangeDisabled}
+                        checked={clusterDimPickOrder.includes(dim)}
+                        onSelect={(e) => {
+                          /* Keep menu open so both cluster picks can be toggled without reopening */
+                          e.preventDefault();
+                        }}
+                        onCheckedChange={(c) => {
+                          const next = computeNextClusterPicks(
+                            clusterDimPickOrder,
+                            dim,
+                            c,
+                          );
+                          commitClusterPickOrder(next);
+                        }}
+                        className="rounded-none text-white focus:bg-white/10 focus:text-white data-[highlighted]:bg-white/10 [&_span.absolute.left-2]:text-white"
                       >
-                        <p className="mb-1.5 text-xs font-semibold tracking-tight text-white/90">
-                          Cluster vertically
-                        </p>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {CLUSTER_VERTICAL_DIMS.map((mode) => (
-                            <DropdownMenuCheckboxItem
-                              key={mode}
-                              className={CLUSTER_CHIP_BASE}
-                              checked={
-                                arrangeRecipe.groupBySecondary === mode
-                              }
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  applyArrangeRecipe({
-                                    groupBySecondary: mode,
-                                  });
-                                  return;
-                                }
-                                if (arrangeRecipe.groupBySecondary === mode) {
-                                  applyArrangeRecipe({
-                                    groupBySecondary: null,
-                                  });
-                                }
-                              }}
-                            >
-                              {verticalClusterCaption(mode)}
-                            </DropdownMenuCheckboxItem>
-                          ))}
-                        </div>
-                      </fieldset>
-                    </div>
+                        {clusterDimensionLabel(dim)}
+                      </DropdownMenuCheckboxItem>
+                    ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

@@ -31,19 +31,164 @@ export const defaultWorkspaceLayout = (): WorkspaceLayoutJson => ({
   z: 0,
 });
 
+/** Destiny class labels aligned with `{@link CLASS_NAMES}` keys 0–2. */
+export const WORKSPACE_CLASS_COLUMN_ORDER_OPTIONS = [
+  "Titan",
+  "Hunter",
+  "Warlock",
+] as const;
+
+export type WorkspaceClassColumnOrderKey =
+  (typeof WORKSPACE_CLASS_COLUMN_ORDER_OPTIONS)[number];
+
+export const WORKSPACE_CLUSTER_DIMENSIONS = [
+  "class_name",
+  "armor_set",
+  "archetype",
+  "tuning",
+] as const;
+
+export type WorkspaceClusterDimension =
+  (typeof WORKSPACE_CLUSTER_DIMENSIONS)[number];
+
+const CLUSTER_DIM_SET = new Set<string>(
+  WORKSPACE_CLUSTER_DIMENSIONS as unknown as string[],
+);
+
+const workspaceClusterDimensionSchema = z.enum([
+  WORKSPACE_CLUSTER_DIMENSIONS[0],
+  WORKSPACE_CLUSTER_DIMENSIONS[1],
+  WORKSPACE_CLUSTER_DIMENSIONS[2],
+  WORKSPACE_CLUSTER_DIMENSIONS[3],
+]);
+
+/** Persisted cluster menu: outer group + optional nested group (`users.workspace_camera.arrange`). */
+export const workspaceArrangePrefsSchema = z.object({
+  primaryCluster: workspaceClusterDimensionSchema.nullable(),
+  secondaryCluster: workspaceClusterDimensionSchema.nullable(),
+});
+
+export type WorkspaceArrangePrefsJson = z.infer<
+  typeof workspaceArrangePrefsSchema
+>;
+
+export function defaultWorkspaceArrangePrefs(): WorkspaceArrangePrefsJson {
+  return {
+    primaryCluster: null,
+    secondaryCluster: null,
+  };
+}
+
+/** Coerce duplicates, cleared secondary without primary, and invalid enums. */
+export function normalizeWorkspaceArrangePrefs(
+  prefs: WorkspaceArrangePrefsJson,
+): WorkspaceArrangePrefsJson {
+  let primaryCluster: WorkspaceClusterDimension | null = prefs.primaryCluster;
+  let secondaryCluster: WorkspaceClusterDimension | null = prefs.secondaryCluster;
+  if (primaryCluster !== null && !CLUSTER_DIM_SET.has(primaryCluster)) {
+    primaryCluster = null;
+  }
+  if (secondaryCluster !== null && !CLUSTER_DIM_SET.has(secondaryCluster)) {
+    secondaryCluster = null;
+  }
+  if (primaryCluster === null) secondaryCluster = null;
+  else if (
+    secondaryCluster !== null &&
+    secondaryCluster === primaryCluster
+  ) {
+    secondaryCluster = null;
+  }
+  return { primaryCluster, secondaryCluster };
+}
+
+/** Merge legacy `{ clusterByClass, … }` or parse new `{ primaryCluster, secondaryCluster }`. */
+function migrateLegacyWorkspaceArrange(raw: unknown): WorkspaceArrangePrefsJson {
+  if (raw === null || typeof raw !== "object") {
+    return normalizeWorkspaceArrangePrefs(defaultWorkspaceArrangePrefs());
+  }
+  const obj = raw as Record<string, unknown>;
+
+  if ("clusterByClass" in obj) {
+    const clusterByClass = obj.clusterByClass === true;
+    const legacySec = normalizeLegacySecondaryCluster(obj.secondaryCluster);
+    if (!clusterByClass) {
+      return normalizeWorkspaceArrangePrefs({
+        primaryCluster: null,
+        secondaryCluster: null,
+      });
+    }
+    return normalizeWorkspaceArrangePrefs({
+      primaryCluster: "class_name",
+      secondaryCluster: legacySec,
+    });
+  }
+
+  const parsed = workspaceArrangePrefsSchema.safeParse({
+    primaryCluster: obj.primaryCluster ?? null,
+    secondaryCluster: obj.secondaryCluster ?? null,
+  });
+  if (parsed.success) {
+    return normalizeWorkspaceArrangePrefs(parsed.data);
+  }
+  return normalizeWorkspaceArrangePrefs(defaultWorkspaceArrangePrefs());
+}
+
+function normalizeLegacySecondaryCluster(raw: unknown): WorkspaceClusterDimension | null {
+  if (raw === null || raw === undefined) return null;
+  const p = z
+    .enum(["tuning", "armor_set", "archetype"])
+    .safeParse(raw);
+  return p.success ? p.data : null;
+}
+
+export function clusterPickOrderFromArrangePrefs(
+  prefs: WorkspaceArrangePrefsJson,
+): WorkspaceClusterDimension[] {
+  const p = normalizeWorkspaceArrangePrefs(prefs);
+  const out: WorkspaceClusterDimension[] = [];
+  if (p.primaryCluster !== null) out.push(p.primaryCluster);
+  if (p.secondaryCluster !== null) out.push(p.secondaryCluster);
+  return out;
+}
+
+export function arrangePrefsFromPickOrder(
+  picks: readonly WorkspaceClusterDimension[],
+): WorkspaceArrangePrefsJson {
+  const seen = new Set<WorkspaceClusterDimension>();
+  const uniq: WorkspaceClusterDimension[] = [];
+  for (const dim of picks) {
+    if (!CLUSTER_DIM_SET.has(dim) || seen.has(dim)) continue;
+    seen.add(dim);
+    uniq.push(dim);
+    if (uniq.length === 2) break;
+  }
+  return normalizeWorkspaceArrangePrefs({
+    primaryCluster: uniq[0] ?? null,
+    secondaryCluster: uniq[1] ?? null,
+  });
+}
+
 /** Pan/zoom from `users.workspace_camera` (aligned with react-zoom-pan-pinch semantics). */
 export const workspaceCameraSchema = z.object({
   zoom: z.number().positive().max(8).min(0.05),
   panX: z.number().finite(),
   panY: z.number().finite(),
+  arrange: workspaceArrangePrefsSchema.optional(),
 });
 
-export type WorkspaceCameraJson = z.infer<typeof workspaceCameraSchema>;
+/** Full camera blob after parse normalization (always includes `arrange`). */
+export type WorkspaceCameraJson = {
+  zoom: number;
+  panX: number;
+  panY: number;
+  arrange: WorkspaceArrangePrefsJson;
+};
 
 export const defaultWorkspaceCamera = (): WorkspaceCameraJson => ({
   zoom: 1,
   panX: 0,
   panY: 0,
+  arrange: defaultWorkspaceArrangePrefs(),
 });
 
 export function parseWorkspaceLayout(raw: unknown): WorkspaceLayoutJson {
@@ -53,12 +198,41 @@ export function parseWorkspaceLayout(raw: unknown): WorkspaceLayoutJson {
 }
 
 export function parseWorkspaceCamera(raw: unknown): WorkspaceCameraJson {
-  if (raw === null || raw === undefined) {
+  if (raw === null || typeof raw !== "object") {
     return defaultWorkspaceCamera();
   }
-  const parsed = workspaceCameraSchema.safeParse(raw);
-  if (parsed.success) return parsed.data;
-  return defaultWorkspaceCamera();
+  const o = raw as Record<string, unknown>;
+  const fallback = defaultWorkspaceCamera();
+  const zoom = workspaceCameraSchema.shape.zoom.safeParse(o.zoom).success
+    ? (o.zoom as number)
+    : fallback.zoom;
+  const panX = workspaceCameraSchema.shape.panX.safeParse(o.panX).success
+    ? (o.panX as number)
+    : fallback.panX;
+  const panY = workspaceCameraSchema.shape.panY.safeParse(o.panY).success
+    ? (o.panY as number)
+    : fallback.panY;
+
+  const arrange = migrateLegacyWorkspaceArrange(o.arrange);
+
+  return {
+    zoom,
+    panX,
+    panY,
+    arrange,
+  };
+}
+
+/** Stripped blob for PATCH `/api/me/workspace`: core fields Supabase persists. */
+export function workspaceCameraPersistPayload(cam: WorkspaceCameraJson): z.infer<
+  typeof workspaceCameraSchema
+> {
+  return {
+    zoom: cam.zoom,
+    panX: cam.panX,
+    panY: cam.panY,
+    arrange: cam.arrange,
+  };
 }
 
 /** Next tracker anchored near workspace center (`z` is caller-managed). */
