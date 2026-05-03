@@ -51,7 +51,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   let syncWarning: string | null = null;
   try {
-    await syncUserInventory(session, { force: false });
+    const inv = await syncUserInventory(session, { force: false });
+    if (inv.equipmentOnlyRestricted) {
+      syncWarning =
+        inv.warnings[0] ??
+        "Bungie only returned equipped armor. Sign out and sign back in to restore full inventory access.";
+    }
   } catch (err) {
     if (err instanceof InventoryNotReady) {
       syncWarning = err.message;

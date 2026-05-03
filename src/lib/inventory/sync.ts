@@ -39,6 +39,12 @@ export interface InventorySyncResult {
   cached: boolean;
   manifestVersion: string | null;
   warnings: string[];
+  /**
+   * Bungie returned equipment only (vault + character bags empty). Almost always
+   * missing `ReadDestinyInventoryAndVault` on the stored token — user must sign
+   * out and back in (and confirm the scope on the Bungie app).
+   */
+  equipmentOnlyRestricted?: boolean;
 }
 
 export interface InventorySyncOptions {
@@ -74,6 +80,7 @@ export async function syncUserInventory(
           cached: true,
           manifestVersion: null,
           warnings: [],
+          equipmentOnlyRestricted: false,
         };
       }
     }
@@ -145,15 +152,16 @@ export async function syncUserInventory(
   }
 
   const rawCounts = rawInventoryItemCounts(profile);
-  if (
+  const equipmentOnlyRestricted =
     rawCounts.profileItems === 0 &&
     rawCounts.characterBagItems === 0 &&
-    rawCounts.equippedItems > 0
-  ) {
+    rawCounts.equippedItems > 0;
+
+  if (equipmentOnlyRestricted) {
     warnings.push(
-      "Bungie returned equipped items only (vault and character inventories were empty). " +
-        "To sync vault and unequipped armor, register your app at bungie.net/en/Application with scope ReadDestinyInventoryAndVault, then sign out and sign in again. " +
-        "If scope is already set, check Bungie.net privacy settings for inventory visibility.",
+      "Bungie returned equipped armor only (vault and character inventories were empty). " +
+        "Sign out and sign back in so your session picks up ReadDestinyInventoryAndVault. " +
+        "If it persists, enable that scope on your app at bungie.net/en/Application and check Bungie.net privacy for inventory visibility.",
     );
   }
 
@@ -175,6 +183,7 @@ export async function syncUserInventory(
     cached: false,
     manifestVersion: lookups.version,
     warnings,
+    equipmentOnlyRestricted,
   };
 }
 

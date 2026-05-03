@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { CSSProperties } from "react";
 import { Plus, Warning, X } from "@phosphor-icons/react/dist/ssr";
 import { NewViewForm } from "@/components/views/new-view-form";
 import {
@@ -13,6 +12,7 @@ import {
 import type { TrackerOptionItem } from "@/lib/views/tracker-option";
 import { layoutForNewTrackerAvoidingOverlap } from "@/lib/workspace/workspace-schema";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
+import { NEW_TRACKER_FAB_CLASSES, NEW_TRACKER_FAB_SHADOW } from "@/components/workspace/new-tracker-fab-styles";
 
 const WORKSPACE_NEW_TRACKER_FORM_ID = "workspace-new-tracker-form";
 
@@ -36,17 +36,9 @@ interface NewTrackerDialogProps {
   getPreferredTrackerTopLeft?: () => { x: number; y: number } | null;
 }
 
-const FAB_CLASSES =
-  "relative flex h-12 shrink-0 items-center gap-2 overflow-hidden rounded-none bg-[#07ad6b] px-6 text-sm font-medium text-white transition-colors hover:bg-[#0ac07a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#07ad6b] focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";
-
 function isFromFabShell(shell: HTMLDivElement | null, target: EventTarget | null) {
   return Boolean(shell && target instanceof Node && shell.contains(target));
 }
-
-const FAB_SHADOW: CSSProperties = {
-  boxShadow:
-    "0 10px 20px -5px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(0,0,0,0.24), inset 0 -10px 14px -4px rgba(255,255,255,0.16)",
-};
 
 export function NewTrackerDialog({
   open,
@@ -110,8 +102,8 @@ export function NewTrackerDialog({
                 onOpenChange(true);
               }
             }}
-            className={`pointer-events-auto z-[1] ${FAB_CLASSES}`}
-            style={FAB_SHADOW}
+            className={`pointer-events-auto z-[1] ${NEW_TRACKER_FAB_CLASSES}`}
+            style={NEW_TRACKER_FAB_SHADOW}
             aria-expanded={open}
             aria-busy={submitBusy || undefined}
             aria-haspopup="dialog"

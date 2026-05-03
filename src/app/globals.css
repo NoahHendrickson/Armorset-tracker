@@ -98,6 +98,16 @@
   }
 }
 
+@layer utilities {
+  /* Pixel art in img/next/image: NN upscale so SVG rasterization doesn’t show gutter lines */
+  .pixel-art-img {
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: -webkit-optimize-contrast;
+    -ms-interpolation-mode: nearest-neighbor;
+  }
+}
+
 @layer components {
   /* Avoid will-change/backface on the zoomed layer: at min zoom Chrome/WebKit
      can leave stale compositor tiles or mis-sized layers, showing “shredded”

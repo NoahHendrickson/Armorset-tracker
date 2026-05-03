@@ -36,19 +36,30 @@ export function RefreshButton({
         error?: string;
         itemCount?: number;
         warnings?: string[];
+        equipmentOnlyRestricted?: boolean;
       };
       if (!res.ok) {
         toast.error(body.error ?? "Refresh failed");
         return;
       }
-      toast.success(
-        `Inventory refreshed${typeof body.itemCount === "number" ? ` — ${body.itemCount} pieces` : ""}.`,
-      );
-      if (Array.isArray(body.warnings)) {
-        for (const w of body.warnings) {
-          toast.warning(w, { duration: 14_000 });
+
+      if (body.equipmentOnlyRestricted) {
+        const detail =
+          Array.isArray(body.warnings) && body.warnings[0]
+            ? body.warnings[0]
+            : "Bungie only returned equipped armor. Sign out and sign back in so your session can read your full vault and inventories.";
+        toast.error(detail, { duration: 22_000 });
+      } else {
+        toast.success(
+          `Inventory refreshed${typeof body.itemCount === "number" ? ` — ${body.itemCount} pieces` : ""}.`,
+        );
+        if (Array.isArray(body.warnings)) {
+          for (const w of body.warnings) {
+            toast.warning(w, { duration: 14_000 });
+          }
         }
       }
+
       startTransition(() => router.refresh());
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Refresh failed");
