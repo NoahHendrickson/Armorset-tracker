@@ -1,4 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  BUNGIE_REAUTH_REQUIRED_CODE,
+  BUNGIE_RECONNECT_PATH,
+} from "@/lib/auth/bungie-reauth";
 import { crossSiteOriginBlockResponse } from "@/lib/auth/api-origin-check";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import {
@@ -25,6 +29,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     if (err instanceof InventoryNotReady) {
+      if (err.status === 401) {
+        return NextResponse.json(
+          {
+            error: err.message,
+            code: BUNGIE_REAUTH_REQUIRED_CODE,
+            reconnectPath: BUNGIE_RECONNECT_PATH,
+          },
+          { status: 401 },
+        );
+      }
       return NextResponse.json(
         { error: err.message, retryable: err.status === 503 },
         { status: err.status },

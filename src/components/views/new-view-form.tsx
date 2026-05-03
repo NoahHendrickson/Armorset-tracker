@@ -25,6 +25,19 @@ export interface OptionItem {
   name: string;
 }
 
+/** Snapshot of the new-tracker form at submit time (for canvas placement). */
+export interface NewTrackerLayoutDraft {
+  name: string;
+  classType: number;
+  setHash: number;
+  archetypeHash: number;
+  tuningHash: number;
+  setName: string;
+  archetypeName: string;
+  tuningName: string;
+  className: string;
+}
+
 type ClassValue = "0" | "1" | "2";
 
 interface NewViewFormProps {
@@ -41,9 +54,9 @@ interface NewViewFormProps {
   initialLayout?: WorkspaceLayoutJson;
   /**
    * When set, called at submit time to build `layout` for the create request
-   * (e.g. from the current viewport). Overrides {@link initialLayout}.
+   * (e.g. viewport center or cluster-aware placement). Overrides {@link initialLayout}.
    */
-  resolveLayoutOnSubmit?: () => WorkspaceLayoutJson;
+  resolveLayoutOnSubmit?: (draft: NewTrackerLayoutDraft) => WorkspaceLayoutJson;
   /** Includes `tracker` when the API returns workspace payload so the dashboard can merge without refetching. */
   onCreated?: (viewId: string, tracker?: SerializableTrackerPayload) => void;
   onCancel?: () => void;
@@ -113,6 +126,12 @@ export function NewViewForm({
     sortedSets.find((s) => String(s.hash) === setHash)?.name ?? "";
   const archetypeLabel =
     sortedArchetypes.find((a) => String(a.hash) === archetypeHash)?.name ?? "";
+  const tuningLabel =
+    sortedTunings.find((t) => String(t.hash) === tuningHash)?.name ?? "";
+  const classNameLabel =
+    classType !== "" ?
+      (CLASS_OPTIONS.find((o) => o.value === classType)?.label ?? "")
+    : "";
 
   const canSubmit =
     name.trim().length > 0 &&
@@ -162,7 +181,17 @@ export function NewViewForm({
     setSubmitting(true);
     try {
       const layoutForRequest =
-        resolveLayoutOnSubmit?.() ??
+        resolveLayoutOnSubmit?.({
+          name: name.trim(),
+          classType: Number(classType),
+          setHash: Number(setHash),
+          archetypeHash: Number(archetypeHash),
+          tuningHash: Number(tuningHash),
+          setName: setLabel,
+          archetypeName: archetypeLabel,
+          tuningName: tuningLabel,
+          className: classNameLabel,
+        }) ??
         (initialLayout !== undefined ? initialLayout : undefined);
       const res = await fetch("/api/views", {
         method: "POST",

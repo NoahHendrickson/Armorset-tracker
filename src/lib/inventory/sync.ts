@@ -3,6 +3,7 @@ import { BungieApiError, getProfile } from "@/lib/bungie/client";
 import { PROFILE_COMPONENTS } from "@/lib/bungie/constants";
 import { withBackoff, withUserRateLimit } from "@/lib/bungie/rate-limit";
 import { getServiceRoleClient } from "@/lib/db/server";
+import { BUNGIE_REAUTH_USER_MESSAGE } from "@/lib/auth/bungie-reauth";
 import {
   forceRefreshAccessToken,
   getValidAccessToken,
@@ -88,10 +89,7 @@ export async function syncUserInventory(
 
   const accessToken = await getValidAccessToken(session.userId);
   if (!accessToken) {
-    throw new InventoryNotReady(
-      "Bungie session expired — please sign in again.",
-      401,
-    );
+    throw new InventoryNotReady(BUNGIE_REAUTH_USER_MESSAGE, 401);
   }
 
   const lookups = await getManifestLookups();
@@ -127,10 +125,7 @@ export async function syncUserInventory(
     if (err instanceof BungieApiError && err.status === 401) {
       const refreshed = await forceRefreshAccessToken(session.userId);
       if (!refreshed) {
-        throw new InventoryNotReady(
-          "Bungie session expired — please sign in again.",
-          401,
-        );
+        throw new InventoryNotReady(BUNGIE_REAUTH_USER_MESSAGE, 401);
       }
       try {
         profile = await fetchProfile(refreshed);
@@ -139,10 +134,7 @@ export async function syncUserInventory(
           retryErr instanceof BungieApiError &&
           retryErr.status === 401
         ) {
-          throw new InventoryNotReady(
-            "Bungie session expired — please sign in again.",
-            401,
-          );
+          throw new InventoryNotReady(BUNGIE_REAUTH_USER_MESSAGE, 401);
         }
         throw retryErr;
       }
@@ -160,7 +152,7 @@ export async function syncUserInventory(
   if (equipmentOnlyRestricted) {
     warnings.push(
       "Bungie returned equipped armor only (vault and character inventories were empty). " +
-        "Sign out and sign back in so your session picks up ReadDestinyInventoryAndVault. " +
+        "Reconnect Bungie so your session picks up ReadDestinyInventoryAndVault. " +
         "If it persists, enable that scope on your app at bungie.net/en/Application and check Bungie.net privacy for inventory visibility.",
     );
   }

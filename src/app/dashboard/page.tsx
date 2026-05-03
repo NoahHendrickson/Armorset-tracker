@@ -55,7 +55,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     if (inv.equipmentOnlyRestricted) {
       syncWarning =
         inv.warnings[0] ??
-        "Bungie only returned equipped armor. Sign out and sign back in to restore full inventory access.";
+        "Bungie only returned equipped armor. Reconnect Bungie to restore full vault access.";
     }
   } catch (err) {
     if (err instanceof InventoryNotReady) {

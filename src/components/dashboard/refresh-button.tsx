@@ -4,6 +4,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowsCounterClockwise } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
+import {
+  BUNGIE_REAUTH_REQUIRED_CODE,
+  BUNGIE_RECONNECT_PATH,
+  BUNGIE_REAUTH_USER_MESSAGE,
+} from "@/lib/auth/bungie-reauth";
 import { Button } from "@/components/ui/button";
 import { chromeStandaloneSquareIconButtonClass } from "@/components/ui/chrome-square-icon-button";
 
@@ -34,12 +39,27 @@ export function RefreshButton({
       });
       const body = (await res.json()) as {
         error?: string;
+        code?: string;
+        reconnectPath?: string;
         itemCount?: number;
         warnings?: string[];
         equipmentOnlyRestricted?: boolean;
       };
       if (!res.ok) {
-        toast.error(body.error ?? "Refresh failed");
+        if (body.code === BUNGIE_REAUTH_REQUIRED_CODE) {
+          toast.error(body.error ?? BUNGIE_REAUTH_USER_MESSAGE, {
+            duration: 22_000,
+            action: {
+              label: "Reconnect Bungie",
+              onClick: () => {
+                window.location.href =
+                  body.reconnectPath ?? BUNGIE_RECONNECT_PATH;
+              },
+            },
+          });
+        } else {
+          toast.error(body.error ?? "Refresh failed");
+        }
         return;
       }
 
@@ -47,8 +67,16 @@ export function RefreshButton({
         const detail =
           Array.isArray(body.warnings) && body.warnings[0]
             ? body.warnings[0]
-            : "Bungie only returned equipped armor. Sign out and sign back in so your session can read your full vault and inventories.";
-        toast.error(detail, { duration: 22_000 });
+            : "Bungie only returned equipped armor. Reconnect Bungie so your session can read your full vault and inventories.";
+        toast.error(detail, {
+          duration: 22_000,
+          action: {
+            label: "Reconnect Bungie",
+            onClick: () => {
+              window.location.href = BUNGIE_RECONNECT_PATH;
+            },
+          },
+        });
       } else {
         toast.success(
           `Inventory refreshed${typeof body.itemCount === "number" ? ` — ${body.itemCount} pieces` : ""}.`,

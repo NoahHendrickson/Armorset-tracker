@@ -52,6 +52,7 @@ export type Database = {
           refresh_token_encrypted: string;
           expires_at: string;
           refresh_expires_at: string;
+          refresh_lease_until: string | null;
           updated_at: string;
         };
         Insert: {
@@ -60,6 +61,7 @@ export type Database = {
           refresh_token_encrypted: string;
           expires_at: string;
           refresh_expires_at: string;
+          refresh_lease_until?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -68,6 +70,7 @@ export type Database = {
           refresh_token_encrypted?: string;
           expires_at?: string;
           refresh_expires_at?: string;
+          refresh_lease_until?: string | null;
           updated_at?: string;
         };
         Relationships: [

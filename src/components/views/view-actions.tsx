@@ -175,7 +175,7 @@ export function ViewActions({
       </Dialog>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-none sm:rounded-none">
           <DialogHeader>
             <DialogTitle>Delete this view?</DialogTitle>
             <DialogDescription>

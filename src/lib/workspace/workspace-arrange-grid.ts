@@ -6,6 +6,7 @@ import {
   WORKSPACE_CANVAS_WIDTH,
 } from "@/lib/workspace/workspace-constants";
 import {
+  centeredTrackerLayout,
   parseWorkspaceLayout,
   type WorkspaceLayoutJson,
 } from "@/lib/workspace/workspace-schema";
@@ -518,4 +519,103 @@ export function computeWorkspaceGridLayouts(
   });
 
   return { updates };
+}
+
+/** Stable id for the synthetic tracker appended during cluster placement preview. */
+export const NEW_TRACKER_CLUSTER_PLACEMENT_ID =
+  "00000000-0000-4000-8000-000000000001";
+
+function syntheticTrackerForClusterPlacement(draft: {
+  viewName: string;
+  classType: number;
+  className: string;
+  setName: string;
+  archetypeName: string;
+  tuningName: string;
+  setHash: number;
+  archetypeHash: number;
+  tuningHash: number;
+}): SerializableTrackerPayload {
+  const lo = centeredTrackerLayout(0);
+  return {
+    view: {
+      id: NEW_TRACKER_CLUSTER_PLACEMENT_ID,
+      user_id: "",
+      name: draft.viewName,
+      set_hash: draft.setHash,
+      archetype_hash: draft.archetypeHash,
+      tuning_hash: draft.tuningHash,
+      class_type: draft.classType,
+      created_at: new Date(0).toISOString(),
+      updated_at: new Date(0).toISOString(),
+      layout: lo,
+    },
+    progress: {
+      viewId: NEW_TRACKER_CLUSTER_PLACEMENT_ID,
+      classType: draft.classType,
+      tertiaryStats: [],
+      cells: {
+        helmet: {},
+        arms: {},
+        chest: {},
+        legs: {},
+        classItem: {},
+      },
+      ownedCells: 0,
+      totalCells: 0,
+    },
+    setName: draft.setName,
+    archetypeName: draft.archetypeName,
+    tuningName: draft.tuningName,
+    className: draft.className,
+    archetypePrimarySecondary: null,
+    tertiaryStatIconPaths: {},
+    tuningStatIconPath: null,
+    needsClass: false,
+    resolvedSetHash: draft.setHash,
+  };
+}
+
+/**
+ * Top-left (canvas px) where a new tracker would land if the grid were recomputed
+ * with the draft labels included — matches {@link computeWorkspaceGridLayouts} for
+ * the same recipe. Returns `null` when clustering is off (`groupBy === "none"`).
+ */
+export function preferredTopLeftForNewTrackerInClusterGrid(
+  existing: readonly SerializableTrackerPayload[],
+  draft: {
+    viewName: string;
+    classType: number;
+    className: string;
+    setName: string;
+    archetypeName: string;
+    tuningName: string;
+    setHash: number;
+    archetypeHash: number;
+    tuningHash: number;
+  },
+  options: {
+    sort: ArrangeSortMode;
+    groupBy: ArrangeGroupMode;
+    groupBySecondary: ArrangeGroupMode | null;
+    classColumnOrder?: readonly string[] | null;
+  },
+): { x: number; y: number } | null {
+  if (options.groupBy === "none") return null;
+
+  const syntheticId = NEW_TRACKER_CLUSTER_PLACEMENT_ID;
+  const filtered = existing.filter((t) => t.view.id !== syntheticId);
+  const ghost = syntheticTrackerForClusterPlacement(draft);
+  const list = [...filtered, ghost];
+
+  const { updates } = computeWorkspaceGridLayouts(list, {
+    sort: options.sort,
+    groupBy: options.groupBy,
+    groupBySecondary: options.groupBySecondary,
+    classColumnOrder: options.classColumnOrder,
+  });
+
+  const placed = updates.find((u) => u.id === syntheticId);
+  if (!placed) return null;
+  return { x: placed.layout.x, y: placed.layout.y };
 }

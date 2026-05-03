@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Warning, X } from "@phosphor-icons/react/dist/ssr";
-import { NewViewForm } from "@/components/views/new-view-form";
+import { NewViewForm, type NewTrackerLayoutDraft } from "@/components/views/new-view-form";
 import {
   Popover,
   PopoverAnchor,
@@ -10,7 +10,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import type { TrackerOptionItem } from "@/lib/views/tracker-option";
-import { layoutForNewTrackerAvoidingOverlap } from "@/lib/workspace/workspace-schema";
+import type { WorkspaceLayoutJson } from "@/lib/workspace/workspace-schema";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import { NEW_TRACKER_FAB_CLASSES, NEW_TRACKER_FAB_SHADOW } from "@/components/workspace/new-tracker-fab-styles";
 
@@ -26,14 +26,12 @@ export interface TrackerFormSelectors {
 interface NewTrackerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  trackers: SerializableTrackerPayload[];
   selectors: TrackerFormSelectors;
   onCreated: (tracker?: SerializableTrackerPayload) => void;
   /**
-   * Canvas-space top-left seed (viewport-centered when implemented). If omitted
-   * or null, placement uses workspace geometric center.
+   * Builds persisted layout at submit time (cluster-aware on the dashboard).
    */
-  getPreferredTrackerTopLeft?: () => { x: number; y: number } | null;
+  resolveLayoutOnSubmit?: (draft: NewTrackerLayoutDraft) => WorkspaceLayoutJson;
 }
 
 function isFromFabShell(shell: HTMLDivElement | null, target: EventTarget | null) {
@@ -43,30 +41,13 @@ function isFromFabShell(shell: HTMLDivElement | null, target: EventTarget | null
 export function NewTrackerDialog({
   open,
   onOpenChange,
-  trackers,
   selectors,
   onCreated,
-  getPreferredTrackerTopLeft,
+  resolveLayoutOnSubmit,
 }: NewTrackerDialogProps) {
   const fabShellRef = useRef<HTMLDivElement>(null);
   const [submitBusy, setSubmitBusy] = useState(false);
   const [canSubmitForm, setCanSubmitForm] = useState(false);
-
-  const resolveLayoutOnSubmit = useCallback(() => {
-    const maxZ = trackers.length
-      ? Math.max(...trackers.map((t) => t.view.layout.z))
-      : -1;
-    const existingRects = trackers.map((t) => ({
-      x: t.view.layout.x,
-      y: t.view.layout.y,
-      w: t.view.layout.w,
-      h: t.view.layout.h,
-    }));
-    const preferred = getPreferredTrackerTopLeft?.() ?? null;
-    return layoutForNewTrackerAvoidingOverlap(maxZ + 1, existingRects, {
-      preferredTopLeft: preferred ?? undefined,
-    });
-  }, [trackers, getPreferredTrackerTopLeft]);
 
   const label = submitBusy ? "Saving..." : open ? "Create" : "New tracker";
   const aria = open ? "Create tracker (submit)" : "New tracker";

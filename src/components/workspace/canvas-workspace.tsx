@@ -39,6 +39,7 @@ import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
   arrangePrefsFromPickOrder,
   clusterPickOrderFromArrangePrefs,
+  layoutForNewTrackerAvoidingOverlap,
   normalizeWorkspaceArrangePrefs,
   parseWorkspaceCamera,
   parseWorkspaceLayout,
@@ -68,6 +69,7 @@ import {
   NewTrackerDialog,
   type TrackerFormSelectors,
 } from "@/components/workspace/new-tracker-dialog";
+import type { NewTrackerLayoutDraft } from "@/components/views/new-view-form";
 import {
   TrackerPanel,
   type TrackerMergeRole,
@@ -79,6 +81,7 @@ import {
 import { attachCanvasViewportWheel } from "@/components/workspace/canvas-viewport-wheel";
 import {
   computeWorkspaceGridLayouts,
+  preferredTopLeftForNewTrackerInClusterGrid,
   type ArrangeGroupMode,
   type ArrangeSortMode,
 } from "@/lib/workspace/workspace-arrange-grid";
@@ -382,6 +385,56 @@ export function CanvasWorkspace({
       },
     );
   }, []);
+
+  const resolveNewTrackerLayout = useCallback(
+    (draft: NewTrackerLayoutDraft) => {
+      const list = trackersRef.current;
+      const maxZ =
+        list.length > 0 ?
+          Math.max(...list.map((t) => t.view.layout.z))
+        : -1;
+      const existingRects = list.map((t) => ({
+        x: t.view.layout.x,
+        y: t.view.layout.y,
+        w: t.view.layout.w,
+        h: t.view.layout.h,
+      }));
+      const recipe = arrangeMenuRecipeRef.current;
+      const usesClass =
+        recipe.groupBy === "class_name" ||
+        recipe.groupBySecondary === "class_name";
+      const clusterTopLeft =
+        recipe.groupBy !== "none" ?
+          preferredTopLeftForNewTrackerInClusterGrid(
+            list,
+            {
+              viewName: draft.name,
+              classType: draft.classType,
+              className: draft.className,
+              setName: draft.setName,
+              archetypeName: draft.archetypeName,
+              tuningName: draft.tuningName,
+              setHash: draft.setHash,
+              archetypeHash: draft.archetypeHash,
+              tuningHash: draft.tuningHash,
+            },
+            {
+              sort: recipe.sort,
+              groupBy: recipe.groupBy,
+              groupBySecondary: recipe.groupBySecondary,
+              classColumnOrder:
+                usesClass ? [...WORKSPACE_CLASS_COLUMN_ORDER_OPTIONS] : null,
+            },
+          )
+        : null;
+      const viewportSeed = getPreferredTrackerTopLeft();
+      const preferredTopLeft = clusterTopLeft ?? viewportSeed ?? undefined;
+      return layoutForNewTrackerAvoidingOverlap(maxZ + 1, existingRects, {
+        preferredTopLeft,
+      });
+    },
+    [getPreferredTrackerTopLeft],
+  );
 
   useEffect(() => {
     return () => {
@@ -1388,8 +1441,8 @@ export function CanvasWorkspace({
               <NewTrackerDialog
                 open={newTrackerOpen}
                 onOpenChange={setNewTrackerOpen}
-                trackers={trackers}
                 selectors={selectors}
+                resolveLayoutOnSubmit={resolveNewTrackerLayout}
                 onCreated={(tracker) => {
                   if (tracker) {
                     setTrackers((prev) =>
@@ -1402,7 +1455,6 @@ export function CanvasWorkspace({
                     router.refresh();
                   }
                 }}
-                getPreferredTrackerTopLeft={getPreferredTrackerTopLeft}
               />
             </div>
           </div>

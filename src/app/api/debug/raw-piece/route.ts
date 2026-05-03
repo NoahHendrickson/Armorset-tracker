@@ -1,4 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  BUNGIE_REAUTH_REQUIRED_CODE,
+  BUNGIE_RECONNECT_PATH,
+  BUNGIE_REAUTH_USER_MESSAGE,
+} from "@/lib/auth/bungie-reauth";
 import { requireSessionFromRequest } from "@/lib/auth/session";
 import { getValidAccessToken } from "@/lib/auth/tokens";
 import { getProfile } from "@/lib/bungie/client";
@@ -23,7 +28,14 @@ export async function GET(req: NextRequest) {
 
   const accessToken = await getValidAccessToken(session.userId);
   if (!accessToken) {
-    return NextResponse.json({ error: "No valid access token" }, { status: 401 });
+    return NextResponse.json(
+      {
+        error: BUNGIE_REAUTH_USER_MESSAGE,
+        code: BUNGIE_REAUTH_REQUIRED_CODE,
+        reconnectPath: BUNGIE_RECONNECT_PATH,
+      },
+      { status: 401 },
+    );
   }
 
   // Find a piece in cache that has tuning but NO archetype — that's the smoking gun
