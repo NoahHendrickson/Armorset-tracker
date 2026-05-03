@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Armor Set Checklist",
+  title: "D2 tuning tracker",
   description:
     "Track Destiny 2 armor 3.0 set completion against archetype + tuning configurations.",
 };

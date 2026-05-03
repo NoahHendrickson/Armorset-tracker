@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { SignOut } from "@phosphor-icons/react/dist/ssr";
+import { FeedbackHeaderDialog } from "@/components/feedback-header-dialog";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
 import { SyncManifestButton } from "@/components/dashboard/sync-manifest-button";
 import { BungieProfileAvatar } from "@/components/bungie-profile-avatar";
+import { chromeSquareIconSegmentClass } from "@/components/ui/chrome-square-icon-button";
 
 interface AppHeaderProps {
   displayName: string;
@@ -11,7 +13,7 @@ interface AppHeaderProps {
 }
 
 /**
- * Top nav: brand cluster (ASB+TT), compact icon actions, profile + sign-out.
+ * Top nav: brand cluster (D2 Tuning Tracker), compact icon actions, profile + sign-out.
  */
 export function AppHeader({ displayName, profilePictureUrl }: AppHeaderProps) {
   return (
@@ -29,17 +31,13 @@ export function AppHeader({ displayName, profilePictureUrl }: AppHeaderProps) {
           className="h-6 w-auto shrink-0"
           aria-hidden
         />
-        <div className="flex min-w-0 flex-col leading-tight">
-          <span className="text-sm font-medium tracking-tight text-white">
-            ASB+TT
-          </span>
-          <span className="text-[11px] font-normal leading-snug text-white/50 sm:text-xs">
-            armorsetbonus+tuningtracker
-          </span>
-        </div>
+        <span className="min-w-0 text-sm font-medium tracking-tight text-white">
+          D2 Tuning Tracker
+        </span>
       </Link>
 
       <div className="pointer-events-auto flex flex-wrap items-center gap-2.5 sm:gap-3">
+        <FeedbackHeaderDialog />
         <RefreshButton variant="header-large" />
         <SyncManifestButton variant="header-large" />
 
@@ -59,7 +57,7 @@ export function AppHeader({ displayName, profilePictureUrl }: AppHeaderProps) {
               type="submit"
               aria-label="Sign out"
               title="Sign out"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-none border-l border-white/15 text-white/75 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/35"
+              className={chromeSquareIconSegmentClass()}
             >
               <SignOut weight="duotone" className="h-5 w-5" />
             </button>

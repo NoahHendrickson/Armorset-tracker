@@ -188,15 +188,10 @@ export function ArmorSetCombobox({
         <ul
           id={listboxId}
           role="listbox"
-          className="max-h-60 overflow-y-auto p-1 motion-reduce:scroll-auto"
+          className="max-h-60 overflow-y-auto px-0 py-1 motion-reduce:scroll-auto"
         >
           {filtered.length === 0 ? (
-            <li
-              className={cn(
-                "px-2 py-2.5 text-sm text-muted-foreground",
-                sharpCorners ? "rounded-none" : "rounded-sm",
-              )}
-            >
+            <li className="px-2 py-2.5 text-sm text-muted-foreground">
               {options.length === 0 ? emptyCatalogMessage : "No matches."}
             </li>
           ) : (
@@ -210,8 +205,7 @@ export function ArmorSetCombobox({
                   role="option"
                   aria-selected={sel}
                   className={cn(
-                    "relative flex cursor-pointer select-none items-center px-2 py-1.5 pr-9 text-sm text-popover-foreground outline-none transition-colors",
-                    sharpCorners ? "rounded-none" : "rounded-sm",
+                    "relative flex w-full cursor-pointer select-none items-center rounded-none px-2 py-1.5 pr-9 text-sm text-popover-foreground outline-none transition-colors",
                     active && "bg-accent text-accent-foreground",
                   )}
                   onMouseEnter={() => setHighlightIndex(idx)}

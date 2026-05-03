@@ -108,7 +108,13 @@ function ClassGlyph({
   );
 }
 
+/** 1px frame only: brighter rim at top/corners, fades toward bottom/sides (#2d2e32 stays on the interior). */
+const TRACKER_BODY_GLASS_BORDER =
+  "bg-[linear-gradient(170deg,rgba(255,255,255,0.5)_0%,rgba(255,255,255,0.24)_18%,rgba(255,255,255,0.24)_52%,rgba(255,255,255,0.36)_100%)]";
 
+/** Horizontal hairline between title row and tracker grid — similar specular cue as the rim. */
+const TRACKER_HEADER_CONTENT_DIVIDER =
+  "h-px w-full shrink-0 bg-gradient-to-r from-white/[0.06] via-white/[0.32] to-white/[0.06]";
 
 export function TrackerPanel({
   payload,
@@ -261,7 +267,7 @@ export function TrackerPanel({
       >
         <aside
           aria-label="Tracker actions"
-          className="flex shrink-0 flex-col items-center gap-2 self-start bg-[#424347] p-2"
+          className="flex shrink-0 cursor-default flex-col items-center gap-2 self-start bg-[#424347] p-2"
         >
           <button
             type="button"
@@ -273,7 +279,9 @@ export function TrackerPanel({
 
           <span aria-hidden className="h-px w-full bg-white/10" />
 
-          <RefreshButton variant="icon" />
+          <span className="no-drag inline-flex">
+            <RefreshButton variant="icon" />
+          </span>
 
           <span aria-hidden className="h-px w-full bg-white/10" />
 
@@ -291,18 +299,26 @@ export function TrackerPanel({
             </>
           ) : null}
 
-          <ViewActions
-            viewId={view.id}
-            initialName={view.name}
-            layout="sidebar"
-          />
+          <div className="no-drag">
+            <ViewActions
+              viewId={view.id}
+              initialName={view.name}
+              layout="sidebar"
+            />
+          </div>
         </aside>
 
         <div
-          className={`flex min-w-0 flex-1 flex-col overflow-hidden border border-[#424347] bg-[#2d2e32] shadow-lg ${dropRing}`}
+          className={cn(
+            // Glass rim only on the draggable body column, not the left icon rail.
+            "tracker-drag flex min-w-0 flex-1 cursor-grab flex-col overflow-hidden rounded-none p-px shadow-lg active:cursor-grabbing",
+            TRACKER_BODY_GLASS_BORDER,
+            dropRing,
+          )}
         >
-          {showMergedGrid && mergePartnerPayload ? (
-            <header className="flex shrink-0 items-stretch gap-0 border-b border-[#424347] px-4 pb-0 pt-4">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#2d2e32]">
+            {showMergedGrid && mergePartnerPayload ? (
+            <header className="flex shrink-0 select-none items-stretch gap-0 px-4 pb-0 pt-4">
               <div
                 className="flex min-w-0 flex-1 flex-col gap-1 border-b-2 pr-2"
                 style={{ borderColor: MERGE_ACCENT_GREEN }}
@@ -342,7 +358,7 @@ export function TrackerPanel({
               </div>
             </header>
           ) : (
-            <header className="flex shrink-0 items-start justify-between gap-2 p-4">
+            <header className="flex shrink-0 select-none items-start justify-between gap-2 p-4">
               <div className="flex min-w-0 flex-1 items-center gap-2.5">
                 <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
                 <div className="min-w-0 flex-1">
@@ -358,13 +374,15 @@ export function TrackerPanel({
             </header>
           )}
 
-          <div
-            className={`no-drag flex min-h-0 flex-1 flex-col gap-4 border-t border-[#424347] px-4 pt-4 pb-2 ${
-              !showMergedGrid && payload.needsClass
-                ? "overflow-y-auto"
-                : "overflow-hidden"
-            }`}
-          >
+            <div className={TRACKER_HEADER_CONTENT_DIVIDER} aria-hidden />
+
+            <div
+              className={`flex min-h-0 flex-1 flex-col gap-4 px-4 pt-4 pb-2 ${
+                !showMergedGrid && payload.needsClass
+                  ? "overflow-y-auto"
+                  : "overflow-hidden"
+              }`}
+            >
             {payload.needsClass ? (
               <div
                 role="alert"
@@ -391,6 +409,7 @@ export function TrackerPanel({
                 tertiaryStatIconPaths={tertiaryPaths}
               />
             )}
+            </div>
           </div>
         </div>
       </div>

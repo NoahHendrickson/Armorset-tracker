@@ -5,16 +5,16 @@ import { useRouter } from "next/navigation";
 import { ArrowsCounterClockwise } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { chromeStandaloneSquareIconButtonClass } from "@/components/ui/chrome-square-icon-button";
 
 interface RefreshButtonProps {
   /**
    * `button`      = outlined button with label (dashboards / older headers).
    * `icon`        = 20px icon-only trigger styled for the tracker sidebar.
-   * `header-icon` = 40px icon button styled for the top app header.
+   * `header-icon` = same bordered 40×40 chrome as `header-large` (kept for API compatibility).
    * `header-large` = compact square nav control (inventory refresh).
-   * `fab`         = circular floating-action icon for the canvas bottom bar.
    */
-  variant?: "button" | "icon" | "header-icon" | "header-large" | "fab";
+  variant?: "button" | "icon" | "header-icon" | "header-large";
 }
 
 export function RefreshButton({
@@ -86,7 +86,7 @@ export function RefreshButton({
           isLoading ? "Refreshing inventory" : "Refresh inventory from Bungie"
         }
         title="Refresh inventory"
-        className="flex h-10 w-10 items-center justify-center border border-white/10 bg-white/5 text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+        className={chromeStandaloneSquareIconButtonClass()}
       >
         <ArrowsCounterClockwise
           weight="duotone"
@@ -106,27 +106,7 @@ export function RefreshButton({
           isLoading ? "Refreshing inventory" : "Refresh inventory from Bungie"
         }
         title="Refresh inventory"
-        className="flex h-10 w-10 shrink-0 items-center justify-center border border-white/10 bg-[#2d2e32] text-white/80 shadow-lg transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
-      >
-        <ArrowsCounterClockwise
-          weight="duotone"
-          className={`h-5 w-5 ${isLoading ? "animate-spin" : ""}`}
-        />
-      </button>
-    );
-  }
-
-  if (variant === "fab") {
-    return (
-      <button
-        type="button"
-        onClick={refresh}
-        disabled={isLoading}
-        aria-label={
-          isLoading ? "Refreshing inventory" : "Refresh inventory from Bungie"
-        }
-        title="Refresh inventory"
-        className="flex h-12 w-12 shrink-0 items-center justify-center border border-white/10 bg-[#2d2e32] text-white/80 shadow-lg transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+        className={chromeStandaloneSquareIconButtonClass()}
       >
         <ArrowsCounterClockwise
           weight="duotone"

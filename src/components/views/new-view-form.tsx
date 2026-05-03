@@ -113,8 +113,6 @@ export function NewViewForm({
     sortedSets.find((s) => String(s.hash) === setHash)?.name ?? "";
   const archetypeLabel =
     sortedArchetypes.find((a) => String(a.hash) === archetypeHash)?.name ?? "";
-  const classLabel =
-    CLASS_OPTIONS.find((c) => c.value === classType)?.label ?? "";
 
   const canSubmit =
     name.trim().length > 0 &&
@@ -149,8 +147,8 @@ export function NewViewForm({
   const showNameError = submitAttempted && name.trim() === "";
 
   function autoFillName() {
-    if (!name && setLabel && archetypeLabel && classLabel) {
-      setName(`${classLabel} ${setLabel} — ${archetypeLabel}`);
+    if (!name && setLabel && archetypeLabel) {
+      setName(`${setLabel} / ${archetypeLabel}`);
     }
   }
 
@@ -338,7 +336,7 @@ export function NewViewForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onFocus={autoFillName}
-          placeholder='e.g. "Warlock Ferropotent — Gunner"'
+          placeholder='e.g. "Ferropotent / Gunner"'
           maxLength={80}
           aria-invalid={showNameError}
           className={cn(
@@ -347,7 +345,7 @@ export function NewViewForm({
           )}
         />
         <p className="text-xs text-muted-foreground">
-          Shown on your dashboard. Defaults to class + set + archetype.
+          Shown on your dashboard. Defaults to armor set / archetype.
         </p>
       </div>
 

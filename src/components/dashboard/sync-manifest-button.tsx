@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { ArrowsClockwise, Database } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { chromeStandaloneSquareIconButtonClass } from "@/components/ui/chrome-square-icon-button";
 
 interface Props {
   /**
    * `primary`/`secondary` = text + icon button (dashboard banners).
-   * `header-icon`         = compact icon-only trigger for the top app header.
+   * `header-icon`         = same bordered 40×40 chrome as `header-large`.
    * `header-large`        = compact square nav control (manifest sync).
    */
   variant?: "primary" | "secondary" | "header-icon" | "header-large";
@@ -75,7 +76,7 @@ export function SyncManifestButton({
           isLoading ? "Syncing Bungie manifest" : "Sync Bungie manifest"
         }
         title="Sync Bungie manifest"
-        className="flex h-10 w-10 items-center justify-center border border-white/10 bg-white/5 text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+        className={chromeStandaloneSquareIconButtonClass()}
       >
         {isLoading ? (
           <ArrowsClockwise weight="duotone" className="h-5 w-5 animate-spin" />
@@ -96,7 +97,7 @@ export function SyncManifestButton({
           isLoading ? "Syncing Bungie manifest" : "Sync Bungie manifest"
         }
         title="Sync Bungie manifest"
-        className="flex h-10 w-10 shrink-0 items-center justify-center border border-white/10 bg-[#2d2e32] text-white/80 shadow-lg transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+        className={chromeStandaloneSquareIconButtonClass()}
       >
         {isLoading ? (
           <ArrowsClockwise weight="duotone" className="h-5 w-5 animate-spin" />

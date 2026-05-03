@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+/** Optional nonempty string env (after trim); empty/absent becomes undefined */
+const optionalGithubFeedbackString = z.preprocess((v: unknown) => {
+  if (v === undefined || v === null || v === "") return undefined;
+  if (typeof v !== "string") return undefined;
+  const t = v.trim();
+  return t === "" ? undefined : t;
+}, z.string().min(1).optional());
+
 const supabaseProjectUrl = z
   .string()
   .url("NEXT_PUBLIC_SUPABASE_URL must be a URL")
@@ -40,6 +48,10 @@ const serverSchema = z.object({
     .string()
     .url("NEXT_PUBLIC_APP_URL must be a URL")
     .default("http://localhost:3000"),
+  /** In-app feedback → GitHub Issues (all required at submit time via {@link githubFeedbackIssueConfig}). */
+  GITHUB_FEEDBACK_OWNER: optionalGithubFeedbackString,
+  GITHUB_FEEDBACK_REPO: optionalGithubFeedbackString,
+  GITHUB_FEEDBACK_TOKEN: optionalGithubFeedbackString,
 });
 
 const clientSchema = z.object({
@@ -61,6 +73,9 @@ const ENV_TRIM_KEYS = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "NEXT_PUBLIC_APP_URL",
+  "GITHUB_FEEDBACK_OWNER",
+  "GITHUB_FEEDBACK_REPO",
+  "GITHUB_FEEDBACK_TOKEN",
 ] as const;
 
 function envWithTrimmedSecrets(): NodeJS.ProcessEnv {
@@ -101,4 +116,23 @@ export function clientEnv() {
   }
   cachedClient = parsed.data;
   return cachedClient;
+}
+
+/** GitHub target for `POST …/repos/…/issues` — undefined if integration is unset. */
+export function githubFeedbackIssueConfig():
+  | { owner: string; repo: string; token: string }
+  | undefined {
+  const e = serverEnv();
+  if (
+    !e.GITHUB_FEEDBACK_OWNER ||
+    !e.GITHUB_FEEDBACK_REPO ||
+    !e.GITHUB_FEEDBACK_TOKEN
+  ) {
+    return undefined;
+  }
+  return {
+    owner: e.GITHUB_FEEDBACK_OWNER,
+    repo: e.GITHUB_FEEDBACK_REPO,
+    token: e.GITHUB_FEEDBACK_TOKEN,
+  };
 }

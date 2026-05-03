@@ -28,7 +28,7 @@ interface ViewActionsProps {
 
 /**
  * Exposes rename + delete affordances for a view. The `sidebar` layout matches
- * the Figma tracker toolbar (two icon buttons stacked under the drag handle +
+ * the Figma tracker toolbar (icons stacked under the grip affordance +
  * refresh); `inline` is the dashboard row layout.
  */
 export function ViewActions({

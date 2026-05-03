@@ -58,7 +58,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { RefreshButton } from "@/components/dashboard/refresh-button";
+import {
+  chromeStandaloneSquareIconButtonClass,
+  chromeToolbarInsetPrimaryTileClass,
+  chromeToolbarInsetSegmentTileClass,
+  chromeToolbarShellClass,
+} from "@/components/ui/chrome-square-icon-button";
 import {
   NewTrackerDialog,
   type TrackerFormSelectors,
@@ -77,6 +82,7 @@ import {
   type ArrangeGroupMode,
   type ArrangeSortMode,
 } from "@/lib/workspace/workspace-arrange-grid";
+import { cn } from "@/lib/utils";
 
 type ArrangeRecipe = {
   sort: ArrangeSortMode;
@@ -1271,7 +1277,7 @@ export function CanvasWorkspace({
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-8">
                 <div className="flex max-w-lg flex-col items-center text-center">
                   <p className="text-[20px] font-normal leading-normal tracking-tight text-white">
-                    Welcome to ASB+TT
+                    Welcome to D2 Tuning Tracker
                   </p>
                   <p className="mt-2 max-w-xl text-sm font-normal leading-snug text-white/50">
                     Create a tracker by class, armor set, archetype, and tuning.
@@ -1282,13 +1288,13 @@ export function CanvasWorkspace({
 
             {/* Zoom + recenter — bottom right */}
             <div className="pointer-events-none absolute bottom-6 right-6 z-30 flex gap-2">
-              <div className="pointer-events-auto flex h-12 shrink-0 overflow-hidden rounded-none border border-white/10 bg-[#2d2e32] shadow-lg">
+              <div className={cn("pointer-events-auto", chromeToolbarShellClass)}>
                 <button
                   type="button"
                   aria-label="Arrange trackers in a 5-column grid (canvas order)"
                   disabled={arrangeDisabled}
                   onClick={() => void handleArrangeGrid()}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center text-white/80 transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+                  className={chromeToolbarInsetPrimaryTileClass()}
                 >
                   <SquaresFour className="h-5 w-5" weight="duotone" />
                 </button>
@@ -1299,9 +1305,11 @@ export function CanvasWorkspace({
                       aria-label="Canvas clustering options"
                       title="Choose how trackers group on the canvas"
                       disabled={arrangeDisabled}
-                      className="flex h-12 w-9 shrink-0 items-center justify-center border-l border-white/15 text-white/80 transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset disabled:pointer-events-none disabled:opacity-60 data-[state=open]:bg-[#3a3b3f] data-[state=open]:text-white"
+                      className={chromeToolbarInsetSegmentTileClass(
+                        "data-[state=open]:bg-[#3a3b3f] data-[state=open]:text-white",
+                      )}
                     >
-                      <CaretDown className="h-4 w-4" weight="bold" />
+                      <CaretDown className="h-4 w-4" weight="duotone" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -1331,7 +1339,7 @@ export function CanvasWorkspace({
                           );
                           commitClusterPickOrder(next);
                         }}
-                        className="rounded-none text-white focus:bg-white/10 focus:text-white data-[highlighted]:bg-white/10 [&_span.absolute.left-2]:text-white"
+                        className="rounded-none pl-3 pr-9 text-white focus:bg-white/10 focus:text-white data-[highlighted]:bg-white/10 [&>span]:left-auto [&>span]:right-2 [&>span]:top-1/2 [&>span]:-translate-y-1/2 [&>span]:text-white"
                       >
                         {clusterDimensionLabel(dim)}
                       </DropdownMenuCheckboxItem>
@@ -1344,7 +1352,10 @@ export function CanvasWorkspace({
                 aria-label="Recenter workspace and trackers"
                 disabled={trackers.length === 0 || draggingId !== null}
                 onClick={() => void handleRecenterWorkspace()}
-                className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center border border-white/10 bg-[#2d2e32] text-white/80 shadow-lg transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+                className={cn(
+                  "pointer-events-auto",
+                  chromeStandaloneSquareIconButtonClass(),
+                )}
               >
                 <Crosshair className="h-5 w-5" weight="duotone" />
               </button>
@@ -1352,7 +1363,10 @@ export function CanvasWorkspace({
                 type="button"
                 aria-label="Zoom out"
                 onClick={() => twRef.current?.zoomOut(0.2)}
-                className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center border border-white/10 bg-[#2d2e32] text-white/80 shadow-lg transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+                className={cn(
+                  "pointer-events-auto",
+                  chromeStandaloneSquareIconButtonClass(),
+                )}
               >
                 <MagnifyingGlassMinus className="h-5 w-5" weight="duotone" />
               </button>
@@ -1360,7 +1374,10 @@ export function CanvasWorkspace({
                 type="button"
                 aria-label="Zoom in"
                 onClick={() => twRef.current?.zoomIn(0.2)}
-                className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center border border-white/10 bg-[#2d2e32] text-white/80 shadow-lg transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+                className={cn(
+                  "pointer-events-auto",
+                  chromeStandaloneSquareIconButtonClass(),
+                )}
               >
                 <MagnifyingGlassPlus className="h-5 w-5" weight="duotone" />
               </button>
@@ -1387,9 +1404,6 @@ export function CanvasWorkspace({
                 }}
                 getPreferredTrackerTopLeft={getPreferredTrackerTopLeft}
               />
-              <div className="pointer-events-auto">
-                <RefreshButton variant="fab" />
-              </div>
             </div>
           </div>
         </TransformWrapper>
