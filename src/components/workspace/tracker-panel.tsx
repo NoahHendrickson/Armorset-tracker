@@ -57,6 +57,11 @@ interface TrackerPanelProps {
   onUnmerge?: () => void;
   /** Brief light-blue frame after the tracker is created on the canvas. */
   spawnHighlight?: boolean;
+  /**
+   * Optional `transform` easing on react-rnd when layouts change from the
+   * canvas arrange menu (flush + rAF primes the transition at the old coords).
+   */
+  easeLayoutPulse?: { durationMs: number } | null;
 }
 
 /**
@@ -117,6 +122,7 @@ export function TrackerPanel({
   mergeDropHighlight,
   onUnmerge,
   spawnHighlight = false,
+  easeLayoutPulse = null,
 }: TrackerPanelProps) {
   const { view } = payload;
   const [layout, setLayout] = useState<WorkspaceLayoutJson>(view.layout);
@@ -187,6 +193,13 @@ export function TrackerPanel({
 
   const isGhostPartner = mergeRole === "mergedPartner";
 
+  const easeMotionStyle =
+    easeLayoutPulse !== null && easeLayoutPulse.durationMs > 1
+      ? {
+          transition: `transform ${easeLayoutPulse.durationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+        }
+      : undefined;
+
   if (isGhostPartner) {
     return (
       <Rnd
@@ -197,7 +210,9 @@ export function TrackerPanel({
         size={{ width: panelWidth, height: TRACKER_DEFAULT_HEIGHT }}
         enableResizing={false}
         enableDragging={false}
-        style={{ zIndex: layout.z }}
+        style={
+          easeMotionStyle ? { zIndex: layout.z, ...easeMotionStyle } : { zIndex: layout.z }
+        }
         cancel=".no-drag"
       >
         <div id={`tracker-${view.id}`} aria-hidden className="h-full w-full" />
@@ -214,6 +229,7 @@ export function TrackerPanel({
       enableResizing={false}
       position={{ x: layout.x, y: layout.y }}
       size={{ width: panelWidth, height: TRACKER_DEFAULT_HEIGHT }}
+      style={easeMotionStyle}
       onDrag={(e, d) => {
         onDragPosition?.(view.id, d.x, d.y, e);
         const next = { ...layoutLiveRef.current, x: d.x, y: d.y };

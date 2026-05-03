@@ -37,3 +37,15 @@ export function trackerWidthForTertiaryColumns(tertiaryColumnCount: number): num
  * Rounded up for breathing room. Not user-resizable.
  */
 export const TRACKER_DEFAULT_HEIGHT = 384;
+
+/** `transform` ease when trackers move programmatically (sort/cluster arrange). */
+export const ARRANGE_LAYOUT_EASE_DURATION_MS = 420;
+
+export function arrangeLayoutEaseDurationMs(): number {
+  if (typeof window === "undefined") {
+    return ARRANGE_LAYOUT_EASE_DURATION_MS;
+  }
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? 1
+    : ARRANGE_LAYOUT_EASE_DURATION_MS;
+}

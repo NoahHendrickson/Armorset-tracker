@@ -43,7 +43,7 @@ export function AppHeader({ displayName, profilePictureUrl }: AppHeaderProps) {
         <RefreshButton variant="header-large" />
         <SyncManifestButton variant="header-large" />
 
-        <div className="flex items-stretch gap-0.5 rounded-none border border-[#5c5d60] bg-[#2e2f2f]">
+        <div className="flex items-stretch gap-0.5 rounded-none border border-white/10 bg-[#2e2f2f]">
           <div className="flex min-w-0 max-w-[min(100vw-10rem,20rem)] items-center gap-2 px-2 py-1 sm:max-w-none sm:gap-2.5 sm:px-2.5">
             <BungieProfileAvatar
               displayName={displayName}

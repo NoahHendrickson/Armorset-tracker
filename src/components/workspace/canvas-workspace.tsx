@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  CaretDown,
   Crosshair,
   MagnifyingGlassMinus,
   MagnifyingGlassPlus,
   SquaresFour,
 } from "@phosphor-icons/react/dist/ssr";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DraggableEvent } from "react-draggable";
@@ -16,6 +18,7 @@ import {
   useTransformEffect,
 } from "react-zoom-pan-pinch";
 import {
+  arrangeLayoutEaseDurationMs,
   TRACKER_DEFAULT_HEIGHT,
   TRACKER_WIDTH,
   trackerWidthForTertiaryColumns,
@@ -39,6 +42,12 @@ import {
   type WorkspaceCameraJson,
   type WorkspaceLayoutJson,
 } from "@/lib/workspace/workspace-schema";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
 import {
   NewTrackerDialog,
@@ -53,6 +62,69 @@ import {
   computeDragEdgePanFromPointer,
 } from "@/components/workspace/canvas-drag-edge-pan";
 import { attachCanvasViewportWheel } from "@/components/workspace/canvas-viewport-wheel";
+import { cn } from "@/lib/utils";
+import {
+  computeWorkspaceGridLayouts,
+  type ArrangeGroupMode,
+  type ArrangeSortMode,
+} from "@/lib/workspace/workspace-arrange-grid";
+
+type ArrangeRecipe = {
+  sort: ArrangeSortMode;
+  groupBy: ArrangeGroupMode;
+  /** Rows within each primary pillar (requires a primary cluster). */
+  groupBySecondary: ArrangeGroupMode | null;
+};
+
+const DEFAULT_ARRANGE: ArrangeRecipe = {
+  sort: "canvas_order",
+  groupBy: "none",
+  groupBySecondary: null,
+};
+
+/** Figma-aligned: horizontal clustering is class-only toggles off by default; vertical subdivides pillars. */
+function ClassClusterChipVisual() {
+  return (
+    <span className="flex items-center gap-1.5" aria-hidden>
+      {/* eslint-disable-next-line @next/next/no-img-element -- small static glyphs */}
+      <img src="/class-icons/titan.svg" alt="" className="h-4 w-auto" />
+      {/* eslint-disable-next-line @next/next/no-img-element -- small static glyphs */}
+      <img src="/class-icons/hunter.svg" alt="" className="h-3.5 w-auto" />
+      {/* eslint-disable-next-line @next/next/no-img-element -- small static glyphs */}
+      <img src="/class-icons/warlock.svg" alt="" className="h-4 w-auto" />
+    </span>
+  );
+}
+
+const CLUSTER_VERTICAL_DIMS = [
+  "tuning",
+  "armor_set",
+  "archetype",
+] as const satisfies readonly ArrangeGroupMode[];
+
+function verticalClusterCaption(
+  mode: (typeof CLUSTER_VERTICAL_DIMS)[number],
+): string {
+  switch (mode) {
+    case "tuning":
+      return "Tuning";
+    case "armor_set":
+      return "Armor set";
+    case "archetype":
+      return "Archetype";
+    default:
+      return mode;
+  }
+}
+
+/** Compact chip row (text ~11px, ~36px min height). */
+const CLUSTER_CHIP_BASE =
+  "[&_span.absolute.left-2]:hidden flex min-h-9 w-[4.75rem] max-w-[5.5rem] shrink-0 cursor-pointer items-center justify-center rounded-none border border-neutral-500 bg-[#2d2e32] px-1 py-1.5 text-center text-[11px] font-medium leading-snug text-white outline-none focus-visible:ring-2 focus-visible:ring-white/35 data-[disabled]:opacity-35 data-[highlighted]:bg-white/10 data-[state=checked]:border-white data-[state=checked]:bg-white/[0.12]";
+
+const CLUSTER_CHIP_CLASS_ROW = cn(
+  CLUSTER_CHIP_BASE,
+  "max-w-none min-w-[6.25rem] justify-center px-2",
+);
 
 function useDebouncedCamera(
   onSave: (c: WorkspaceCameraJson) => void,
@@ -130,6 +202,7 @@ function TrackerLayer({
   mergeDropValid,
   onUnmergeAnchor,
   spawnHighlightId,
+  easeLayoutPulse,
 }: {
   trackers: SerializableTrackerPayload[];
   hasInventory: boolean;
@@ -147,6 +220,7 @@ function TrackerLayer({
   mergeDropValid: boolean;
   onUnmergeAnchor: (anchorViewId: string) => void;
   spawnHighlightId: string | null;
+  easeLayoutPulse: { durationMs: number } | null;
 }) {
   const [scale, setScale] = useState(initialScale);
   useTransformEffect((ref) => {
@@ -185,6 +259,7 @@ function TrackerLayer({
                 : undefined
             }
             spawnHighlight={spawnHighlightId === t.view.id}
+            easeLayoutPulse={easeLayoutPulse}
           />
         );
       })}
@@ -244,6 +319,9 @@ export function CanvasWorkspace({
   const spawnHighlightTimeoutRef = useRef<ReturnType<
     typeof setTimeout
   > | null>(null);
+  const [easeLayoutPulse, setEaseLayoutPulse] = useState<{
+    durationMs: number;
+  } | null>(null);
 
   const scheduleSpawnHighlight = useCallback((viewId: string) => {
     if (spawnHighlightTimeoutRef.current) {
@@ -279,6 +357,14 @@ export function CanvasWorkspace({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!easeLayoutPulse) return;
+    const settleMs =
+      easeLayoutPulse.durationMs > 1 ? easeLayoutPulse.durationMs + 80 : 0;
+    const t = window.setTimeout(() => setEaseLayoutPulse(null), settleMs);
+    return () => clearTimeout(t);
+  }, [easeLayoutPulse]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resync trackers after router.refresh()
@@ -538,98 +624,148 @@ export function CanvasWorkspace({
     }
   }, [draggingId, viewportMinScale, persistCamera, router]);
 
-  const handleArrangeGrid = useCallback(async () => {
-    if (draggingId !== null) return;
-    const surface = viewportSurfaceRef.current;
-    if (!surface) return;
-    const list = trackersRef.current;
-    if (list.length === 0) return;
+  const handleArrangeGrid = useCallback(
+    async (
+      opts?: {
+        sort?: ArrangeSortMode;
+        groupBy?: ArrangeGroupMode;
+        groupBySecondary?: ArrangeGroupMode | null;
+        adjustViewport?: boolean;
+        animateLayouts?: boolean;
+      },
+    ) => {
+      if (draggingId !== null) return;
+      const list = trackersRef.current;
+      if (list.length === 0) return;
 
-    const COLS = 5;
-    const GAP = 40;
-    const SLOT_W = TRACKER_WIDTH + GAP;
-    const SLOT_H = TRACKER_DEFAULT_HEIGHT + GAP;
+      const sort = opts?.sort ?? DEFAULT_ARRANGE.sort;
+      const groupBy = opts?.groupBy ?? DEFAULT_ARRANGE.groupBy;
+      const groupBySecondary =
+        opts?.groupBySecondary ?? DEFAULT_ARRANGE.groupBySecondary ?? null;
 
-    const visited = new Set<string>();
-    const groups: string[][] = [];
-    for (const t of list) {
-      if (visited.has(t.view.id)) continue;
-      const partnerId = t.view.layout.mergedWith ?? null;
-      if (partnerId && list.some((p) => p.view.id === partnerId)) {
-        groups.push([t.view.id, partnerId]);
-        visited.add(t.view.id);
-        visited.add(partnerId);
-      } else {
-        groups.push([t.view.id]);
-        visited.add(t.view.id);
-      }
-    }
+      const adjustViewport = opts?.adjustViewport ?? true;
+      const animateLayouts = opts?.animateLayouts === true;
 
-    const rows = Math.ceil(groups.length / COLS);
-    const gridW = Math.min(groups.length, COLS) * SLOT_W - GAP;
-    const gridH = rows * SLOT_H - GAP;
-    const startX = WORKSPACE_CANVAS_WIDTH / 2 - gridW / 2;
-    const startY = WORKSPACE_CANVAS_HEIGHT / 2 - gridH / 2;
+      const { updates } = computeWorkspaceGridLayouts(list, {
+        sort,
+        groupBy,
+        groupBySecondary,
+      });
 
-    const updates: { id: string; layout: WorkspaceLayoutJson }[] = [];
-    groups.forEach((g, idx) => {
-      const col = idx % COLS;
-      const row = Math.floor(idx / COLS);
-      const x = startX + col * SLOT_W;
-      const y = startY + row * SLOT_H;
-      for (const id of g) {
-        const tracker = list.find((t) => t.view.id === id);
-        if (!tracker) continue;
-        const lo = parseWorkspaceLayout(tracker.view.layout);
-        updates.push({ id, layout: { ...lo, x, y } });
-      }
-    });
-
-    const layoutById = new Map(
-      updates.map((u): [string, WorkspaceLayoutJson] => [u.id, u.layout]),
-    );
-    setTrackers((prev) =>
-      prev.map((p) => {
-        const lo = layoutById.get(p.view.id);
-        return lo ? { ...p, view: { ...p.view, layout: lo } } : p;
-      }),
-    );
-
-    const scale = Math.max(1, viewportMinScale);
-    const vw = surface.clientWidth;
-    const vh = surface.clientHeight;
-    const positionX = vw / 2 - scale * (WORKSPACE_CANVAS_WIDTH / 2);
-    const positionY = vh / 2 - scale * (WORKSPACE_CANVAS_HEIGHT / 2);
-    const camera: WorkspaceCameraJson = {
-      zoom: scale,
-      panX: positionX,
-      panY: positionY,
-    };
-    twRef.current?.setTransform(positionX, positionY, scale, 260);
-    await persistCamera(camera);
-
-    const results = await Promise.all(
-      updates.map(async ({ id, layout }) => {
-        try {
-          const res = await fetch(`/api/views/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ layout }),
+      if (animateLayouts) {
+        const durationMs = arrangeLayoutEaseDurationMs();
+        if (durationMs > 1) {
+          const pulse = { durationMs };
+          flushSync(() => {
+            setEaseLayoutPulse(pulse);
           });
-          return res.ok;
-        } catch {
-          return false;
+          await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => resolve());
+          });
         }
-      }),
-    );
-    if (results.some((ok) => !ok)) {
-      router.refresh();
-    }
-  }, [draggingId, viewportMinScale, persistCamera, router]);
+      }
+
+      const layoutById = new Map(
+        updates.map((u): [string, WorkspaceLayoutJson] => [u.id, u.layout]),
+      );
+      setTrackers((prev) =>
+        prev.map((p) => {
+          const lo = layoutById.get(p.view.id);
+          return lo ? { ...p, view: { ...p.view, layout: lo } } : p;
+        }),
+      );
+
+      if (adjustViewport) {
+        const surface = viewportSurfaceRef.current;
+        if (!surface) return;
+        const scale = Math.max(1, viewportMinScale);
+        const vw = surface.clientWidth;
+        const vh = surface.clientHeight;
+        const positionX = vw / 2 - scale * (WORKSPACE_CANVAS_WIDTH / 2);
+        const positionY = vh / 2 - scale * (WORKSPACE_CANVAS_HEIGHT / 2);
+        const camera: WorkspaceCameraJson = {
+          zoom: scale,
+          panX: positionX,
+          panY: positionY,
+        };
+        twRef.current?.setTransform(positionX, positionY, scale, 260);
+        await persistCamera(camera);
+      }
+
+      const results = await Promise.all(
+        updates.map(async ({ id, layout }) => {
+          try {
+            const res = await fetch(`/api/views/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ layout }),
+            });
+            return res.ok;
+          } catch {
+            return false;
+          }
+        }),
+      );
+      if (results.some((ok) => !ok)) {
+        router.refresh();
+      }
+    },
+    [draggingId, viewportMinScale, persistCamera, router],
+  );
+
+  const arrangeMenuRecipeRef = useRef<ArrangeRecipe>({ ...DEFAULT_ARRANGE });
+  const [arrangeRecipe, setArrangeRecipe] = useState<ArrangeRecipe>(() => ({
+    ...DEFAULT_ARRANGE,
+  }));
+
+  const applyArrangeRecipe = useCallback(
+    (patch: Partial<Pick<ArrangeRecipe, "groupBy" | "groupBySecondary">>) => {
+      const merged: ArrangeRecipe = {
+        ...arrangeMenuRecipeRef.current,
+        ...patch,
+      };
+      /* UI only exposes class clustering horizontally; coerce legacy presets. */
+      if (merged.groupBy !== "none" && merged.groupBy !== "class_name") {
+        merged.groupBy = "none";
+      }
+      if (
+        merged.groupBySecondary !== null &&
+        merged.groupBySecondary !== "tuning" &&
+        merged.groupBySecondary !== "armor_set" &&
+        merged.groupBySecondary !== "archetype"
+      ) {
+        merged.groupBySecondary = null;
+      }
+      if (merged.groupBy === "none") {
+        merged.groupBySecondary = null;
+      }
+      if (
+        merged.groupBySecondary !== null &&
+        merged.groupBySecondary === merged.groupBy
+      ) {
+        merged.groupBySecondary = null;
+      }
+      arrangeMenuRecipeRef.current = merged;
+      setArrangeRecipe(merged);
+      void handleArrangeGrid({
+        sort: merged.sort,
+        groupBy: merged.groupBy,
+        groupBySecondary: merged.groupBySecondary,
+        adjustViewport: false,
+        animateLayouts: true,
+      });
+    },
+    [handleArrangeGrid],
+  );
+
+  const arrangeDisabled =
+    trackers.length === 0 || draggingId !== null;
 
   const onDragPosition = useCallback(
     (viewId: string, x: number, y: number, dragEvent: DraggableEvent) => {
+      setEaseLayoutPulse(null);
+
       const api = twRef.current;
       const surfaceEl = viewportSurfaceRef.current;
       const pt = clientPointFromDragEvent(dragEvent);
@@ -1071,6 +1207,7 @@ export function CanvasWorkspace({
                   mergeDropValid={mergeDropValid}
                   onUnmergeAnchor={handleUnmergeAnchor}
                   spawnHighlightId={spawnHighlightId}
+                  easeLayoutPulse={easeLayoutPulse}
                 />
               </div>
             </TransformComponent>
@@ -1090,15 +1227,101 @@ export function CanvasWorkspace({
 
             {/* Zoom + recenter — bottom right */}
             <div className="pointer-events-none absolute bottom-6 right-6 z-30 flex gap-2">
-              <button
-                type="button"
-                aria-label="Arrange trackers in a 5×5 grid"
-                disabled={trackers.length === 0 || draggingId !== null}
-                onClick={() => void handleArrangeGrid()}
-                className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center border border-white/10 bg-[#2d2e32] text-white/80 shadow-lg transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
-              >
-                <SquaresFour className="h-5 w-5" weight="duotone" />
-              </button>
+              <div className="pointer-events-auto flex h-12 shrink-0 overflow-hidden rounded-none border border-white/10 bg-[#2d2e32] shadow-lg">
+                <button
+                  type="button"
+                  aria-label="Arrange trackers in a 5-column grid (canvas order)"
+                  disabled={arrangeDisabled}
+                  onClick={() => void handleArrangeGrid()}
+                  className="flex h-12 w-12 shrink-0 items-center justify-center text-white/80 transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+                >
+                  <SquaresFour className="h-5 w-5" weight="duotone" />
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Canvas clustering options"
+                      title="Choose how trackers group on the canvas"
+                      disabled={arrangeDisabled}
+                      className="flex h-12 w-9 shrink-0 items-center justify-center border-l border-white/15 text-white/80 transition-colors hover:bg-[#3a3b3f] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset disabled:pointer-events-none disabled:opacity-60 data-[state=open]:bg-[#3a3b3f] data-[state=open]:text-white"
+                    >
+                      <CaretDown className="h-4 w-4" weight="bold" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    side="top"
+                    sideOffset={8}
+                    className="w-[min(17.5rem,calc(100vw-1.25rem))] rounded-none border border-white/15 bg-[#2d2e32] px-3 py-2.5 text-white shadow-xl"
+                  >
+                    <div className="space-y-3.5">
+                      <section>
+                        <p className="mb-1.5 text-xs font-semibold tracking-tight text-white/90">
+                          Cluster horizontally
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <DropdownMenuCheckboxItem
+                            className={CLUSTER_CHIP_CLASS_ROW}
+                            checked={
+                              arrangeRecipe.groupBy === "class_name"
+                            }
+                            onCheckedChange={(checked) =>
+                              applyArrangeRecipe({
+                                groupBy: checked ? "class_name" : "none",
+                              })
+                            }
+                          >
+                            <span className="sr-only">
+                              Cluster into class columns (Titan, Hunter,
+                              Warlock)
+                            </span>
+                            <ClassClusterChipVisual />
+                          </DropdownMenuCheckboxItem>
+                        </div>
+                      </section>
+
+                      <fieldset
+                        className={cn(
+                          arrangeRecipe.groupBy === "none" &&
+                            "pointer-events-none opacity-40",
+                        )}
+                        disabled={arrangeRecipe.groupBy === "none"}
+                      >
+                        <p className="mb-1.5 text-xs font-semibold tracking-tight text-white/90">
+                          Cluster vertically
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {CLUSTER_VERTICAL_DIMS.map((mode) => (
+                            <DropdownMenuCheckboxItem
+                              key={mode}
+                              className={CLUSTER_CHIP_BASE}
+                              checked={
+                                arrangeRecipe.groupBySecondary === mode
+                              }
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  applyArrangeRecipe({
+                                    groupBySecondary: mode,
+                                  });
+                                  return;
+                                }
+                                if (arrangeRecipe.groupBySecondary === mode) {
+                                  applyArrangeRecipe({
+                                    groupBySecondary: null,
+                                  });
+                                }
+                              }}
+                            >
+                              {verticalClusterCaption(mode)}
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                        </div>
+                      </fieldset>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               <button
                 type="button"
                 aria-label="Recenter workspace and trackers"
