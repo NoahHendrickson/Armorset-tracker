@@ -1,3 +1,5 @@
+"use client";
+
 import {
   CLASS_NAMES,
   SLOT_LABELS,
@@ -6,6 +8,11 @@ import {
 } from "@/lib/bungie/constants";
 import type { ArmorStatName, DerivedArmorPieceJson } from "@/lib/db/types";
 import type { ViewProgress } from "@/lib/views/progress";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { OwnershipIcon, type OwnershipState } from "./ownership-icon";
 
 interface ViewGridProps {
@@ -145,32 +152,37 @@ export function ViewGrid({
                     : "missing";
                 const isDuplicate = state === "owned" && matches.length > 1;
                 return (
-                  <div
-                    key={slot}
-                    role="cell"
-                    title={cellTitle(state, matches)}
-                    className={`flex h-12 items-center justify-center p-2 ${
-                      i < SLOT_ORDER.length - 1
-                        ? "border-b border-white/10"
-                        : ""
-                    }`}
-                  >
-                    {/*
-                     * Wrapper keeps the OwnershipIcon centered in the cell
-                     * regardless of the duplicate badge — the red square
-                     * is absolute-positioned so it doesn't shift the icon
-                     * between dupe / non-dupe rows.
-                     */}
-                    <div className="relative">
-                      <OwnershipIcon state={state} count={matches.length} />
-                      {isDuplicate ? (
-                        <span
-                          aria-hidden
-                          className="pointer-events-none absolute left-full top-1/2 ml-1.5 h-2 w-2 -translate-y-1/2 bg-[#ff3b30] shadow-[0_0_4px_-1px_rgba(255,59,48,0.6)]"
-                        />
-                      ) : null}
-                    </div>
-                  </div>
+                  <Tooltip key={slot}>
+                    <TooltipTrigger asChild>
+                      <div
+                        role="cell"
+                        className={`flex h-12 items-center justify-center p-2 ${
+                          i < SLOT_ORDER.length - 1
+                            ? "border-b border-white/10"
+                            : ""
+                        }`}
+                      >
+                        {/*
+                         * Wrapper keeps the OwnershipIcon centered in the cell
+                         * regardless of the duplicate badge — the red square
+                         * is absolute-positioned so it doesn't shift the icon
+                         * between dupe / non-dupe rows.
+                         */}
+                        <div className="relative">
+                          <OwnershipIcon state={state} count={matches.length} />
+                          {isDuplicate ? (
+                            <span
+                              aria-hidden
+                              className="pointer-events-none absolute left-full top-1/2 ml-1.5 h-2 w-2 -translate-y-1/2 rounded-sm bg-[#ff3b30] shadow-[0_0_4px_-1px_rgba(255,59,48,0.6)]"
+                            />
+                          ) : null}
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="whitespace-pre-line">
+                      {cellTitle(state, matches)}
+                    </TooltipContent>
+                  </Tooltip>
                 );
               })}
             </div>

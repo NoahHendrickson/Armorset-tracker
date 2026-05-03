@@ -1,3 +1,6 @@
+"use client";
+
+import type React from "react";
 import {
   CLASS_NAMES,
   SLOT_LABELS,
@@ -6,6 +9,7 @@ import {
 } from "@/lib/bungie/constants";
 import type { ArmorStatName, DerivedArmorPieceJson } from "@/lib/db/types";
 import {
+  isMergedExoticSlotCandidate,
   isUnionGridComplete,
   mergeCompareCellState,
   mergeColorOrder,
@@ -15,7 +19,30 @@ import {
   type MergeCompareCellState,
 } from "@/lib/views/merge-compare";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+
+function TrackerHalfTooltip({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactElement;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent className="whitespace-pre-line">{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+const EXOTIC_SLOT_HINT_TITLE =
+  "You can slot an exotic here and retain both 2pc bonuses";
 
 function matchSummary(match: DerivedArmorPieceJson): string {
   const locationLabel =
@@ -71,84 +98,90 @@ function MergeHalfSquare({
 
   if (!applicable) {
     return (
-      <div
-        className={cn(
-          "relative flex h-full w-1/2 items-center justify-center bg-white/[0.08]",
-          outerRounded,
-        )}
-        style={{ boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.12)" }}
-        title="Not applicable for this tracker"
-      >
-        <span
-          aria-hidden
+      <TrackerHalfTooltip label="Not applicable for this tracker">
+        <div
           className={cn(
-            "pointer-events-none absolute inset-0 shadow-[inset_0_-4px_6px_-2px_rgba(0,0,0,0.18)]",
+            "relative flex h-full w-1/2 items-center justify-center bg-white/[0.08]",
             outerRounded,
           )}
-        />
-      </div>
+          style={{ boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.12)" }}
+        >
+          <span
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute inset-0 shadow-[inset_0_-4px_6px_-2px_rgba(0,0,0,0.18)]",
+              outerRounded,
+            )}
+          />
+        </div>
+      </TrackerHalfTooltip>
     );
   }
 
   if (loading) {
     return (
-      <div
-        className={cn(
-          "flex h-full w-1/2 items-center justify-center border border-white/35",
-          outerRounded,
-        )}
-        title="Loading inventory…"
-      >
-        <span
-          className="block size-3 shrink-0 rounded-sm border border-white/40 animate-pulse"
-          aria-hidden
-        />
-      </div>
+      <TrackerHalfTooltip label="Loading inventory…">
+        <div
+          className={cn(
+            "flex h-full w-1/2 items-center justify-center border border-white/35",
+            outerRounded,
+          )}
+        >
+          <span
+            className="block size-3 shrink-0 rounded-sm border border-white/40 animate-pulse"
+            aria-hidden
+          />
+        </div>
+      </TrackerHalfTooltip>
     );
   }
 
   if (!owned) {
     return (
-      <div
-        className={cn(
-          "flex h-full w-1/2 items-center justify-center border border-white/40",
-          outerRounded,
-        )}
-        title="0 matching pieces"
-      />
+      <TrackerHalfTooltip label="0 matching pieces">
+        <div
+          className={cn(
+            "flex h-full w-1/2 items-center justify-center border border-white/40",
+            outerRounded,
+          )}
+        />
+      </TrackerHalfTooltip>
     );
   }
 
   return (
-    <div
-      className={cn(
-        "relative flex h-full w-1/2 items-center justify-center",
-        outerRounded,
-      )}
-      style={{
-        boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.2), 0 0 10px -1px ${
-          side === "green"
-            ? "rgba(0, 255, 133, 0.45)"
-            : "rgba(56, 189, 248, 0.45)"
-        }`,
-        backgroundColor: accent,
-      }}
-      title={halfTitle(hasInventory, applicable, owned, count, matches)}
+    <TrackerHalfTooltip
+      label={halfTitle(hasInventory, applicable, owned, count, matches)}
     >
-      <span
-        aria-hidden
+      <div
         className={cn(
-          "pointer-events-none absolute inset-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),inset_0_-4px_6px_-2px_rgba(0,0,0,0.2)]",
+          "relative flex h-full w-1/2 items-center justify-center",
           outerRounded,
         )}
-      />
-      {isDuplicate ? (
+        style={{
+          boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.2), 0 0 10px -1px ${
+            side === "green"
+              ? "rgba(0, 255, 133, 0.45)"
+              : "rgba(56, 189, 248, 0.45)"
+          }`,
+          backgroundColor: accent,
+        }}
+      >
         <span
           aria-hidden
-          className="pointer-events-none absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-sm bg-[#ff3b30] shadow-[0_0_4px_-1px_rgba(255,59,48,0.6)]"
+          className={cn(
+            "pointer-events-none absolute inset-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),inset_0_-4px_6px_-2px_rgba(0,0,0,0.2)]",
+            outerRounded,
+          )}
         />
-      ) : null}
-    </div>
+        {isDuplicate ? (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-sm bg-[#ff3b30] shadow-[0_0_4px_-1px_rgba(255,59,48,0.6)]"
+          />
+        ) : null}
+      </div>
+    </TrackerHalfTooltip>
   );
 }
 
@@ -264,6 +297,13 @@ export function MergedCompareGrid({
                   greenPayload.progress.cells[slot]?.[t] ?? [];
                 const blueMatches =
                   bluePayload.progress.cells[slot]?.[t] ?? [];
+                const exoticCandidate = isMergedExoticSlotCandidate(
+                  greenPayload,
+                  bluePayload,
+                  t,
+                  slot,
+                  { hasInventory },
+                );
                 return (
                   <div
                     key={slot}
@@ -272,21 +312,41 @@ export function MergedCompareGrid({
                       i < SLOT_ORDER.length - 1 ? "border-b border-white/10" : ""
                     }`}
                   >
-                    <div className="flex size-6 shrink-0 rounded-[5px] border border-white/15">
-                      <MergeHalfSquare
-                        hasInventory={hasInventory}
-                        state={st}
-                        side="green"
-                        accent={MERGE_ACCENT_GREEN}
-                        matches={greenMatches}
-                      />
-                      <MergeHalfSquare
-                        hasInventory={hasInventory}
-                        state={st}
-                        side="blue"
-                        accent={MERGE_ACCENT_BLUE}
-                        matches={blueMatches}
-                      />
+                    {/*
+                     * Same layout as ViewGrid duplicate badge: marker sits just
+                     * right of the ownership square, vertically centered.
+                     */}
+                    <div className="relative inline-flex shrink-0">
+                      <div className="flex size-6 shrink-0 rounded-[5px] border border-white/15">
+                        <MergeHalfSquare
+                          hasInventory={hasInventory}
+                          state={st}
+                          side="green"
+                          accent={MERGE_ACCENT_GREEN}
+                          matches={greenMatches}
+                        />
+                        <MergeHalfSquare
+                          hasInventory={hasInventory}
+                          state={st}
+                          side="blue"
+                          accent={MERGE_ACCENT_BLUE}
+                          matches={blueMatches}
+                        />
+                      </div>
+                      {exoticCandidate ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              role="img"
+                              aria-label={EXOTIC_SLOT_HINT_TITLE}
+                              className="pointer-events-auto box-content absolute left-full top-1/2 ml-1.5 size-[8px] -translate-y-1/2 cursor-default !rounded-none border border-solid border-white bg-[#e8b84a] shadow-[0_0_4px_-1px_rgba(232,184,74,0.6)] [border-image:linear-gradient(130deg,rgba(255,255,255,0.24)_0%,rgba(77,71,10,0.24)_100%)_1]"
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {EXOTIC_SLOT_HINT_TITLE}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : null}
                     </div>
                   </div>
                 );

@@ -15,6 +15,11 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { chromeStandaloneSquareIconButtonClass } from "@/components/ui/chrome-square-icon-button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type FeedbackCategory = "bug" | "wishlist";
@@ -24,6 +29,9 @@ type FeedbackCategory = "bug" | "wishlist";
  */
 export function FeedbackHeaderDialog() {
   const [open, setOpen] = React.useState(false);
+  const [tooltipOpen, setTooltipOpen] = React.useState(false);
+  /** After closing the dialog, ignore tooltip opens until the trigger loses pointer (avoids instant re-show). */
+  const suppressTooltipUntilLeaveRef = React.useRef(false);
   const [category, setCategory] = React.useState<FeedbackCategory | null>(null);
   const [message, setMessage] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -33,7 +41,11 @@ export function FeedbackHeaderDialog() {
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
-    if (!next) {
+    setTooltipOpen(false);
+    if (next) {
+      suppressTooltipUntilLeaveRef.current = false;
+    } else {
+      suppressTooltipUntilLeaveRef.current = true;
       setMessage("");
       setCategory(null);
       setSending(false);
@@ -73,16 +85,29 @@ export function FeedbackHeaderDialog() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          aria-label="Send feedback"
-          title="Feedback"
-          className={chromeStandaloneSquareIconButtonClass()}
-        >
-          <ChatCircleDots weight="duotone" className="h-5 w-5" />
-        </button>
-      </DialogTrigger>
+      <Tooltip
+        open={tooltipOpen}
+        onOpenChange={(nextTip) => {
+          if (nextTip && suppressTooltipUntilLeaveRef.current) return;
+          setTooltipOpen(nextTip);
+        }}
+      >
+        <TooltipTrigger asChild>
+          <DialogTrigger asChild>
+            <button
+              type="button"
+              aria-label="Send feedback"
+              className={chromeStandaloneSquareIconButtonClass()}
+              onPointerLeave={() => {
+                suppressTooltipUntilLeaveRef.current = false;
+              }}
+            >
+              <ChatCircleDots weight="duotone" className="h-5 w-5" />
+            </button>
+          </DialogTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Feedback</TooltipContent>
+      </Tooltip>
       <DialogContent className="rounded-none border-[color:var(--border)] bg-[#2e2f2f] text-white sm:rounded-none">
         <DialogHeader className="pb-4">
           <DialogTitle className="text-white">Feedback</DialogTitle>

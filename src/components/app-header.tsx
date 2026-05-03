@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { SignOut } from "@phosphor-icons/react/dist/ssr";
 import { FeedbackHeaderDialog } from "@/components/feedback-header-dialog";
@@ -5,6 +7,11 @@ import { RefreshButton } from "@/components/dashboard/refresh-button";
 import { SyncManifestButton } from "@/components/dashboard/sync-manifest-button";
 import { BungieProfileAvatar } from "@/components/bungie-profile-avatar";
 import { chromeSquareIconSegmentClass } from "@/components/ui/chrome-square-icon-button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface AppHeaderProps {
   displayName: string;
@@ -53,14 +60,18 @@ export function AppHeader({ displayName, profilePictureUrl }: AppHeaderProps) {
             </span>
           </div>
           <form action="/api/auth/logout" method="POST" className="contents">
-            <button
-              type="submit"
-              aria-label="Sign out"
-              title="Sign out"
-              className={chromeSquareIconSegmentClass()}
-            >
-              <SignOut weight="duotone" className="h-5 w-5" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="submit"
+                  aria-label="Sign out"
+                  className={chromeSquareIconSegmentClass()}
+                >
+                  <SignOut weight="duotone" className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Sign out</TooltipContent>
+            </Tooltip>
           </form>
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { DraggableEvent } from "react-draggable";
 import { Rnd } from "react-rnd";
 import {
@@ -29,7 +30,13 @@ import {
   parseWorkspaceLayout,
   type WorkspaceLayoutJson,
 } from "@/lib/workspace/workspace-schema";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useWorkspaceZoomScaleRef } from "@/components/workspace/workspace-zoom-scale-context";
 
 export type TrackerMergeRole = "solo" | "anchor" | "mergedPartner";
 
@@ -37,12 +44,10 @@ interface TrackerPanelProps {
   payload: SerializableTrackerPayload;
   hasInventory: boolean;
   /**
-   * Live canvas zoom factor. Forwarded to `<Rnd>` so react-draggable can
-   * correctly translate screen-space mouse coordinates into canvas-space
-   * drag offsets. Without it, the tracker jumps to the wrong position on
-   * mousedown when zoomed (the library divides by scale, defaulting to 1).
+   * Canvas zoom for react-draggable is synced from the transform library via
+   * `workspace-zoom-scale-context` — only flushed to React before pointer/touch
+   * interaction so pinch-zoom doesn't re-render every tracker each tick.
    */
-  scale: number;
   onInteract: (viewId: string) => void;
   onDragPosition?: (
     viewId: string,
@@ -119,7 +124,6 @@ const TRACKER_HEADER_CONTENT_DIVIDER =
 export function TrackerPanel({
   payload,
   hasInventory,
-  scale,
   onDragPosition,
   onDragLayoutEnd,
   onInteract,
@@ -131,6 +135,16 @@ export function TrackerPanel({
   easeLayoutPulse = null,
 }: TrackerPanelProps) {
   const { view } = payload;
+  const zoomScaleRef = useWorkspaceZoomScaleRef();
+  const [rndScale, setRndScale] = useState(() => zoomScaleRef.current);
+
+  const primeRndScaleForPointer = useCallback(() => {
+    const s = zoomScaleRef.current;
+    flushSync(() => {
+      setRndScale((prev) => (Math.abs(prev - s) <= 1e-9 ? prev : s));
+    });
+  }, [zoomScaleRef]);
+
   const [layout, setLayout] = useState<WorkspaceLayoutJson>(view.layout);
   /** Latest layout during drag — avoids stale React state in `onDragStop`. */
   const layoutLiveRef = useRef<WorkspaceLayoutJson>(
@@ -147,7 +161,7 @@ export function TrackerPanel({
 
   useEffect(
     () => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- keep Rnd state aligned after server refresh
+       
       layoutLiveRef.current = parseWorkspaceLayout(view.layout);
       setLayout(parseWorkspaceLayout(view.layout));
     },
@@ -211,7 +225,7 @@ export function TrackerPanel({
       <Rnd
         className="rnd-tracker rnd-tracker-ghost pointer-events-none"
         bounds="parent"
-        scale={scale}
+        scale={rndScale}
         position={{ x: layout.x, y: layout.y }}
         size={{ width: panelWidth, height: TRACKER_DEFAULT_HEIGHT }}
         enableResizing={false}
@@ -231,7 +245,7 @@ export function TrackerPanel({
       className="rnd-tracker pointer-events-auto"
       dragHandleClassName="tracker-drag"
       bounds="parent"
-      scale={scale}
+      scale={rndScale}
       enableResizing={false}
       position={{ x: layout.x, y: layout.y }}
       size={{ width: panelWidth, height: TRACKER_DEFAULT_HEIGHT }}
@@ -269,13 +283,20 @@ export function TrackerPanel({
           aria-label="Tracker actions"
           className="flex shrink-0 cursor-default flex-col items-center gap-2 self-start bg-[#424347] p-2"
         >
-          <button
-            type="button"
-            aria-label="Drag tracker"
-            className="tracker-drag flex h-5 w-5 cursor-grab items-center justify-center text-white/70 transition-colors hover:text-white active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-          >
-            <DotsSixVertical className="h-5 w-5" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="Drag tracker"
+                onPointerDownCapture={primeRndScaleForPointer}
+                onTouchStartCapture={primeRndScaleForPointer}
+                className="tracker-drag flex h-5 w-5 cursor-grab items-center justify-center text-white/70 transition-colors hover:text-white active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+              >
+                <DotsSixVertical className="h-5 w-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Drag tracker</TooltipContent>
+          </Tooltip>
 
           <span aria-hidden className="h-px w-full bg-white/10" />
 
@@ -287,14 +308,19 @@ export function TrackerPanel({
 
           {showMergedGrid && onUnmerge ? (
             <>
-              <button
-                type="button"
-                aria-label="Split merged trackers"
-                onClick={onUnmerge}
-                className="no-drag flex h-5 w-5 cursor-pointer items-center justify-center text-[#00FF85]/80 transition-colors hover:text-[#00FF85] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00FF85]/40"
-              >
-                <SquareSplitHorizontal className="h-5 w-5" weight="bold" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Split merged trackers"
+                    onClick={onUnmerge}
+                    className="no-drag flex h-5 w-5 cursor-pointer items-center justify-center text-[#00FF85]/80 transition-colors hover:text-[#00FF85] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00FF85]/40"
+                  >
+                    <SquareSplitHorizontal className="h-5 w-5" weight="bold" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Split merged trackers</TooltipContent>
+              </Tooltip>
               <span aria-hidden className="h-px w-full bg-white/10" />
             </>
           ) : null}
@@ -315,6 +341,8 @@ export function TrackerPanel({
             TRACKER_BODY_GLASS_BORDER,
             dropRing,
           )}
+          onPointerDownCapture={primeRndScaleForPointer}
+          onTouchStartCapture={primeRndScaleForPointer}
         >
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#2d2e32]">
             {showMergedGrid && mergePartnerPayload ? (

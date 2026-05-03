@@ -171,12 +171,7 @@ export function attachCanvasViewportWheel(
         viewportWidth: surface.clientWidth,
         viewportHeight: surface.clientHeight,
       });
-      api.setTransform(
-        clamped.positionX,
-        clamped.positionY,
-        nextScale,
-        0,
-      );
+      api.setTransform(clamped.positionX, clamped.positionY, nextScale, 0);
       return;
     }
 

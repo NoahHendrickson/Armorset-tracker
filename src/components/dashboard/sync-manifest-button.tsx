@@ -6,6 +6,11 @@ import { ArrowsClockwise, Database } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { chromeStandaloneSquareIconButtonClass } from "@/components/ui/chrome-square-icon-button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Props {
   /**
@@ -68,43 +73,55 @@ export function SyncManifestButton({
 
   if (variant === "header-icon") {
     return (
-      <button
-        type="button"
-        onClick={sync}
-        disabled={isLoading}
-        aria-label={
-          isLoading ? "Syncing Bungie manifest" : "Sync Bungie manifest"
-        }
-        title="Sync Bungie manifest"
-        className={chromeStandaloneSquareIconButtonClass()}
-      >
-        {isLoading ? (
-          <ArrowsClockwise weight="duotone" className="h-5 w-5 animate-spin" />
-        ) : (
-          <Database weight="duotone" className="h-5 w-5" />
-        )}
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={sync}
+            disabled={isLoading}
+            aria-label={
+              isLoading ? "Syncing Bungie manifest" : "Sync Bungie manifest"
+            }
+            className={chromeStandaloneSquareIconButtonClass()}
+          >
+            {isLoading ? (
+              <ArrowsClockwise weight="duotone" className="h-5 w-5 animate-spin" />
+            ) : (
+              <Database weight="duotone" className="h-5 w-5" />
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {isLoading ? "Syncing manifest…" : "Sync Bungie manifest"}
+        </TooltipContent>
+      </Tooltip>
     );
   }
 
   if (variant === "header-large") {
     return (
-      <button
-        type="button"
-        onClick={sync}
-        disabled={isLoading}
-        aria-label={
-          isLoading ? "Syncing Bungie manifest" : "Sync Bungie manifest"
-        }
-        title="Sync Bungie manifest"
-        className={chromeStandaloneSquareIconButtonClass()}
-      >
-        {isLoading ? (
-          <ArrowsClockwise weight="duotone" className="h-5 w-5 animate-spin" />
-        ) : (
-          <Database weight="duotone" className="h-5 w-5" />
-        )}
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={sync}
+            disabled={isLoading}
+            aria-label={
+              isLoading ? "Syncing Bungie manifest" : "Sync Bungie manifest"
+            }
+            className={chromeStandaloneSquareIconButtonClass()}
+          >
+            {isLoading ? (
+              <ArrowsClockwise weight="duotone" className="h-5 w-5 animate-spin" />
+            ) : (
+              <Database weight="duotone" className="h-5 w-5" />
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {isLoading ? "Syncing manifest…" : "Sync Bungie manifest"}
+        </TooltipContent>
+      </Tooltip>
     );
   }
 

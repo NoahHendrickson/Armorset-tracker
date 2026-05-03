@@ -60,6 +60,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   chromeStandaloneSquareIconButtonClass,
   chromeToolbarInsetPrimaryTileClass,
   chromeToolbarInsetSegmentTileClass,
@@ -79,6 +84,7 @@ import {
   computeDragEdgePanFromPointer,
 } from "@/components/workspace/canvas-drag-edge-pan";
 import { attachCanvasViewportWheel } from "@/components/workspace/canvas-viewport-wheel";
+import { WorkspaceZoomScaleRefContext } from "@/components/workspace/workspace-zoom-scale-context";
 import {
   computeWorkspaceGridLayouts,
   preferredTopLeftForNewTrackerInClusterGrid,
@@ -194,15 +200,11 @@ function getMergeRole(
 }
 
 /**
- * Renders the tracker layer and tracks the live transform scale. We pass
- * `scale` to each `<TrackerPanel>` (and from there to `<Rnd>`) so that
- * react-draggable can correctly translate screen-space mouse coordinates
- * into canvas-space drag offsets — without it the tracker jumps to the
- * wrong position on mousedown when the canvas is zoomed in/out, since the
- * library divides by `scale` (default 1) when computing the drag origin.
- *
- * Isolated as its own component so re-renders on zoom (~60Hz) don't bubble
- * up and force the entire `CanvasWorkspace` chrome to re-render.
+ * Renders tracker panels on the canvas. Live zoom is stored in a ref (see
+ * `workspace-zoom-scale-context`) so pinch-zoom updates don't re-render every
+ * `<TrackerPanel>`. Each panel flushes the current zoom into `<Rnd>` via
+ * `flushSync` on pointer/touch capture before drag starts so react-draggable
+ * still divides mouse deltas by the correct scale.
  */
 function TrackerLayer({
   trackers,
@@ -236,12 +238,16 @@ function TrackerLayer({
   spawnHighlightId: string | null;
   easeLayoutPulse: { durationMs: number } | null;
 }) {
-  const [scale, setScale] = useState(initialScale);
+  const scaleRef = useRef(initialScale);
   useTransformEffect((ref) => {
-    setScale(ref.state.scale);
+    scaleRef.current = ref.state.scale;
   });
+  useEffect(() => {
+    scaleRef.current = initialScale;
+  }, [initialScale]);
+
   return (
-    <>
+    <WorkspaceZoomScaleRefContext.Provider value={scaleRef}>
       {trackers.map((t) => {
         const mergeRole = getMergeRole(t, trackers);
         const mw = t.view.layout.mergedWith;
@@ -260,7 +266,6 @@ function TrackerLayer({
             key={t.view.id}
             payload={t}
             hasInventory={hasInventory}
-            scale={scale}
             onInteract={onInteract}
             onDragPosition={onDragPosition}
             onDragLayoutEnd={onDragLayoutEnd}
@@ -277,7 +282,7 @@ function TrackerLayer({
           />
         );
       })}
-    </>
+    </WorkspaceZoomScaleRefContext.Provider>
   );
 }
 
@@ -1260,10 +1265,7 @@ export function CanvasWorkspace({
             ref={viewportSurfaceRef}
             className="canvas-viewport-surface relative h-full w-full"
           >
-            <TransformComponent
-              infinite
-              wrapperStyle={{ width: "100%", height: "100%" }}
-            >
+            <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }}>
               <div
                 id={WORKSPACE_CANVAS_ELEMENT_ID}
                 className="workspace-canvas-bounds relative"
@@ -1273,6 +1275,10 @@ export function CanvasWorkspace({
                   position: "relative",
                 }}
               >
+                <div
+                  className="workspace-canvas-dot-pattern pointer-events-none absolute inset-0 z-0"
+                  aria-hidden
+                />
                 <svg
                   className="workspace-canvas-edge-overlay absolute left-0 top-0"
                   width={WORKSPACE_CANVAS_WIDTH}
@@ -1342,29 +1348,42 @@ export function CanvasWorkspace({
             {/* Zoom + recenter — bottom right */}
             <div className="pointer-events-none absolute bottom-6 right-6 z-30 flex gap-2">
               <div className={cn("pointer-events-auto", chromeToolbarShellClass)}>
-                <button
-                  type="button"
-                  aria-label="Arrange trackers in a 5-column grid (canvas order)"
-                  disabled={arrangeDisabled}
-                  onClick={() => void handleArrangeGrid()}
-                  className={chromeToolbarInsetPrimaryTileClass()}
-                >
-                  <SquaresFour className="h-5 w-5" weight="duotone" />
-                </button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <button
                       type="button"
-                      aria-label="Canvas clustering options"
-                      title="Choose how trackers group on the canvas"
+                      aria-label="Arrange trackers in a 5-column grid (canvas order)"
                       disabled={arrangeDisabled}
-                      className={chromeToolbarInsetSegmentTileClass(
-                        "data-[state=open]:bg-[#3a3b3f] data-[state=open]:text-white",
-                      )}
+                      onClick={() => void handleArrangeGrid()}
+                      className={chromeToolbarInsetPrimaryTileClass()}
                     >
-                      <CaretDown className="h-4 w-4" weight="duotone" />
+                      <SquaresFour className="h-5 w-5" weight="duotone" />
                     </button>
-                  </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Arrange trackers in a 5-column grid
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenu>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="Canvas clustering options"
+                          disabled={arrangeDisabled}
+                          className={chromeToolbarInsetSegmentTileClass(
+                            "data-[state=open]:bg-[#3a3b3f] data-[state=open]:text-white",
+                          )}
+                        >
+                          <CaretDown className="h-4 w-4" weight="duotone" />
+                        </button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Choose how trackers group on the canvas
+                    </TooltipContent>
+                  </Tooltip>
                   <DropdownMenuContent
                     align="end"
                     side="top"
@@ -1400,40 +1419,57 @@ export function CanvasWorkspace({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              <button
-                type="button"
-                aria-label="Recenter workspace and trackers"
-                disabled={trackers.length === 0 || draggingId !== null}
-                onClick={() => void handleRecenterWorkspace()}
-                className={cn(
-                  "pointer-events-auto",
-                  chromeStandaloneSquareIconButtonClass(),
-                )}
-              >
-                <Crosshair className="h-5 w-5" weight="duotone" />
-              </button>
-              <button
-                type="button"
-                aria-label="Zoom out"
-                onClick={() => twRef.current?.zoomOut(0.2)}
-                className={cn(
-                  "pointer-events-auto",
-                  chromeStandaloneSquareIconButtonClass(),
-                )}
-              >
-                <MagnifyingGlassMinus className="h-5 w-5" weight="duotone" />
-              </button>
-              <button
-                type="button"
-                aria-label="Zoom in"
-                onClick={() => twRef.current?.zoomIn(0.2)}
-                className={cn(
-                  "pointer-events-auto",
-                  chromeStandaloneSquareIconButtonClass(),
-                )}
-              >
-                <MagnifyingGlassPlus className="h-5 w-5" weight="duotone" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Recenter workspace and trackers"
+                    disabled={trackers.length === 0 || draggingId !== null}
+                    onClick={() => void handleRecenterWorkspace()}
+                    className={cn(
+                      "pointer-events-auto",
+                      chromeStandaloneSquareIconButtonClass(),
+                    )}
+                  >
+                    <Crosshair className="h-5 w-5" weight="duotone" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Recenter workspace and trackers
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Zoom out"
+                    onClick={() => twRef.current?.zoomOut(0.2)}
+                    className={cn(
+                      "pointer-events-auto",
+                      chromeStandaloneSquareIconButtonClass(),
+                    )}
+                  >
+                    <MagnifyingGlassMinus className="h-5 w-5" weight="duotone" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Zoom out</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Zoom in"
+                    onClick={() => twRef.current?.zoomIn(0.2)}
+                    className={cn(
+                      "pointer-events-auto",
+                      chromeStandaloneSquareIconButtonClass(),
+                    )}
+                  >
+                    <MagnifyingGlassPlus className="h-5 w-5" weight="duotone" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Zoom in</TooltipContent>
+              </Tooltip>
             </div>
 
             {/* Sticky primary action — bottom-center of the canvas */}

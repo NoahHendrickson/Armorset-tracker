@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { TooltipAppShell } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -30,7 +31,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
       <body className="flex h-full flex-col overflow-hidden bg-background text-foreground">
-        {children}
+        <TooltipAppShell>{children}</TooltipAppShell>
         <Toaster richColors closeButton />
       </body>
     </html>

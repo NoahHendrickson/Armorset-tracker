@@ -15,6 +15,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ViewActionsProps {
   viewId: string;
@@ -99,42 +104,62 @@ export function ViewActions({
   const triggers =
     layout === "sidebar" ? (
       <div className="flex flex-col items-center gap-3">
-        <button
-          type="button"
-          aria-label="Rename tracker"
-          onClick={openRename}
-          className="flex h-5 w-5 items-center justify-center text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-        >
-          <PencilSimple weight="duotone" className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          aria-label="Delete tracker"
-          onClick={() => setDeleteOpen(true)}
-          className="flex h-5 w-5 items-center justify-center text-white/70 transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-        >
-          <Trash weight="duotone" className="h-5 w-5" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label="Rename tracker"
+              onClick={openRename}
+              className="flex h-5 w-5 items-center justify-center text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            >
+              <PencilSimple weight="duotone" className="h-5 w-5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">Rename tracker</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label="Delete tracker"
+              onClick={() => setDeleteOpen(true)}
+              className="flex h-5 w-5 items-center justify-center text-white/70 transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            >
+              <Trash weight="duotone" className="h-5 w-5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">Delete tracker</TooltipContent>
+        </Tooltip>
       </div>
     ) : (
       <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Rename view"
-          onClick={openRename}
-        >
-          <PencilSimple weight="duotone" className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Delete view"
-          className="text-destructive hover:text-destructive"
-          onClick={() => setDeleteOpen(true)}
-        >
-          <Trash weight="duotone" className="h-4 w-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Rename view"
+              onClick={openRename}
+            >
+              <PencilSimple weight="duotone" className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Rename view</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Delete view"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash weight="duotone" className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Delete view</TooltipContent>
+        </Tooltip>
       </div>
     );
 

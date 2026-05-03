@@ -93,6 +93,14 @@
     font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
+  /* Enabled buttons: pointer; utilities like cursor-grab still override this. */
+  button:not(:disabled):not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  button:disabled,
+  button[aria-disabled="true"] {
+    cursor: not-allowed;
+  }
   .font-mono {
     font-family: var(--font-mono), ui-monospace, monospace;
   }
@@ -146,16 +154,14 @@
     }
   }
 
-  /* react-zoom-pan-pinch bakes in an `rgba(0,0,0,0.12)` dot pattern for its
-     `infinite` grid, which disappears on our #1a1b1b canvas. The library
-     injects its own stylesheet at runtime (into <head>), so we need
-     !important + higher specificity (wrapper ancestor chain) to reliably win.
-     Attribute selector survives library CSS-module rebuilds.
-     Per-tile SVG so we get small squares only — paired linear-gradients read
-     as full graph-paper lines and feel too loud. */
-  .react-transform-wrapper [class*="transform-component-module_infiniteGrid"] {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Crect fill='%23fff' opacity='0.055' x='16' y='16' width='4' height='4'/%3E%3C/svg%3E") !important;
-    background-size: 36px 36px !important;
+  /* Dot grid lives inside `.workspace-canvas-bounds` (the scaled transform
+     subtree). The library `infinite` overlay sits outside scaled content and
+     only moves background-position with pan — not zoom — so it swims and
+     strobes during pinch; this stays locked to canvas space with trackers. */
+  .workspace-canvas-dot-pattern {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Crect fill='%23fff' opacity='0.055' x='16' y='16' width='4' height='4'/%3E%3C/svg%3E");
+    background-size: 36px 36px;
+    background-position: 0 0;
   }
 
   /* Space-held pan mode: the surface shows a grab cursor and trackers drop

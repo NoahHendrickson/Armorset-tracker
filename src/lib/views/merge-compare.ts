@@ -77,6 +77,44 @@ export function mergeCompareCellState(
   };
 }
 
+/** Slots where this tracker has at least one inventory match for `tertiary`. */
+export function slotsWithMatches(
+  payload: SerializableTrackerPayload,
+  tertiary: ArmorStatName,
+): ArmorSlot[] {
+  if (!tertiaryApplicable(payload, tertiary)) return [];
+  return SLOT_ORDER.filter((slot) => cellOwnedCount(payload, slot, tertiary) > 0);
+}
+
+/**
+ * True if this armor slot is a reasonable exotic seat for tertiary column
+ * `tertiary`: neither applicable tracker already has a matching piece in this
+ * slot for this stat, and each applicable tracker still has ≥2 matching slots
+ * elsewhere (inventory flexibility hint).
+ */
+export function isMergedExoticSlotCandidate(
+  greenPayload: SerializableTrackerPayload,
+  bluePayload: SerializableTrackerPayload,
+  tertiary: ArmorStatName,
+  slot: ArmorSlot,
+  opts: { hasInventory: boolean },
+): boolean {
+  if (!opts.hasInventory) return false;
+  const gApp = tertiaryApplicable(greenPayload, tertiary);
+  const bApp = tertiaryApplicable(bluePayload, tertiary);
+  if (!gApp && !bApp) return false;
+
+  if (gApp && cellOwnedCount(greenPayload, slot, tertiary) > 0) return false;
+  if (bApp && cellOwnedCount(bluePayload, slot, tertiary) > 0) return false;
+
+  const sg = slotsWithMatches(greenPayload, tertiary);
+  const sb = slotsWithMatches(bluePayload, tertiary);
+
+  const greenOk = !gApp || sg.length >= 2;
+  const blueOk = !bApp || sb.length >= 2;
+  return greenOk && blueOk;
+}
+
 /** True when every cell with at least one applicable side is covered by union ownership. */
 export function isUnionGridComplete(
   greenPayload: SerializableTrackerPayload,

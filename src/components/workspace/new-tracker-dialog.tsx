@@ -9,6 +9,11 @@ import {
   PopoverClose,
   PopoverContent,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { TrackerOptionItem } from "@/lib/views/tracker-option";
 import type { WorkspaceLayoutJson } from "@/lib/workspace/workspace-schema";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
@@ -116,13 +121,18 @@ export function NewTrackerDialog({
               Choose class, armor set, archetype, and tuning — then arrange it on the canvas.
             </p>
           </div>
-          <PopoverClose
-            type="button"
-            className="shrink-0 rounded-none p-1.5 text-white/70 opacity-90 ring-offset-[#2d2e32] transition-opacity hover:bg-white/10 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-[#2d2e32]"
-            aria-label="Close"
-          >
-            <X weight="duotone" className="h-4 w-4" />
-          </PopoverClose>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverClose
+                type="button"
+                className="shrink-0 rounded-none p-1.5 text-white/70 opacity-90 ring-offset-[#2d2e32] transition-opacity hover:bg-white/10 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-[#2d2e32]"
+                aria-label="Close"
+              >
+                <X weight="duotone" className="h-4 w-4" />
+              </PopoverClose>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Close</TooltipContent>
+          </Tooltip>
         </div>
 
         {selectors.manifestEmpty ? (
