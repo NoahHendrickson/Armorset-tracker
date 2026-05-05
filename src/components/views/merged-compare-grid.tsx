@@ -339,7 +339,7 @@ export function MergedCompareGrid({
                             <span
                               role="img"
                               aria-label={EXOTIC_SLOT_HINT_TITLE}
-                              className="pointer-events-auto box-content absolute left-full top-1/2 ml-1.5 size-[8px] -translate-y-1/2 cursor-default !rounded-none border border-solid border-white bg-[#e8b84a] shadow-[0_0_4px_-1px_rgba(232,184,74,0.6)] [border-image:linear-gradient(130deg,rgba(255,255,255,0.24)_0%,rgba(77,71,10,0.24)_100%)_1]"
+                              className="pointer-events-auto overflow-hidden box-content absolute left-full top-1/2 ml-1.5 size-[8px] -translate-y-1/2 cursor-default rounded-[2px] border border-solid border-white/12 bg-[linear-gradient(140deg,rgba(232,184,74,1)_0%,rgba(218,186,114,1)_100%)] text-[rgba(255,255,255,0)] shadow-[0_0_4px_-1px_rgba(232,184,74,0.6)]"
                             />
                           </TooltipTrigger>
                           <TooltipContent>

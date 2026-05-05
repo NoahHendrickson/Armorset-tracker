@@ -70,6 +70,7 @@ import {
   chromeToolbarInsetSegmentTileClass,
   chromeToolbarShellClass,
 } from "@/components/ui/chrome-square-icon-button";
+import { DuplicateTrackerDialog } from "@/components/workspace/duplicate-tracker-dialog";
 import {
   NewTrackerDialog,
   type TrackerFormSelectors,
@@ -217,6 +218,7 @@ function TrackerLayer({
   mergeDropTargetId,
   mergeDropValid,
   onUnmergeAnchor,
+  onRequestDuplicate,
   spawnHighlightId,
   easeLayoutPulse,
 }: {
@@ -235,6 +237,7 @@ function TrackerLayer({
   mergeDropTargetId: string | null;
   mergeDropValid: boolean;
   onUnmergeAnchor: (anchorViewId: string) => void;
+  onRequestDuplicate?: (payload: SerializableTrackerPayload) => void;
   spawnHighlightId: string | null;
   easeLayoutPulse: { durationMs: number } | null;
 }) {
@@ -277,6 +280,9 @@ function TrackerLayer({
                 ? () => onUnmergeAnchor(t.view.id)
                 : undefined
             }
+            onRequestDuplicate={
+              mergeRole === "mergedPartner" ? undefined : onRequestDuplicate
+            }
             spawnHighlight={spawnHighlightId === t.view.id}
             easeLayoutPulse={easeLayoutPulse}
           />
@@ -310,6 +316,8 @@ export function CanvasWorkspace({
   const router = useRouter();
   const [trackers, setTrackers] = useState(initialTrackers);
   const [newTrackerOpen, setNewTrackerOpen] = useState(false);
+  const [duplicateSource, setDuplicateSource] =
+    useState<SerializableTrackerPayload | null>(null);
   const twRef = useRef<ReactZoomPanPinchContentRef | null>(null);
   const viewportSurfaceRef = useRef<HTMLDivElement | null>(null);
   const lastFocused = useRef<string | null>(null);
@@ -772,7 +780,7 @@ export function CanvasWorkspace({
       const groupBySecondary =
         opts?.groupBySecondary ?? arrangeMenuRecipeRef.current.groupBySecondary ?? null;
 
-      const adjustViewport = opts?.adjustViewport ?? true;
+      const adjustViewport = opts?.adjustViewport ?? false;
       const animateLayouts = opts?.animateLayouts === true;
 
       const usesClassColumns =
@@ -871,7 +879,6 @@ export function CanvasWorkspace({
         sort: recipe.sort,
         groupBy: recipe.groupBy,
         groupBySecondary: recipe.groupBySecondary,
-        adjustViewport: false,
         animateLayouts: true,
       });
     },
@@ -1326,6 +1333,10 @@ export function CanvasWorkspace({
                   mergeDropTargetId={mergeDropTargetId}
                   mergeDropValid={mergeDropValid}
                   onUnmergeAnchor={handleUnmergeAnchor}
+                  onRequestDuplicate={(payload) => {
+                    setNewTrackerOpen(false);
+                    setDuplicateSource(payload);
+                  }}
                   spawnHighlightId={spawnHighlightId}
                   easeLayoutPulse={easeLayoutPulse}
                 />
@@ -1476,7 +1487,30 @@ export function CanvasWorkspace({
             <div className="pointer-events-none absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 gap-2">
               <NewTrackerDialog
                 open={newTrackerOpen}
-                onOpenChange={setNewTrackerOpen}
+                onOpenChange={(open) => {
+                  setNewTrackerOpen(open);
+                  if (open) setDuplicateSource(null);
+                }}
+                selectors={selectors}
+                resolveLayoutOnSubmit={resolveNewTrackerLayout}
+                onCreated={(tracker) => {
+                  if (tracker) {
+                    setTrackers((prev) =>
+                      prev.some((t) => t.view.id === tracker.view.id)
+                        ? prev
+                        : [...prev, tracker],
+                    );
+                    scheduleSpawnHighlight(tracker.view.id);
+                  } else {
+                    router.refresh();
+                  }
+                }}
+              />
+              <DuplicateTrackerDialog
+                source={duplicateSource}
+                onOpenChange={(open) => {
+                  if (!open) setDuplicateSource(null);
+                }}
                 selectors={selectors}
                 resolveLayoutOnSubmit={resolveNewTrackerLayout}
                 onCreated={(tracker) => {

@@ -21,12 +21,6 @@ export function TuningHeaderGlyph({ tuningName, iconPath }: TuningHeaderGlyphPro
     <Tooltip>
       <TooltipTrigger asChild>
         <div className="flex shrink-0 cursor-default items-center gap-1.5 text-white/45">
-          <span
-            className="text-lg font-medium leading-none tabular-nums tracking-tight"
-            aria-hidden
-          >
-            +/-
-          </span>
           {iconPath ? (
             // eslint-disable-next-line @next/next/no-img-element -- Bungie CDN
             <img
@@ -44,7 +38,12 @@ export function TuningHeaderGlyph({ tuningName, iconPath }: TuningHeaderGlyphPro
               +
             </span>
           )}
-          <span className="sr-only">Tuning: {tuningName}</span>
+          <span className="text-sm font-medium leading-none" aria-hidden>
+            Tuning
+          </span>
+          <span className="sr-only">
+            Tuning: {tuningName}
+          </span>
         </div>
       </TooltipTrigger>
       <TooltipContent>Tuning: {tuningName}</TooltipContent>

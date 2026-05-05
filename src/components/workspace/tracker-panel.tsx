@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import type { DraggableEvent } from "react-draggable";
 import { Rnd } from "react-rnd";
 import {
+  CopySimple,
   DotsSixVertical,
   SquareSplitHorizontal,
 } from "@phosphor-icons/react/dist/ssr";
@@ -60,6 +61,8 @@ interface TrackerPanelProps {
   mergePartnerPayload: SerializableTrackerPayload | null;
   mergeDropHighlight: "none" | "valid" | "invalid";
   onUnmerge?: () => void;
+  /** Open duplicate flow (dashboard) pre-filled from this tracker. */
+  onRequestDuplicate?: (payload: SerializableTrackerPayload) => void;
   /** Brief light-blue frame after the tracker is created on the canvas. */
   spawnHighlight?: boolean;
   /**
@@ -131,6 +134,7 @@ export function TrackerPanel({
   mergePartnerPayload,
   mergeDropHighlight,
   onUnmerge,
+  onRequestDuplicate,
   spawnHighlight = false,
   easeLayoutPulse = null,
 }: TrackerPanelProps) {
@@ -303,6 +307,22 @@ export function TrackerPanel({
           <span className="no-drag inline-flex">
             <RefreshButton variant="icon" />
           </span>
+
+          {onRequestDuplicate ?
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Duplicate tracker"
+                  onClick={() => onRequestDuplicate(payload)}
+                  className="no-drag flex h-5 w-5 cursor-pointer items-center justify-center text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                >
+                  <CopySimple className="h-5 w-5" weight="duotone" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Duplicate tracker</TooltipContent>
+            </Tooltip>
+          : null}
 
           <span aria-hidden className="h-px w-full bg-white/10" />
 

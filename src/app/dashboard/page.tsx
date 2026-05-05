@@ -10,10 +10,9 @@ import {
 import { listViewsForUser } from "@/lib/views/queries";
 import { getManifestLookups } from "@/lib/manifest/lookups";
 import { checkManifestVersion } from "@/lib/manifest/version-check";
-import { AppHeader } from "@/components/app-header";
 import { SyncManifestButton } from "@/components/dashboard/sync-manifest-button";
 import { buildSerializableTrackerPayload } from "@/lib/workspace/build-tracker-payload";
-import { CanvasWorkspace } from "@/components/workspace/canvas-workspace";
+import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
 import { manifestSelectorsFromLookups } from "@/lib/views/manifest-selectors-from-lookup";
 import { parseWorkspaceCamera } from "@/lib/workspace/workspace-schema";
 import { bungieIconUrl } from "@/lib/bungie/constants";
@@ -145,18 +144,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   );
 
   return (
-    <>
-      <AppHeader displayName={displayName} profilePictureUrl={profilePictureUrl} />
-
-      <CanvasWorkspace
-        banners={banners}
-        initialTrackers={trackerPayloads}
-        initialCamera={initialCamera}
-        focusTrackerId={focusTrackerId}
-        syncWarning={syncWarning}
-        hasInventory={cached !== null}
-        selectors={selectors}
-      />
-    </>
+    <DashboardWorkspace
+      displayName={displayName}
+      profilePictureUrl={profilePictureUrl}
+      banners={banners}
+      initialTrackers={trackerPayloads}
+      initialCamera={initialCamera}
+      focusTrackerId={focusTrackerId}
+      syncWarning={syncWarning}
+      hasInventory={cached !== null}
+      selectors={selectors}
+      inventory={inventory}
+    />
   );
 }

@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FloppyDisk } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
@@ -38,7 +45,35 @@ export interface NewTrackerLayoutDraft {
   className: string;
 }
 
+/** Initial values for duplicate / pre-filled create. Use `class_type` from DB; negative legacy values leave class unset in the form. */
+export interface NewViewFormPrefill {
+  name: string;
+  classType: number;
+  setHash: number;
+  archetypeHash: number;
+  tuningHash: number;
+}
+
 type ClassValue = "0" | "1" | "2";
+
+type PrefillBaseline = {
+  name: string;
+  classType: ClassValue | "";
+  setHash: string;
+  archetypeHash: string;
+  tuningHash: string;
+};
+
+function baselineFromPrefill(prefill: NewViewFormPrefill): PrefillBaseline {
+  return {
+    name: prefill.name.trim(),
+    classType:
+      prefill.classType >= 0 ? (String(prefill.classType) as ClassValue) : "",
+    setHash: String(prefill.setHash),
+    archetypeHash: String(prefill.archetypeHash),
+    tuningHash: String(prefill.tuningHash),
+  };
+}
 
 interface NewViewFormProps {
   setsByClass: { 0: OptionItem[]; 1: OptionItem[]; 2: OptionItem[] };
@@ -57,13 +92,35 @@ interface NewViewFormProps {
    * (e.g. viewport center or cluster-aware placement). Overrides {@link initialLayout}.
    */
   resolveLayoutOnSubmit?: (draft: NewTrackerLayoutDraft) => WorkspaceLayoutJson;
+  /** Populate fields (e.g. duplicate). Prefer remounting the form with `key` when the source changes. */
+  prefillFrom?: NewViewFormPrefill;
+  /**
+   * When true with {@link prefillFrom}, submit stays disabled until at least one field differs from the pre-fill.
+   */
+  requireChangeFromPrefill?: boolean;
+  /**
+   * With {@link embedded} + {@link externalSubmit}, hide the inline cancel row so the parent can render a shared footer (e.g. dialog).
+   */
+  suppressEmbeddedActionRow?: boolean;
   /** Includes `tracker` when the API returns workspace payload so the dashboard can merge without refetching. */
   onCreated?: (viewId: string, tracker?: SerializableTrackerPayload) => void;
   onCancel?: () => void;
   onBusyChange?: (busy: boolean) => void;
   /** Fires when embedded “Create” via external submit becomes allowed (all required fields + not busy). */
   onCanSubmitChange?: (canSubmit: boolean) => void;
+  /** Whether name, class, set, archetype, and tuning are all set (independent of duplicate “must change” rule). */
+  onFieldsCompleteChange?: (complete: boolean) => void;
+  /**
+   * When set, the armor set dropdown panel portals into this node (e.g. the dialog content element)
+   * so the list stays wheel-scrollable under Radix modal scroll lock.
+   */
+  armorSetComboboxPortalContainer?: HTMLElement | null;
 }
+
+export type NewViewFormHandle = {
+  /** Turns the duplicate-flow hint red (blocked create: unchanged from pre-fill). */
+  signalUnchangedDuplicateAttempt: () => void;
+};
 
 const CLASS_OPTIONS: Array<{ value: ClassValue; label: string }> = [
   { value: "0", label: "Titan" },
@@ -71,20 +128,29 @@ const CLASS_OPTIONS: Array<{ value: ClassValue; label: string }> = [
   { value: "2", label: "Warlock" },
 ];
 
-export function NewViewForm({
-  setsByClass,
-  archetypes,
-  tunings,
-  embedded,
-  formId,
-  externalSubmit,
-  initialLayout,
-  resolveLayoutOnSubmit,
-  onCreated,
-  onCancel,
-  onBusyChange,
-  onCanSubmitChange,
-}: NewViewFormProps) {
+export const NewViewForm = forwardRef<NewViewFormHandle, NewViewFormProps>(
+  function NewViewForm(
+    {
+      setsByClass,
+      archetypes,
+      tunings,
+      embedded,
+      formId,
+      externalSubmit,
+      initialLayout,
+      resolveLayoutOnSubmit,
+      prefillFrom,
+      requireChangeFromPrefill = false,
+      onCreated,
+      onCancel,
+      onBusyChange,
+      onCanSubmitChange,
+      onFieldsCompleteChange,
+      suppressEmbeddedActionRow = false,
+      armorSetComboboxPortalContainer,
+    },
+    ref,
+  ) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [submitting, setSubmitting] = useState(false);
@@ -93,12 +159,35 @@ export function NewViewForm({
     onBusyChange?.(submitting || isPending);
   }, [submitting, isPending, onBusyChange]);
 
-  const [name, setName] = useState("");
-  const [classType, setClassType] = useState<ClassValue | "">("");
-  const [setHash, setSetHash] = useState<string>("");
-  const [archetypeHash, setArchetypeHash] = useState<string>("");
-  const [tuningHash, setTuningHash] = useState<string>("");
+  const [name, setName] = useState(() => prefillFrom?.name ?? "");
+  const [classType, setClassType] = useState<ClassValue | "">(() =>
+    prefillFrom && prefillFrom.classType >= 0
+      ? (String(prefillFrom.classType) as ClassValue)
+      : "",
+  );
+  const [setHash, setSetHash] = useState(() =>
+    prefillFrom ? String(prefillFrom.setHash) : "",
+  );
+  const [archetypeHash, setArchetypeHash] = useState(() =>
+    prefillFrom ? String(prefillFrom.archetypeHash) : "",
+  );
+  const [tuningHash, setTuningHash] = useState(() =>
+    prefillFrom ? String(prefillFrom.tuningHash) : "",
+  );
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [unchangedDuplicateSubmitAttempted, setUnchangedDuplicateSubmitAttempted] =
+    useState(false);
+
+  useImperativeHandle(ref, () => ({
+    signalUnchangedDuplicateAttempt: () => {
+      setUnchangedDuplicateSubmitAttempted(true);
+    },
+  }));
+
+  const prefillBaseline = useMemo((): PrefillBaseline | null => {
+    if (!prefillFrom) return null;
+    return baselineFromPrefill(prefillFrom);
+  }, [prefillFrom]);
 
   const sortedSets = useMemo(() => {
     if (classType !== "") {
@@ -133,21 +222,50 @@ export function NewViewForm({
       (CLASS_OPTIONS.find((o) => o.value === classType)?.label ?? "")
     : "";
 
-  const canSubmit =
+  const matchesPrefill =
+    Boolean(prefillBaseline) &&
+    name.trim() === prefillBaseline!.name &&
+    classType === prefillBaseline!.classType &&
+    setHash === prefillBaseline!.setHash &&
+    archetypeHash === prefillBaseline!.archetypeHash &&
+    tuningHash === prefillBaseline!.tuningHash;
+
+  const blockedUnchangedDuplicate =
+    Boolean(requireChangeFromPrefill && prefillBaseline && matchesPrefill);
+
+  const fieldsComplete =
     name.trim().length > 0 &&
     classType !== "" &&
     setHash !== "" &&
     archetypeHash !== "" &&
-    tuningHash !== "" &&
-    !submitting;
+    tuningHash !== "";
+
+  const canSubmit =
+    fieldsComplete && !submitting && !blockedUnchangedDuplicate;
 
   const canSubmitWithTransition = canSubmit && !isPending;
+
+  const showUnchangedHint =
+    Boolean(
+      requireChangeFromPrefill &&
+        prefillBaseline &&
+        fieldsComplete &&
+        matchesPrefill,
+    );
 
   const sharpMenus = Boolean(embedded);
 
   useEffect(() => {
     onCanSubmitChange?.(canSubmitWithTransition);
   }, [canSubmitWithTransition, onCanSubmitChange]);
+
+  useEffect(() => {
+    onFieldsCompleteChange?.(fieldsComplete);
+  }, [fieldsComplete, onFieldsCompleteChange]);
+
+  useEffect(() => {
+    if (!matchesPrefill) setUnchangedDuplicateSubmitAttempted(false);
+  }, [matchesPrefill]);
 
   useEffect(() => {
     if (canSubmit) setSubmitAttempted(false);
@@ -175,6 +293,9 @@ export function NewViewForm({
     e.preventDefault();
     if (!canSubmit) {
       setSubmitAttempted(true);
+      if (blockedUnchangedDuplicate) {
+        setUnchangedDuplicateSubmitAttempted(true);
+      }
       return;
     }
 
@@ -211,6 +332,13 @@ export function NewViewForm({
         view?: { id: string };
         tracker?: SerializableTrackerPayload;
       };
+      if (res.status === 409) {
+        toast.error(
+          body.error ??
+            "A tracker with this name and build already exists. Change something and try again.",
+        );
+        return;
+      }
       if (!res.ok || !body.view) {
         toast.error(body.error ?? "Could not create view");
         return;
@@ -283,6 +411,7 @@ export function NewViewForm({
           placeholder="Select an armor set"
           sharpCorners={sharpMenus}
           invalid={showSetError}
+          portalContainer={armorSetComboboxPortalContainer}
         />
       </div>
 
@@ -378,33 +507,54 @@ export function NewViewForm({
         </p>
       </div>
 
-      <div
-        className={`flex gap-3 pt-2 ${embedded && externalSubmit ? "justify-start" : "items-center justify-between"}`}
-      >
-        {embedded && onCancel ? (
-          <Button variant="ghost" type="button" onClick={() => onCancel()}>
-            <ArrowLeft weight="duotone" />
-            Cancel
-          </Button>
-        ) : (
-          <Button asChild variant="ghost" type="button">
-            <Link href="/dashboard">
+      {showUnchangedHint ? (
+        <p
+          className={cn(
+            "text-xs",
+            unchangedDuplicateSubmitAttempted
+              ? "text-destructive"
+              : "text-muted-foreground",
+          )}
+        >
+          Change something to create a new tracker.
+        </p>
+      ) : null}
+
+      {!(
+        embedded &&
+        externalSubmit &&
+        suppressEmbeddedActionRow
+      ) ?
+        <div
+          className={`flex gap-3 pt-2 ${embedded && externalSubmit ? "justify-start" : "items-center justify-between"}`}
+        >
+          {embedded && onCancel ?
+            <Button variant="ghost" type="button" onClick={() => onCancel()}>
               <ArrowLeft weight="duotone" />
               Cancel
-            </Link>
-          </Button>
-        )}
-        {!externalSubmit ? (
-          <Button type="submit" disabled={!canSubmit || isPending}>
-            <FloppyDisk weight="duotone" />
-            {submitting || isPending
-              ? "Saving..."
-              : embedded
-                ? "Create tracker"
-                : "Create view"}
-          </Button>
-        ) : null}
-      </div>
+            </Button>
+          : (
+            <Button asChild variant="ghost" type="button">
+              <Link href="/dashboard">
+                <ArrowLeft weight="duotone" />
+                Cancel
+              </Link>
+            </Button>
+          )}
+          {!externalSubmit ?
+            <Button type="submit" disabled={!canSubmit || isPending}>
+              <FloppyDisk weight="duotone" />
+              {submitting || isPending
+                ? "Saving..."
+                : embedded
+                  ? "Create tracker"
+                  : "Create view"}
+            </Button>
+          : null}
+        </div>
+      : null}
     </form>
   );
-}
+});
+
+NewViewForm.displayName = "NewViewForm";
