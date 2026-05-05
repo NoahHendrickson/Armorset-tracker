@@ -1,12 +1,19 @@
 import { z } from "zod";
 
-/** Optional nonempty string env (after trim); empty/absent becomes undefined */
-const optionalGithubFeedbackString = z.preprocess((v: unknown) => {
-  if (v === undefined || v === null || v === "") return undefined;
-  if (typeof v !== "string") return undefined;
-  const t = v.trim();
-  return t === "" ? undefined : t;
-}, z.string().min(1).optional());
+/**
+ * Optional nonempty string env (after trim); empty/absent becomes undefined.
+ * Zod 4's `z.preprocess` + inner `.optional()` rejects plain `undefined` input in
+ * some builds; use transform so unset GitHub feedback vars don't block boot.
+ */
+const optionalGithubFeedbackString = z
+  .string()
+  .optional()
+  .transform((s) => {
+    if (s === undefined) return undefined;
+    const t = s.trim();
+    return t === "" ? undefined : t;
+  })
+  .refine((v) => v === undefined || v.length >= 1);
 
 const supabaseProjectUrl = z
   .string()

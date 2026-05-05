@@ -60,11 +60,34 @@ export async function POST(req: NextRequest) {
   const lookupsPromise = getManifestLookups();
   const cachedPromise = getCachedInventoryWithSyncedAt(session.userId);
   const { layout: layoutPayload, ...createFields } = parsed.data;
+  const trimmedName = createFields.name.trim();
+
+  const { data: duplicateRow } = await sb
+    .from("views")
+    .select("id")
+    .eq("user_id", session.userId)
+    .eq("name", trimmedName)
+    .eq("set_hash", createFields.set_hash)
+    .eq("archetype_hash", createFields.archetype_hash)
+    .eq("tuning_hash", createFields.tuning_hash)
+    .eq("class_type", createFields.class_type)
+    .maybeSingle();
+
+  if (duplicateRow) {
+    return NextResponse.json(
+      {
+        error:
+          "A tracker with this name and build already exists. Change something and try again.",
+      },
+      { status: 409 },
+    );
+  }
+
   const { data, error } = await sb
     .from("views")
     .insert({
       user_id: session.userId,
-      name: createFields.name.trim(),
+      name: trimmedName,
       set_hash: createFields.set_hash,
       archetype_hash: createFields.archetype_hash,
       tuning_hash: createFields.tuning_hash,

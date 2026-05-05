@@ -95,11 +95,16 @@ export function attachCanvasViewportWheel(
   getMinScale: () => number,
 ): () => void {
   const onWheel = (e: WheelEvent) => {
-    // Targets may be SVG elements (icon paths), so use the general Element
-    // interface — HTMLElement would miss Phosphor icon hits and make the
-    // handler silently no-op as the cursor passes over them.
     const t = e.target;
-    if (!t || !(t instanceof Element)) return;
+    if (!t) return;
+
+    // Wheel targets are often Text nodes or deep SVG paths; walk the full path
+    // so portaled UI (e.g. armor set popover) still opts out of canvas routing.
+    for (const n of typeof e.composedPath === "function" ? e.composedPath() : []) {
+      if (n instanceof Element && n.hasAttribute("data-skip-canvas-wheel")) {
+        return;
+      }
+    }
 
     // While a Radix modal/alert dialog is open, leave wheels outside the
     // dialog content alone. The dialog and its scrollable body handle their
@@ -108,7 +113,7 @@ export function attachCanvasViewportWheel(
     const openModal = document.querySelector(
       '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]',
     );
-    if (openModal && !openModal.contains(t)) return;
+    if (openModal && t instanceof Node && !openModal.contains(t)) return;
 
     const api = getApi();
     if (!api?.state || typeof api.setTransform !== "function") return;
@@ -132,8 +137,17 @@ export function attachCanvasViewportWheel(
     // tracker bodies) that can still scroll in the wheel direction. Zoom
     // gestures always route to canvas.
     if (!isZoomGesture) {
-      const scrollable = findScrollableAncestor(t, document.body, dx, dy);
-      if (scrollable) return;
+      const scrollFrom: Element | null =
+        t instanceof Element ? t : t instanceof Node ? t.parentElement : null;
+      if (scrollFrom) {
+        const scrollable = findScrollableAncestor(
+          scrollFrom,
+          document.body,
+          dx,
+          dy,
+        );
+        if (scrollable) return;
+      }
     }
 
     e.preventDefault();
