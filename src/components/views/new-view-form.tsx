@@ -13,9 +13,9 @@ import { ArrowLeft, FloppyDisk } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { autoTrackerStorageName } from "@/lib/views/auto-tracker-name";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import type { WorkspaceLayoutJson } from "@/lib/workspace/workspace-schema";
 import {
@@ -34,6 +34,7 @@ export interface OptionItem {
 
 /** Snapshot of the new-tracker form at submit time (for canvas placement). */
 export interface NewTrackerLayoutDraft {
+  /** Auto-generated row label for `views.name` (set / archetype / tuning). */
   name: string;
   classType: number;
   setHash: number;
@@ -47,7 +48,6 @@ export interface NewTrackerLayoutDraft {
 
 /** Initial values for duplicate / pre-filled create. Use `class_type` from DB; negative legacy values leave class unset in the form. */
 export interface NewViewFormPrefill {
-  name: string;
   classType: number;
   setHash: number;
   archetypeHash: number;
@@ -57,7 +57,6 @@ export interface NewViewFormPrefill {
 type ClassValue = "0" | "1" | "2";
 
 type PrefillBaseline = {
-  name: string;
   classType: ClassValue | "";
   setHash: string;
   archetypeHash: string;
@@ -66,7 +65,6 @@ type PrefillBaseline = {
 
 function baselineFromPrefill(prefill: NewViewFormPrefill): PrefillBaseline {
   return {
-    name: prefill.name.trim(),
     classType:
       prefill.classType >= 0 ? (String(prefill.classType) as ClassValue) : "",
     setHash: String(prefill.setHash),
@@ -108,7 +106,7 @@ interface NewViewFormProps {
   onBusyChange?: (busy: boolean) => void;
   /** Fires when embedded “Create” via external submit becomes allowed (all required fields + not busy). */
   onCanSubmitChange?: (canSubmit: boolean) => void;
-  /** Whether name, class, set, archetype, and tuning are all set (independent of duplicate “must change” rule). */
+  /** Whether class, set, archetype, and tuning are all set (independent of duplicate “must change” rule). */
   onFieldsCompleteChange?: (complete: boolean) => void;
   /**
    * When set, the armor set dropdown panel portals into this node (e.g. the dialog content element)
@@ -159,7 +157,6 @@ export const NewViewForm = forwardRef<NewViewFormHandle, NewViewFormProps>(
     onBusyChange?.(submitting || isPending);
   }, [submitting, isPending, onBusyChange]);
 
-  const [name, setName] = useState(() => prefillFrom?.name ?? "");
   const [classType, setClassType] = useState<ClassValue | "">(() =>
     prefillFrom && prefillFrom.classType >= 0
       ? (String(prefillFrom.classType) as ClassValue)
@@ -222,19 +219,19 @@ export const NewViewForm = forwardRef<NewViewFormHandle, NewViewFormProps>(
       (CLASS_OPTIONS.find((o) => o.value === classType)?.label ?? "")
     : "";
 
-  const matchesPrefill =
+  const selectionMatchesPrefill =
     Boolean(prefillBaseline) &&
-    name.trim() === prefillBaseline!.name &&
     classType === prefillBaseline!.classType &&
     setHash === prefillBaseline!.setHash &&
     archetypeHash === prefillBaseline!.archetypeHash &&
     tuningHash === prefillBaseline!.tuningHash;
 
+  const matchesPrefill = Boolean(prefillBaseline) && selectionMatchesPrefill;
+
   const blockedUnchangedDuplicate =
     Boolean(requireChangeFromPrefill && prefillBaseline && matchesPrefill);
 
   const fieldsComplete =
-    name.trim().length > 0 &&
     classType !== "" &&
     setHash !== "" &&
     archetypeHash !== "" &&
@@ -281,13 +278,6 @@ export const NewViewForm = forwardRef<NewViewFormHandle, NewViewFormProps>(
     submitAttempted && archetypeHash === "" && sortedArchetypes.length > 0;
   const showTuningError =
     submitAttempted && tuningHash === "" && sortedTunings.length > 0;
-  const showNameError = submitAttempted && name.trim() === "";
-
-  function autoFillName() {
-    if (!name && setLabel && archetypeLabel) {
-      setName(`${setLabel} / ${archetypeLabel}`);
-    }
-  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -301,9 +291,14 @@ export const NewViewForm = forwardRef<NewViewFormHandle, NewViewFormProps>(
 
     setSubmitting(true);
     try {
+      const storageName = autoTrackerStorageName(
+        setLabel,
+        archetypeLabel,
+        tuningLabel,
+      );
       const layoutForRequest =
         resolveLayoutOnSubmit?.({
-          name: name.trim(),
+          name: storageName,
           classType: Number(classType),
           setHash: Number(setHash),
           archetypeHash: Number(archetypeHash),
@@ -319,7 +314,7 @@ export const NewViewForm = forwardRef<NewViewFormHandle, NewViewFormProps>(
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
+          name: storageName,
           set_hash: Number(setHash),
           archetype_hash: Number(archetypeHash),
           tuning_hash: Number(tuningHash),
@@ -485,26 +480,6 @@ export const NewViewForm = forwardRef<NewViewFormHandle, NewViewFormProps>(
             )}
           </SelectContent>
         </Select>
-      </div>
-
-      <div className="grid gap-2">
-        <Label htmlFor="name">{embedded ? "Tracker name" : "View name"}</Label>
-        <Input
-          id="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onFocus={autoFillName}
-          placeholder='e.g. "Ferropotent / Gunner"'
-          maxLength={80}
-          aria-invalid={showNameError}
-          className={cn(
-            "rounded-none",
-            showNameError && fieldErrorOutline,
-          )}
-        />
-        <p className="text-xs text-muted-foreground">
-          Shown on your dashboard. Defaults to armor set / archetype.
-        </p>
       </div>
 
       {showUnchangedHint ? (

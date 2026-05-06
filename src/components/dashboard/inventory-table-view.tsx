@@ -7,17 +7,17 @@ import {
   CLASS_NAMES,
   SLOT_LABELS,
   SLOT_ORDER,
+  bungieIconUrl,
   type ArmorSlot,
 } from "@/lib/bungie/constants";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -26,11 +26,33 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArmorSetCombobox } from "@/components/views/armor-set-combobox";
+import {
+  ArmorSetMultiCombobox,
+} from "@/components/views/armor-set-combobox";
 import type { TrackerFormSelectors } from "@/components/workspace/new-tracker-dialog";
 import { chromeToolbarShellClass } from "@/components/ui/chrome-square-icon-button";
+import { CaretDown } from "@phosphor-icons/react/dist/ssr";
 
-const ALL_SENTINEL = "__all__";
+const TABLE_FILTER_MENU_CONTENT =
+  "max-h-[min(60vh,20rem)] overflow-y-auto rounded-none border border-white/15 bg-[#2d2e32] py-2 text-white shadow-xl";
+
+const INVENTORY_TABLE_FILTER_TRIGGER =
+  "flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-none border border-white/15 bg-[#2d2e32] px-3 py-2 text-left text-sm text-white shadow-sm focus:outline-none focus:ring-1 focus:ring-white/25 disabled:cursor-not-allowed disabled:opacity-50";
+
+function multiOptionSummary(
+  selected: string[],
+  labelForValue: (v: string) => string | undefined,
+  emptyPlaceholder: string,
+): string {
+  if (selected.length === 0) return emptyPlaceholder;
+  const names = selected
+    .map((v) => labelForValue(v))
+    .filter((n): n is string => Boolean(n));
+  if (names.length === 0) return emptyPlaceholder;
+  if (names.length === 1) return names[0]!;
+  if (names.length === 2) return `${names[0]}, ${names[1]}`;
+  return `${names[0]}, ${names[1]} +${names.length - 2}`;
+}
 
 type InventoryClass = 0 | 1 | 2;
 
@@ -69,10 +91,10 @@ export function InventoryTableView({
   selectors,
 }: InventoryTableViewProps) {
   const [inventoryClass, setInventoryClass] = useState<InventoryClass>(0);
-  const [setHash, setSetHash] = useState("");
-  const [archetypeHash, setArchetypeHash] = useState(ALL_SENTINEL);
-  const [tuningHash, setTuningHash] = useState(ALL_SENTINEL);
-  const [tertiaryStat, setTertiaryStat] = useState<string>(ALL_SENTINEL);
+  const [setHashes, setSetHashes] = useState<string[]>([]);
+  const [archetypeHashes, setArchetypeHashes] = useState<string[]>([]);
+  const [tuningHashes, setTuningHashes] = useState<string[]>([]);
+  const [tertiaryStats, setTertiaryStats] = useState<string[]>([]);
 
   const sortedSets = useMemo(
     () => selectors.setsByClass[inventoryClass],
@@ -90,20 +112,29 @@ export function InventoryTableView({
 
   const filteredRows = useMemo(() => {
     let rows = inventory.filter((p) => p.classType === inventoryClass);
-    if (setHash) {
-      const h = Number(setHash);
-      rows = rows.filter((p) => p.setHash === h);
+    if (setHashes.length > 0) {
+      const allowed = new Set(setHashes.map(Number));
+      rows = rows.filter(
+        (p) => p.setHash != null && allowed.has(p.setHash),
+      );
     }
-    if (archetypeHash !== ALL_SENTINEL) {
-      const h = Number(archetypeHash);
-      rows = rows.filter((p) => p.archetypeHash === h);
+    if (archetypeHashes.length > 0) {
+      const allowed = new Set(archetypeHashes.map(Number));
+      rows = rows.filter(
+        (p) => p.archetypeHash != null && allowed.has(p.archetypeHash),
+      );
     }
-    if (tuningHash !== ALL_SENTINEL) {
-      const h = Number(tuningHash);
-      rows = rows.filter((p) => p.tuningHash === h);
+    if (tuningHashes.length > 0) {
+      const allowed = new Set(tuningHashes.map(Number));
+      rows = rows.filter(
+        (p) => p.tuningHash != null && allowed.has(p.tuningHash),
+      );
     }
-    if (tertiaryStat !== ALL_SENTINEL) {
-      rows = rows.filter((p) => p.tertiaryStat === tertiaryStat);
+    if (tertiaryStats.length > 0) {
+      const allowed = new Set(tertiaryStats);
+      rows = rows.filter(
+        (p) => p.tertiaryStat != null && allowed.has(p.tertiaryStat),
+      );
     }
     rows = [...rows].sort((a, b) => {
       const sd = slotRank(a.slot) - slotRank(b.slot);
@@ -116,11 +147,27 @@ export function InventoryTableView({
   }, [
     inventory,
     inventoryClass,
-    setHash,
-    archetypeHash,
-    tuningHash,
-    tertiaryStat,
+    setHashes,
+    archetypeHashes,
+    tuningHashes,
+    tertiaryStats,
   ]);
+
+  const archetypeSummary = multiOptionSummary(
+    archetypeHashes,
+    (h) => sortedArchetypes.find((a) => String(a.hash) === h)?.name,
+    "All archetypes",
+  );
+  const tuningSummary = multiOptionSummary(
+    tuningHashes,
+    (h) => sortedTunings.find((t) => String(t.hash) === h)?.name,
+    "All tuning stats",
+  );
+  const tertiarySummary = multiOptionSummary(
+    tertiaryStats,
+    (s) => s,
+    "All tertiary stats",
+  );
 
   const hasTopMessage = Boolean(banners) || Boolean(syncWarning);
 
@@ -152,12 +199,12 @@ export function InventoryTableView({
             </p>
           ) : (
             <>
-              <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end lg:gap-x-4 lg:gap-y-3">
-                <div className="grid gap-2">
+              <div className="flex flex-col gap-3 sm:gap-4">
+                <div className="grid min-w-0 gap-2">
                   <Label className="text-xs font-medium uppercase tracking-wide text-white/50">
                     Class
                   </Label>
-                  <div className={cn(chromeToolbarShellClass, "w-fit")}>
+                  <div className={cn(chromeToolbarShellClass, "w-full sm:w-fit")}>
                     {CLASS_TABS.map((tab, i) => (
                       <button
                         key={tab.value}
@@ -170,13 +217,12 @@ export function InventoryTableView({
                         )}
                         onClick={() => {
                           setInventoryClass(tab.value);
-                          setSetHash((prev) =>
-                            prev &&
-                            selectors.setsByClass[tab.value].some(
-                              (s) => String(s.hash) === prev,
-                            )
-                              ? prev
-                              : "",
+                          setSetHashes((prev) =>
+                            prev.filter((h) =>
+                              selectors.setsByClass[tab.value].some(
+                                (s) => String(s.hash) === h,
+                              ),
+                            ),
                           );
                         }}
                       >
@@ -186,18 +232,26 @@ export function InventoryTableView({
                   </div>
                 </div>
 
-                <div className="grid min-w-[min(100%,14rem)] flex-1 gap-2">
+                <div
+                  className={cn(
+                    "grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-x-3 sm:gap-y-3 lg:grid-cols-4 lg:items-end lg:gap-x-4",
+                  )}
+                >
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="inv-filter-set" className="text-white/50">
                     Armor set
                   </Label>
-                  <ArmorSetCombobox
+                  <ArmorSetMultiCombobox
                     id="inv-filter-set"
                     options={sortedSets}
-                    value={setHash}
-                    onValueChange={setSetHash}
+                    values={setHashes}
+                    onValuesChange={setSetHashes}
                     aria-label="Armor set filter"
-                    placeholder="Any armor set"
+                    placeholder="All armor sets"
                     sharpCorners
+                    triggerClassName={INVENTORY_TABLE_FILTER_TRIGGER}
+                    summaryEmptyClassName="text-white/45"
+                    caretClassName="opacity-60"
                     emptyCatalogMessage={
                       selectors.manifestEmpty
                         ? "Sync the manifest first."
@@ -206,115 +260,182 @@ export function InventoryTableView({
                   />
                 </div>
 
-                <div className="grid min-w-[min(100%,12rem)] flex-1 gap-2">
-                  <Label htmlFor="inv-filter-archetype" className="text-white/50">
-                    Archetype
-                  </Label>
-                  <Select
-                    value={archetypeHash}
-                    onValueChange={setArchetypeHash}
-                  >
-                    <SelectTrigger
-                      id="inv-filter-archetype"
-                      aria-label="Archetype filter"
-                      className="rounded-none border-white/15 bg-[#2d2e32] text-white"
-                    >
-                      <SelectValue placeholder="Any archetype" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-none border-white/15 bg-[#2d2e32] text-white">
-                      <SelectItem
-                        value={ALL_SENTINEL}
-                        className="rounded-none focus:bg-white/10 focus:text-white"
+                <div className="grid min-w-0 gap-2">
+                  <Label className="text-white/50">Archetype</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        id="inv-filter-archetype"
+                        aria-label="Archetype filter"
+                        className={INVENTORY_TABLE_FILTER_TRIGGER}
                       >
-                        Any archetype
-                      </SelectItem>
+                        <span
+                          className={cn(
+                            "min-w-0 flex-1 truncate",
+                            archetypeHashes.length === 0 && "text-white/45",
+                          )}
+                        >
+                          {archetypeSummary}
+                        </span>
+                        <CaretDown
+                          weight="duotone"
+                          className="h-4 w-4 shrink-0 opacity-60"
+                          aria-hidden
+                        />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className={cn(
+                        TABLE_FILTER_MENU_CONTENT,
+                        "min-w-[var(--radix-dropdown-menu-trigger-width)]",
+                      )}
+                    >
                       {sortedArchetypes.length === 0 ? (
-                        <div className="px-2 py-3 text-sm text-white/50">
+                        <div className="px-3 py-2.5 text-sm text-white/50">
                           No archetypes — sync the manifest first.
                         </div>
                       ) : (
-                        sortedArchetypes.map((a) => (
-                          <SelectItem
-                            key={a.hash}
-                            value={String(a.hash)}
-                            className="rounded-none focus:bg-white/10 focus:text-white"
-                          >
-                            {a.name}
-                          </SelectItem>
-                        ))
+                        sortedArchetypes.map((a) => {
+                          const id = String(a.hash);
+                          return (
+                            <DropdownMenuCheckboxItem
+                              key={a.hash}
+                              checked={archetypeHashes.includes(id)}
+                              onSelect={(e) => e.preventDefault()}
+                              onCheckedChange={(c) => {
+                                setArchetypeHashes((prev) =>
+                                  c
+                                    ? [...prev, id]
+                                    : prev.filter((h) => h !== id),
+                                );
+                              }}
+                              className="rounded-none pl-3 pr-9 text-white focus:bg-white/10 focus:text-white data-[highlighted]:bg-white/10 [&>span]:left-auto [&>span]:right-2 [&>span]:top-1/2 [&>span]:-translate-y-1/2 [&>span]:text-white"
+                            >
+                              {a.name}
+                            </DropdownMenuCheckboxItem>
+                          );
+                        })
                       )}
-                    </SelectContent>
-                  </Select>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
 
-                <div className="grid min-w-[min(100%,12rem)] flex-1 gap-2">
-                  <Label htmlFor="inv-filter-tuning" className="text-white/50">
-                    Tuning stat
-                  </Label>
-                  <Select value={tuningHash} onValueChange={setTuningHash}>
-                    <SelectTrigger
-                      id="inv-filter-tuning"
-                      aria-label="Tuning stat filter"
-                      className="rounded-none border-white/15 bg-[#2d2e32] text-white"
-                    >
-                      <SelectValue placeholder="Any tuning" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-none border-white/15 bg-[#2d2e32] text-white">
-                      <SelectItem
-                        value={ALL_SENTINEL}
-                        className="rounded-none focus:bg-white/10 focus:text-white"
+                <div className="grid min-w-0 gap-2">
+                  <Label className="text-white/50">Tuning stat</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        id="inv-filter-tuning"
+                        aria-label="Tuning stat filter"
+                        className={INVENTORY_TABLE_FILTER_TRIGGER}
                       >
-                        Any tuning
-                      </SelectItem>
+                        <span
+                          className={cn(
+                            "min-w-0 flex-1 truncate",
+                            tuningHashes.length === 0 && "text-white/45",
+                          )}
+                        >
+                          {tuningSummary}
+                        </span>
+                        <CaretDown
+                          weight="duotone"
+                          className="h-4 w-4 shrink-0 opacity-60"
+                          aria-hidden
+                        />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className={cn(
+                        TABLE_FILTER_MENU_CONTENT,
+                        "min-w-[var(--radix-dropdown-menu-trigger-width)]",
+                      )}
+                    >
                       {sortedTunings.length === 0 ? (
-                        <div className="px-2 py-3 text-sm text-white/50">
+                        <div className="px-3 py-2.5 text-sm text-white/50">
                           No tunings — sync the manifest first.
                         </div>
                       ) : (
-                        sortedTunings.map((t) => (
-                          <SelectItem
-                            key={t.hash}
-                            value={String(t.hash)}
-                            className="rounded-none focus:bg-white/10 focus:text-white"
-                          >
-                            {t.name}
-                          </SelectItem>
-                        ))
+                        sortedTunings.map((t) => {
+                          const id = String(t.hash);
+                          return (
+                            <DropdownMenuCheckboxItem
+                              key={t.hash}
+                              checked={tuningHashes.includes(id)}
+                              onSelect={(e) => e.preventDefault()}
+                              onCheckedChange={(c) => {
+                                setTuningHashes((prev) =>
+                                  c
+                                    ? [...prev, id]
+                                    : prev.filter((h) => h !== id),
+                                );
+                              }}
+                              className="rounded-none pl-3 pr-9 text-white focus:bg-white/10 focus:text-white data-[highlighted]:bg-white/10 [&>span]:left-auto [&>span]:right-2 [&>span]:top-1/2 [&>span]:-translate-y-1/2 [&>span]:text-white"
+                            >
+                              {t.name}
+                            </DropdownMenuCheckboxItem>
+                          );
+                        })
                       )}
-                    </SelectContent>
-                  </Select>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
 
-                <div className="grid min-w-[min(100%,12rem)] flex-1 gap-2">
-                  <Label htmlFor="inv-filter-tertiary" className="text-white/50">
-                    Tertiary stat
-                  </Label>
-                  <Select value={tertiaryStat} onValueChange={setTertiaryStat}>
-                    <SelectTrigger
-                      id="inv-filter-tertiary"
-                      aria-label="Tertiary stat filter"
-                      className="rounded-none border-white/15 bg-[#2d2e32] text-white"
-                    >
-                      <SelectValue placeholder="Any tertiary" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-none border-white/15 bg-[#2d2e32] text-white">
-                      <SelectItem
-                        value={ALL_SENTINEL}
-                        className="rounded-none focus:bg-white/10 focus:text-white"
+                <div className="grid min-w-0 gap-2">
+                  <Label className="text-white/50">Tertiary stat</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        id="inv-filter-tertiary"
+                        aria-label="Tertiary stat filter"
+                        className={INVENTORY_TABLE_FILTER_TRIGGER}
                       >
-                        Any tertiary
-                      </SelectItem>
+                        <span
+                          className={cn(
+                            "min-w-0 flex-1 truncate",
+                            tertiaryStats.length === 0 && "text-white/45",
+                          )}
+                        >
+                          {tertiarySummary}
+                        </span>
+                        <CaretDown
+                          weight="duotone"
+                          className="h-4 w-4 shrink-0 opacity-60"
+                          aria-hidden
+                        />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className={cn(
+                        TABLE_FILTER_MENU_CONTENT,
+                        "min-w-[var(--radix-dropdown-menu-trigger-width)]",
+                      )}
+                    >
                       {ARMOR_STAT_NAMES.map((stat) => (
-                        <SelectItem
+                        <DropdownMenuCheckboxItem
                           key={stat}
-                          value={stat}
-                          className="rounded-none focus:bg-white/10 focus:text-white"
+                          checked={tertiaryStats.includes(stat)}
+                          onSelect={(e) => e.preventDefault()}
+                          onCheckedChange={(c) => {
+                            setTertiaryStats((prev) =>
+                              c
+                                ? [...prev, stat]
+                                : prev.filter((s) => s !== stat),
+                            );
+                          }}
+                          className="rounded-none pl-3 pr-9 text-white focus:bg-white/10 focus:text-white data-[highlighted]:bg-white/10 [&>span]:left-auto [&>span]:right-2 [&>span]:top-1/2 [&>span]:-translate-y-1/2 [&>span]:text-white"
                         >
                           {stat}
-                        </SelectItem>
+                        </DropdownMenuCheckboxItem>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
                 </div>
               </div>
 
@@ -328,7 +449,7 @@ export function InventoryTableView({
                 <Table>
                   <TableHeader>
                     <TableRow className="border-white/10 hover:bg-transparent">
-                      <TableHead className="text-white/60">Slot</TableHead>
+                      <TableHead className="w-px pe-2 text-white/60" aria-label="Icon" />
                       <TableHead className="text-white/60">Armor set</TableHead>
                       <TableHead className="text-white/60">Archetype</TableHead>
                       <TableHead className="text-white/60">Tuning</TableHead>
@@ -342,7 +463,7 @@ export function InventoryTableView({
                     {filteredRows.length === 0 ? (
                       <TableRow className="border-white/10 hover:bg-white/[0.02]">
                         <TableCell
-                          colSpan={8}
+                          colSpan={7}
                           className="py-8 text-center text-sm text-white/50"
                         >
                           No armor matches these filters.
@@ -354,8 +475,24 @@ export function InventoryTableView({
                           key={piece.itemInstanceId}
                           className="border-white/10 hover:bg-white/[0.04]"
                         >
-                          <TableCell className="font-medium text-white">
-                            {SLOT_LABELS[piece.slot]}
+                          <TableCell className="w-px whitespace-nowrap py-2 pe-2 align-middle">
+                            {piece.iconPath ? (
+                              <span className="inline-flex rounded-none border border-white/10 bg-black/30 leading-none">
+                                {/* eslint-disable-next-line @next/next/no-img-element -- Bungie CDN thumbnails; avoid bloating the bundle with next/image remotePatterns. */}
+                                <img
+                                  src={bungieIconUrl(piece.iconPath)}
+                                  alt={`${SLOT_LABELS[piece.slot]} — ${piece.setName ?? "armor"}`}
+                                  className="block max-h-10 max-w-12 h-auto w-auto"
+                                  loading="lazy"
+                                />
+                              </span>
+                            ) : (
+                              <div
+                                role="img"
+                                aria-label={`${SLOT_LABELS[piece.slot]} — no artwork`}
+                                className="inline-block size-10 rounded-none border border-white/10 bg-white/5"
+                              />
+                            )}
                           </TableCell>
                           <TableCell className="text-white/90">
                             {piece.setName ?? "—"}

@@ -105,6 +105,7 @@ export interface DerivedManifestData {
     set_hash: number;
     slot: "helmet" | "arms" | "chest" | "legs" | "classItem";
     class_type: number;
+    icon_path: string;
   }>;
   archetypes: Array<{ archetype_hash: number; name: string }>;
   tunings: Array<{ tuning_hash: number; name: string }>;

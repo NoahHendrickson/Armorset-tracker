@@ -192,18 +192,21 @@ export type Database = {
           set_hash: number;
           slot: "helmet" | "arms" | "chest" | "legs" | "classItem";
           class_type: number;
+          icon_path: string;
         };
         Insert: {
           item_hash: number;
           set_hash: number;
           slot: "helmet" | "arms" | "chest" | "legs" | "classItem";
           class_type: number;
+          icon_path?: string;
         };
         Update: {
           item_hash?: number;
           set_hash?: number;
           slot?: "helmet" | "arms" | "chest" | "legs" | "classItem";
           class_type?: number;
+          icon_path?: string;
         };
         Relationships: [
           {
@@ -321,6 +324,8 @@ export type ArmorStatName = (typeof ARMOR_STAT_NAMES)[number];
 export interface DerivedArmorPieceJson {
   itemInstanceId: string;
   itemHash: number;
+  /** Relative manifest icon path; prefix with `bungieIconUrl` in the UI. */
+  iconPath?: string;
   slot: "helmet" | "arms" | "chest" | "legs" | "classItem";
   classType: number | null;
   setHash: number | null;

@@ -74,8 +74,8 @@ export function DuplicateTrackerDialog({
                 Duplicate tracker
               </DialogTitle>
               <DialogDescription className="text-sm text-white/65">
-                Adjust anything that should differ from &quot;{source.view.name}
-                &quot;, then create the new tracker on your canvas.
+                Adjust anything that should differ from your current tracker&apos;s
+                build, then create the new tracker on your canvas.
               </DialogDescription>
             </DialogHeader>
 
@@ -110,7 +110,6 @@ export function DuplicateTrackerDialog({
               suppressEmbeddedActionRow
               resolveLayoutOnSubmit={resolveLayoutOnSubmit}
               prefillFrom={{
-                name: source.view.name,
                 classType: source.view.class_type,
                 setHash: source.view.set_hash,
                 archetypeHash: source.view.archetype_hash,

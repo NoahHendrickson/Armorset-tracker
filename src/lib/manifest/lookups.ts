@@ -13,7 +13,10 @@ export interface ManifestLookups {
   canonicalSetHashByLegacy: Map<number, number>;
   archetypeByPlug: Map<number, number>;
   tuningByPlug: Map<number, number>;
-  armorItemByHash: Map<number, { setHash: number; slot: ArmorSlot; classType: number }>;
+  armorItemByHash: Map<
+    number,
+    { setHash: number; slot: ArmorSlot; classType: number; iconPath: string }
+  >;
   archetypeStatPair: Map<
     number,
     { primary: ArmorStatName; secondary: ArmorStatName }
@@ -93,8 +96,14 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
         .from("armor_sets")
         .select("set_hash, name, legacy_set_hash, legacy_set_hashes"),
     ),
-    paginatedSelect<{ item_hash: number | string; set_hash: number | string; slot: string; class_type: number }>(
-      () => sb.from("armor_items").select("item_hash, set_hash, slot, class_type"),
+    paginatedSelect<{
+      item_hash: number | string;
+      set_hash: number | string;
+      slot: string;
+      class_type: number;
+      icon_path: string | null;
+    }>(() =>
+      sb.from("armor_items").select("item_hash, set_hash, slot, class_type, icon_path"),
     ),
     paginatedSelect<{ archetype_hash: number | string; name: string }>(
       () => sb.from("archetypes").select("archetype_hash, name"),
@@ -157,6 +166,7 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
           setHash: Number(r.set_hash),
           slot: r.slot as ArmorSlot,
           classType: Number(r.class_type),
+          iconPath: String(r.icon_path ?? "").trim(),
         },
       ]),
     ),

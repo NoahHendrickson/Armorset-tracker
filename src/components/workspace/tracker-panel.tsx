@@ -21,6 +21,7 @@ import {
   MERGE_ACCENT_GREEN,
   unionTertiaryStats,
 } from "@/lib/views/merge-compare";
+import { TrackerIdentBadges } from "@/components/workspace/tracker-ident-badges";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
   TRACKER_DEFAULT_HEIGHT,
@@ -203,10 +204,11 @@ export function TrackerPanel({
         ? "h-3.5 w-auto shrink-0"
         : "h-7 w-auto shrink-0";
 
+  const soloIdent = `${payload.setName} · ${payload.archetypeName}`;
   const ariaRegionLabel =
     showMergedGrid && mergePartnerPayload
-      ? `Merged trackers ${payload.view.name} and ${mergePartnerPayload.view.name}`
-      : `Tracker ${payload.view.name}`;
+      ? `Merged trackers ${soloIdent} and ${mergePartnerPayload.setName} · ${mergePartnerPayload.archetypeName}`
+      : `Tracker ${soloIdent}`;
 
   const dropRing =
     mergeDropHighlight === "valid"
@@ -346,11 +348,7 @@ export function TrackerPanel({
           ) : null}
 
           <div className="no-drag">
-            <ViewActions
-              viewId={view.id}
-              initialName={view.name}
-              layout="sidebar"
-            />
+            <ViewActions viewId={view.id} layout="sidebar" />
           </div>
         </aside>
 
@@ -372,11 +370,12 @@ export function TrackerPanel({
                 style={{ borderColor: MERGE_ACCENT_GREEN }}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
                     <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
-                    <h2 className="truncate text-xl font-normal leading-7 text-white">
-                      {payload.view.name}
-                    </h2>
+                    <TrackerIdentBadges
+                      setName={payload.setName}
+                      archetypeName={payload.archetypeName}
+                    />
                   </div>
                   <TuningHeaderGlyph
                     tuningName={payload.tuningName}
@@ -389,10 +388,11 @@ export function TrackerPanel({
                 style={{ borderColor: MERGE_ACCENT_BLUE }}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 flex-1 flex-row-reverse items-center gap-2">
-                    <h2 className="truncate text-right text-xl font-normal leading-7 text-white">
-                      {mergePartnerPayload.view.name}
-                    </h2>
+                  <div className="flex min-w-0 flex-1 flex-row-reverse items-start gap-2">
+                    <TrackerIdentBadges
+                      setName={mergePartnerPayload.setName}
+                      archetypeName={mergePartnerPayload.archetypeName}
+                    />
                     <ClassGlyph
                       classType={Number(mergePartnerPayload.view.class_type)}
                       className={glyphClass}
@@ -407,13 +407,12 @@ export function TrackerPanel({
             </header>
           ) : (
             <header className="flex shrink-0 select-none items-start justify-between gap-2 p-4">
-              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <div className="flex min-w-0 flex-1 items-start gap-2.5">
                 <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
-                <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-xl font-normal leading-7 text-white">
-                    {payload.view.name}
-                  </h2>
-                </div>
+                <TrackerIdentBadges
+                  setName={payload.setName}
+                  archetypeName={payload.archetypeName}
+                />
               </div>
               <TuningHeaderGlyph
                 tuningName={payload.tuningName}

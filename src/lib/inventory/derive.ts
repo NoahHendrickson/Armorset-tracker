@@ -87,6 +87,8 @@ export function deriveArmorPiece(
   const setHash = armorItem?.setHash ?? null;
   const setName = setHash !== null ? lookups.setNameByHash.get(setHash) ?? null : null;
   const classType = armorItem?.classType ?? null;
+  const iconPath =
+    armorItem?.iconPath && armorItem.iconPath.length > 0 ? armorItem.iconPath : undefined;
 
   const sockets =
     profile.itemComponents?.sockets?.data?.[item.itemInstanceId]?.sockets ?? [];
@@ -169,6 +171,7 @@ export function deriveArmorPiece(
   return {
     itemInstanceId: item.itemInstanceId,
     itemHash: item.itemHash,
+    ...(iconPath ? { iconPath } : {}),
     slot,
     classType,
     setHash,

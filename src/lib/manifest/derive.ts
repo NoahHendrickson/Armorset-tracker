@@ -325,6 +325,7 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
     set_hash: number;
     slot: ArmorSlot;
     class_type: number;
+    icon_path: string;
   }> = [];
 
   for (const item of Object.values(items)) {
@@ -353,12 +354,11 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
     if (!name) continue;
 
     let fallbackSetName = stripSlotSuffix(name, slot);
-    if (item.collectibleHash) {
-      const collectible = collectibles[String(item.collectibleHash)];
-      const collectibleName = collectible?.displayProperties?.name;
-      if (collectibleName) {
-        fallbackSetName = stripSlotSuffix(collectibleName, slot);
-      }
+    const collectible = item.collectibleHash
+      ? collectibles[String(item.collectibleHash)]
+      : undefined;
+    if (collectible?.displayProperties?.name) {
+      fallbackSetName = stripSlotSuffix(collectible.displayProperties.name, slot);
     }
     fallbackSetName = fallbackSetName.trim();
     const setName =
@@ -387,6 +387,9 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
       set_hash: eqSetHash,
       slot,
       class_type: item.classType ?? 3,
+      icon_path:
+        pickStatIconPath(item.displayProperties) ||
+        pickStatIconPath(collectible?.displayProperties),
     });
   }
 

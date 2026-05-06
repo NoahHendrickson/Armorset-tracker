@@ -61,6 +61,7 @@ export async function syncManifest({
         { count: armorSetsCount },
         { count: armorItemsCount },
         { count: setsMissingLegacyHashes },
+        { data: armorItemIconSample },
       ] = await Promise.all([
         sb.from("archetype_stat_pairs").select("*", { count: "exact", head: true }),
         sb.from("armor_stat_plugs").select("*", { count: "exact", head: true }),
@@ -71,6 +72,7 @@ export async function syncManifest({
           .from("armor_sets")
           .select("*", { count: "exact", head: true })
           .is("legacy_set_hashes", null),
+        sb.from("armor_items").select("item_hash").neq("icon_path", "").limit(1).maybeSingle(),
       ]);
       const derivedComplete =
         (pairsCount ?? 0) > 0 &&
@@ -78,7 +80,9 @@ export async function syncManifest({
         (iconsCount ?? 0) > 0 &&
         (armorSetsCount ?? 0) > 0 &&
         (armorItemsCount ?? 0) > 0 &&
-        (setsMissingLegacyHashes ?? 0) === 0;
+        (setsMissingLegacyHashes ?? 0) === 0 &&
+        /** Re-run derive after schema adds `icon_path` — old rows keep "" until tables are replaced. */
+        armorItemIconSample != null;
       if (derivedComplete) {
         return {
           version,
