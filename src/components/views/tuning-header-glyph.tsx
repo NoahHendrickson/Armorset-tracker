@@ -19,10 +19,10 @@ interface TuningHeaderGlyphProps {
 }
 
 /**
- * Bungie raster stat icons → brand green (#00FF85) via CSS filter (icons are neutral-on-transparent).
+ * Bungie raster stat icons → white (source assets are neutral-on-transparent).
  */
 const TUNING_ICON_FILTER =
-  "brightness(0) saturate(100%) invert(67%) sepia(98%) saturate(434%) hue-rotate(84deg) brightness(105%) contrast(105%)";
+  "brightness(0) saturate(100%) invert(100%)";
 
 /**
  * Tuning pill for tracker headers: manifest icon + “Tuning” (full stat in tooltip).

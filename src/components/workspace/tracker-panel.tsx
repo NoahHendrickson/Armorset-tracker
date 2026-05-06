@@ -199,10 +199,10 @@ export function TrackerPanel({
 
   const glyphClass =
     Number(view.class_type) < 0
-      ? "h-[15px] w-[30px] shrink-0 text-white"
+      ? "block h-[15px] w-[30px] shrink-0 text-white"
       : Number(view.class_type) === 2
-        ? "h-3.5 w-auto shrink-0"
-        : "h-7 w-auto shrink-0";
+        ? "block h-3.5 w-auto shrink-0 object-contain"
+        : "block h-7 w-auto shrink-0 object-contain";
 
   const soloIdent = `${payload.setName} · ${payload.archetypeName}`;
   const ariaRegionLabel =
@@ -369,17 +369,17 @@ export function TrackerPanel({
                 className="flex min-w-0 flex-1 flex-col gap-1 border-b-2 pr-2"
                 style={{ borderColor: MERGE_ACCENT_GREEN }}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 flex-1 items-start gap-2">
-                    <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
-                    <TrackerIdentBadges
-                      setName={payload.setName}
-                      archetypeName={payload.archetypeName}
-                    />
-                  </div>
-                  <TuningHeaderGlyph
-                    tuningName={payload.tuningName}
-                    iconPath={payload.tuningStatIconPath}
+                <div className="flex min-w-0 items-center gap-4">
+                  <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
+                  <TrackerIdentBadges
+                    setName={payload.setName}
+                    archetypeName={payload.archetypeName}
+                    tuning={
+                      <TuningHeaderGlyph
+                        tuningName={payload.tuningName}
+                        iconPath={payload.tuningStatIconPath}
+                      />
+                    }
                   />
                 </div>
               </div>
@@ -387,36 +387,36 @@ export function TrackerPanel({
                 className="flex min-w-0 flex-1 flex-col gap-1 border-b-2 pl-2"
                 style={{ borderColor: MERGE_ACCENT_BLUE }}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 flex-1 flex-row-reverse items-start gap-2">
-                    <TrackerIdentBadges
-                      setName={mergePartnerPayload.setName}
-                      archetypeName={mergePartnerPayload.archetypeName}
-                    />
-                    <ClassGlyph
-                      classType={Number(mergePartnerPayload.view.class_type)}
-                      className={glyphClass}
-                    />
-                  </div>
-                  <TuningHeaderGlyph
-                    tuningName={mergePartnerPayload.tuningName}
-                    iconPath={mergePartnerPayload.tuningStatIconPath}
+                <div className="flex min-w-0 flex-1 flex-row-reverse items-center gap-4">
+                  <TrackerIdentBadges
+                    setName={mergePartnerPayload.setName}
+                    archetypeName={mergePartnerPayload.archetypeName}
+                    tuning={
+                      <TuningHeaderGlyph
+                        tuningName={mergePartnerPayload.tuningName}
+                        iconPath={mergePartnerPayload.tuningStatIconPath}
+                      />
+                    }
+                  />
+                  <ClassGlyph
+                    classType={Number(mergePartnerPayload.view.class_type)}
+                    className={glyphClass}
                   />
                 </div>
               </div>
             </header>
           ) : (
-            <header className="flex shrink-0 select-none items-start justify-between gap-2 p-4">
-              <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
-                <TrackerIdentBadges
-                  setName={payload.setName}
-                  archetypeName={payload.archetypeName}
-                />
-              </div>
-              <TuningHeaderGlyph
-                tuningName={payload.tuningName}
-                iconPath={payload.tuningStatIconPath}
+            <header className="flex shrink-0 select-none items-center gap-4 p-4">
+              <ClassGlyph classType={Number(view.class_type)} className={glyphClass} />
+              <TrackerIdentBadges
+                setName={payload.setName}
+                archetypeName={payload.archetypeName}
+                tuning={
+                  <TuningHeaderGlyph
+                    tuningName={payload.tuningName}
+                    iconPath={payload.tuningStatIconPath}
+                  />
+                }
               />
             </header>
           )}

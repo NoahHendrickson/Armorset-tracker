@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { Badge } from "@/components/ui/badge";
 
 const trackerBadgeClass =
@@ -6,14 +8,17 @@ const trackerBadgeClass =
 interface TrackerIdentBadgesProps {
   setName: string;
   archetypeName: string;
+  /** Rendered after the archetype pill (typically {@link TuningHeaderGlyph}). */
+  tuning?: ReactNode;
 }
 
 /**
- * Armor set + archetype pills for canvas tracker headers (tuning uses {@link TuningHeaderGlyph}).
+ * Armor set + archetype pills + optional tuning pill for canvas tracker headers.
  */
 export function TrackerIdentBadges({
   setName,
   archetypeName,
+  tuning,
 }: TrackerIdentBadgesProps) {
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -23,6 +28,7 @@ export function TrackerIdentBadges({
       <Badge variant="outline" className={trackerBadgeClass} title={archetypeName}>
         {archetypeName}
       </Badge>
+      {tuning}
     </div>
   );
 }

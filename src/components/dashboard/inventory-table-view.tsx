@@ -323,6 +323,59 @@ export function InventoryTableView({
                 </div>
 
                 <div className="grid min-w-0 gap-2">
+                  <Label className="text-white/50">Tertiary stat</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        id="inv-filter-tertiary"
+                        aria-label="Tertiary stat filter"
+                        className={INVENTORY_TABLE_FILTER_TRIGGER}
+                      >
+                        <span
+                          className={cn(
+                            "min-w-0 flex-1 truncate",
+                            tertiaryStats.length === 0 && "text-white/45",
+                          )}
+                        >
+                          {tertiarySummary}
+                        </span>
+                        <CaretDown
+                          weight="duotone"
+                          className="h-4 w-4 shrink-0 opacity-60"
+                          aria-hidden
+                        />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className={cn(
+                        TABLE_FILTER_MENU_CONTENT,
+                        "min-w-[var(--radix-dropdown-menu-trigger-width)]",
+                      )}
+                    >
+                      {ARMOR_STAT_NAMES.map((stat) => (
+                        <DropdownMenuCheckboxItem
+                          key={stat}
+                          checked={tertiaryStats.includes(stat)}
+                          onSelect={(e) => e.preventDefault()}
+                          onCheckedChange={(c) => {
+                            setTertiaryStats((prev) =>
+                              c
+                                ? [...prev, stat]
+                                : prev.filter((s) => s !== stat),
+                            );
+                          }}
+                          className="rounded-none pl-3 pr-9 text-white focus:bg-white/10 focus:text-white data-[highlighted]:bg-white/10 [&>span]:left-auto [&>span]:right-2 [&>span]:top-1/2 [&>span]:-translate-y-1/2 [&>span]:text-white"
+                        >
+                          {stat}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                <div className="grid min-w-0 gap-2">
                   <Label className="text-white/50">Tuning stat</Label>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -383,59 +436,6 @@ export function InventoryTableView({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-
-                <div className="grid min-w-0 gap-2">
-                  <Label className="text-white/50">Tertiary stat</Label>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        id="inv-filter-tertiary"
-                        aria-label="Tertiary stat filter"
-                        className={INVENTORY_TABLE_FILTER_TRIGGER}
-                      >
-                        <span
-                          className={cn(
-                            "min-w-0 flex-1 truncate",
-                            tertiaryStats.length === 0 && "text-white/45",
-                          )}
-                        >
-                          {tertiarySummary}
-                        </span>
-                        <CaretDown
-                          weight="duotone"
-                          className="h-4 w-4 shrink-0 opacity-60"
-                          aria-hidden
-                        />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="start"
-                      className={cn(
-                        TABLE_FILTER_MENU_CONTENT,
-                        "min-w-[var(--radix-dropdown-menu-trigger-width)]",
-                      )}
-                    >
-                      {ARMOR_STAT_NAMES.map((stat) => (
-                        <DropdownMenuCheckboxItem
-                          key={stat}
-                          checked={tertiaryStats.includes(stat)}
-                          onSelect={(e) => e.preventDefault()}
-                          onCheckedChange={(c) => {
-                            setTertiaryStats((prev) =>
-                              c
-                                ? [...prev, stat]
-                                : prev.filter((s) => s !== stat),
-                            );
-                          }}
-                          className="rounded-none pl-3 pr-9 text-white focus:bg-white/10 focus:text-white data-[highlighted]:bg-white/10 [&>span]:left-auto [&>span]:right-2 [&>span]:top-1/2 [&>span]:-translate-y-1/2 [&>span]:text-white"
-                        >
-                          {stat}
-                        </DropdownMenuCheckboxItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
                 </div>
               </div>
 
@@ -452,8 +452,8 @@ export function InventoryTableView({
                       <TableHead className="w-px pe-2 text-white/60" aria-label="Icon" />
                       <TableHead className="text-white/60">Armor set</TableHead>
                       <TableHead className="text-white/60">Archetype</TableHead>
-                      <TableHead className="text-white/60">Tuning</TableHead>
                       <TableHead className="text-white/60">Tertiary</TableHead>
+                      <TableHead className="text-white/60">Tuning</TableHead>
                       <TableHead className="text-white/60">Location</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -498,11 +498,11 @@ export function InventoryTableView({
                           <TableCell className="text-white/90">
                             {piece.archetypeName ?? "—"}
                           </TableCell>
-                          <TableCell className="text-white/90">
-                            {piece.tuningName ?? "—"}
-                          </TableCell>
                           <TableCell className="text-white/80">
                             {piece.tertiaryStat ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-white/90">
+                            {piece.tuningName ?? "—"}
                           </TableCell>
                           <TableCell className="text-white/70">
                             {formatLocation(piece)}
