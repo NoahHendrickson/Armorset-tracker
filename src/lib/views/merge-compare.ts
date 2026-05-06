@@ -38,6 +38,16 @@ export interface MergeCompareCellState {
   blueCount: number;
 }
 
+/** Layout order: left header / green accent = anchor, right / blue = partner. */
+export interface MergeCompareSpatialCellState {
+  anchorOwned: boolean;
+  partnerOwned: boolean;
+  anchorApplicable: boolean;
+  partnerApplicable: boolean;
+  anchorCount: number;
+  partnerCount: number;
+}
+
 function cellOwnedCount(
   payload: SerializableTrackerPayload,
   slot: ArmorSlot,
@@ -74,6 +84,30 @@ export function mergeCompareCellState(
     blueOwned: gB && cB > 0,
     greenCount: cG,
     blueCount: cB,
+  };
+}
+
+/**
+ * Same ownership math as {@link mergeCompareCellState}, keyed to **panel**
+ * layout: anchor = left / green header, partner = right / blue.
+ */
+export function mergeCompareCellStateSpatial(
+  anchorPayload: SerializableTrackerPayload,
+  partnerPayload: SerializableTrackerPayload,
+  slot: ArmorSlot,
+  tertiary: ArmorStatName,
+): MergeCompareSpatialCellState {
+  const anchorApp = tertiaryApplicable(anchorPayload, tertiary);
+  const partnerApp = tertiaryApplicable(partnerPayload, tertiary);
+  const cA = cellOwnedCount(anchorPayload, slot, tertiary);
+  const cP = cellOwnedCount(partnerPayload, slot, tertiary);
+  return {
+    anchorApplicable: anchorApp,
+    partnerApplicable: partnerApp,
+    anchorOwned: anchorApp && cA > 0,
+    partnerOwned: partnerApp && cP > 0,
+    anchorCount: cA,
+    partnerCount: cP,
   };
 }
 

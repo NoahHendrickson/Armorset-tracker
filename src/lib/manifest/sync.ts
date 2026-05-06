@@ -17,7 +17,6 @@ const TABLES_OF_INTEREST = [
   "DestinySocketCategoryDefinition",
   "DestinySocketTypeDefinition",
   "DestinyCollectibleDefinition",
-  "DestinyInventoryBucketDefinition",
   "DestinyStatDefinition",
   "DestinyEquipableItemSetDefinition",
 ] as const;

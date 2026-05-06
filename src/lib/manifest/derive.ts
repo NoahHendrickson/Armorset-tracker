@@ -1,9 +1,5 @@
 import "server-only";
-import {
-  ARMOR_BUCKET_TO_SLOT,
-  DESTINY_TIER_EXOTIC,
-  type ArmorSlot,
-} from "@/lib/bungie/constants";
+import { ARMOR_BUCKET_TO_SLOT, DESTINY_TIER_EXOTIC, type ArmorSlot } from "@/lib/bungie/constants";
 import { ARMOR_STAT_NAMES, type ArmorStatName } from "@/lib/db/types";
 import type {
   DerivedManifestData,

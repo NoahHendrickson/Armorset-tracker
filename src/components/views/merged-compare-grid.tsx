@@ -3,20 +3,21 @@
 import type React from "react";
 import {
   CLASS_NAMES,
-  SLOT_LABELS,
   SLOT_ORDER,
   bungieIconUrl,
+  type ArmorSlot,
 } from "@/lib/bungie/constants";
+import { ArmorSlotTrackerRowHeader } from "@/components/views/armor-slot-tracker-row-header";
+import { TRACKER_SLOT_COLUMN_WIDTH } from "@/lib/workspace/workspace-constants";
 import type { ArmorStatName, DerivedArmorPieceJson } from "@/lib/db/types";
 import {
   isMergedExoticSlotCandidate,
   isUnionGridComplete,
-  mergeCompareCellState,
-  mergeColorOrder,
+  mergeCompareCellStateSpatial,
   MERGE_ACCENT_BLUE,
   MERGE_ACCENT_GREEN,
   unionTertiaryStats,
-  type MergeCompareCellState,
+  type MergeCompareSpatialCellState,
 } from "@/lib/views/merge-compare";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
@@ -78,23 +79,24 @@ function halfTitle(
 function MergeHalfSquare({
   hasInventory,
   state,
-  side,
+  panel,
   accent,
   matches,
 }: {
   hasInventory: boolean;
-  state: MergeCompareCellState;
-  side: "green" | "blue";
+  state: MergeCompareSpatialCellState;
+  panel: "anchor" | "partner";
   accent: string;
   matches: DerivedArmorPieceJson[];
 }) {
-  const applicable = side === "green" ? state.greenApplicable : state.blueApplicable;
-  const owned = side === "green" ? state.greenOwned : state.blueOwned;
-  const count = side === "green" ? state.greenCount : state.blueCount;
+  const applicable =
+    panel === "anchor" ? state.anchorApplicable : state.partnerApplicable;
+  const owned = panel === "anchor" ? state.anchorOwned : state.partnerOwned;
+  const count = panel === "anchor" ? state.anchorCount : state.partnerCount;
   const isDuplicate = applicable && owned && count > 1;
   const loading = applicable && !hasInventory;
   const outerRounded =
-    side === "green" ? "rounded-l-[4px]" : "rounded-r-[4px]";
+    panel === "anchor" ? "rounded-l-[4px]" : "rounded-r-[4px]";
 
   if (!applicable) {
     return (
@@ -160,7 +162,7 @@ function MergeHalfSquare({
         )}
         style={{
           boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.2), 0 0 10px -1px ${
-            side === "green"
+            panel === "anchor"
               ? "rgba(0, 255, 133, 0.45)"
               : "rgba(56, 189, 248, 0.45)"
           }`,
@@ -192,28 +194,27 @@ interface MergedCompareGridProps {
 }
 
 /**
- * Merged tracker grid: union tertiary columns, split green/blue cells (Figma).
+ * Merged tracker grid: union tertiary columns; left / green accent = anchor,
+ * right / blue = merge partner (aligned with merged header).
  */
 export function MergedCompareGrid({
   anchorPayload,
   partnerPayload,
   hasInventory,
 }: MergedCompareGridProps) {
-  const { greenId } = mergeColorOrder(
-    anchorPayload.view.id,
-    partnerPayload.view.id,
-  );
-  const greenPayload =
-    greenId === anchorPayload.view.id ? anchorPayload : partnerPayload;
-  const bluePayload =
-    greenId === anchorPayload.view.id ? partnerPayload : anchorPayload;
-
-  const tertiaries = unionTertiaryStats(greenPayload, bluePayload);
+  const tertiaries = unionTertiaryStats(anchorPayload, partnerPayload);
 
   const iconPaths = {
-    ...greenPayload.tertiaryStatIconPaths,
-    ...bluePayload.tertiaryStatIconPaths,
+    ...anchorPayload.tertiaryStatIconPaths,
+    ...partnerPayload.tertiaryStatIconPaths,
   } as Partial<Record<ArmorStatName, string>>;
+
+  const anchorSlotIcons = anchorPayload.armorSlotIconPaths as Partial<
+    Record<ArmorSlot, string>
+  >;
+  const partnerSlotIcons = partnerPayload.armorSlotIconPaths as Partial<
+    Record<ArmorSlot, string>
+  >;
 
   if (tertiaries.length === 0) {
     return (
@@ -223,7 +224,7 @@ export function MergedCompareGrid({
     );
   }
 
-  const complete = isUnionGridComplete(greenPayload, bluePayload);
+  const complete = isUnionGridComplete(anchorPayload, partnerPayload);
 
   return (
     <div className="min-h-0 overflow-hidden">
@@ -238,12 +239,12 @@ export function MergedCompareGrid({
         className="flex min-w-max flex-col gap-4 pb-1"
       >
         <div role="row" className="flex items-center">
+          {/* Left armor rail — anchor tracker (green header) */}
           <div
-            role="columnheader"
-            className="flex h-6 w-[120px] shrink-0 items-center p-2 text-base text-white/45"
-          >
-            <span className="truncate">Tertiary stat</span>
-          </div>
+            aria-hidden
+            className="h-6 shrink-0 border-r border-white/[0.12] p-2"
+            style={{ width: TRACKER_SLOT_COLUMN_WIDTH }}
+          />
           {tertiaries.map((t) => {
             const iconPath = iconPaths[t];
             return (
@@ -267,39 +268,46 @@ export function MergedCompareGrid({
               </div>
             );
           })}
+          {/* Right armor rail — merge partner (blue header) */}
+          <div
+            aria-hidden
+            className="h-6 shrink-0 border-l border-white/[0.12] p-2"
+            style={{ width: TRACKER_SLOT_COLUMN_WIDTH }}
+          />
         </div>
 
         <div role="rowgroup" className="flex items-start">
-          <div className="flex w-[120px] shrink-0 flex-col">
+          <div
+            className="flex shrink-0 flex-col border-r border-white/[0.12]"
+            style={{ width: TRACKER_SLOT_COLUMN_WIDTH }}
+          >
             {SLOT_ORDER.map((slot, i) => (
-              <div
+              <ArmorSlotTrackerRowHeader
                 key={slot}
-                role="rowheader"
-                className={`flex h-12 items-center p-2 text-base font-medium text-white ${
-                  i < SLOT_ORDER.length - 1 ? "border-b border-white/10" : ""
-                }`}
-              >
-                <span className="truncate">{SLOT_LABELS[slot]}</span>
-              </div>
+                slot={slot}
+                iconPath={anchorSlotIcons[slot]}
+                isLastRow={i >= SLOT_ORDER.length - 1}
+                tooltipSide="right"
+              />
             ))}
           </div>
 
           {tertiaries.map((t) => (
             <div key={t} className="flex w-[100px] shrink-0 flex-col">
               {SLOT_ORDER.map((slot, i) => {
-                const st = mergeCompareCellState(
-                  greenPayload,
-                  bluePayload,
+                const st = mergeCompareCellStateSpatial(
+                  anchorPayload,
+                  partnerPayload,
                   slot,
                   t,
                 );
-                const greenMatches =
-                  greenPayload.progress.cells[slot]?.[t] ?? [];
-                const blueMatches =
-                  bluePayload.progress.cells[slot]?.[t] ?? [];
+                const anchorMatches =
+                  anchorPayload.progress.cells[slot]?.[t] ?? [];
+                const partnerMatches =
+                  partnerPayload.progress.cells[slot]?.[t] ?? [];
                 const exoticCandidate = isMergedExoticSlotCandidate(
-                  greenPayload,
-                  bluePayload,
+                  anchorPayload,
+                  partnerPayload,
                   t,
                   slot,
                   { hasInventory },
@@ -321,16 +329,16 @@ export function MergedCompareGrid({
                         <MergeHalfSquare
                           hasInventory={hasInventory}
                           state={st}
-                          side="green"
+                          panel="anchor"
                           accent={MERGE_ACCENT_GREEN}
-                          matches={greenMatches}
+                          matches={anchorMatches}
                         />
                         <MergeHalfSquare
                           hasInventory={hasInventory}
                           state={st}
-                          side="blue"
+                          panel="partner"
                           accent={MERGE_ACCENT_BLUE}
-                          matches={blueMatches}
+                          matches={partnerMatches}
                         />
                       </div>
                       {exoticCandidate ? (
@@ -353,6 +361,20 @@ export function MergedCompareGrid({
               })}
             </div>
           ))}
+          <div
+            className="flex shrink-0 flex-col border-l border-white/[0.12]"
+            style={{ width: TRACKER_SLOT_COLUMN_WIDTH }}
+          >
+            {SLOT_ORDER.map((slot, i) => (
+              <ArmorSlotTrackerRowHeader
+                key={slot}
+                slot={slot}
+                iconPath={partnerSlotIcons[slot]}
+                isLastRow={i >= SLOT_ORDER.length - 1}
+                tooltipSide="left"
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>

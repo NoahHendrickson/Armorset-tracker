@@ -26,6 +26,8 @@ export interface SerializableTrackerPayload {
   } | null;
   /** Relative paths for tertiary column headers — JSON-serializable map. */
   tertiaryStatIconPaths: Record<string, string>;
+  /** Per-slot armor thumbnails for this view’s set + class (`armor_items`). */
+  armorSlotIconPaths: Record<string, string>;
   /** Icon for the tuning +stat (+Weapons, …) when parsing succeeds. */
   tuningStatIconPath: string | null;
   needsClass: boolean;

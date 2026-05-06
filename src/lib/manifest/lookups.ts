@@ -1,6 +1,8 @@
 import "server-only";
-import { getServiceRoleClient } from "@/lib/db/server";
+
 import type { ArmorSlot } from "@/lib/bungie/constants";
+import { SLOT_ORDER } from "@/lib/bungie/constants";
+import { getServiceRoleClient } from "@/lib/db/server";
 import type { ArmorStatName } from "@/lib/db/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -24,6 +26,51 @@ export interface ManifestLookups {
   statPlug: Map<number, { stat: ArmorStatName; value: number }>;
   /** Relative icon paths from DestinyStatDefinition (prefix with bungie.net). */
   statIconByName: Map<ArmorStatName, string>;
+  /** `armor_items` thumbnails keyed `${set_hash}:${class_type}:${slot}`. */
+  armorSlotIconPathBySetClassSlot: Map<string, string>;
+  /** Weak fallback when no row matches `(set × class)` — first manifest icon seen per slot. */
+  slotFallbackIconPathBySlot: Map<ArmorSlot, string>;
+}
+
+/** Stable lookup key into {@link ManifestLookups.armorSlotIconPathBySetClassSlot}. */
+export function armorItemIconLookupKey(
+  setHash: number,
+  classType: number,
+  slot: ArmorSlot,
+): string {
+  return `${setHash}:${classType}:${slot}`;
+}
+
+/**
+ * Tracker row thumbnails from `armor_items`: exact match on canonical set hash +
+ * view class where possible.
+ */
+export function armorSlotIconPathsForView(
+  lookups: ManifestLookups,
+  resolvedSetHash: number,
+  viewClassType: number,
+): Partial<Record<ArmorSlot, string>> {
+  const out: Partial<Record<ArmorSlot, string>> = {};
+  for (const slot of SLOT_ORDER) {
+    let path: string | undefined;
+
+    if (viewClassType >= 0) {
+      path = lookups.armorSlotIconPathBySetClassSlot.get(
+        armorItemIconLookupKey(resolvedSetHash, viewClassType, slot),
+      );
+    } else {
+      for (const cls of [0, 1, 2, 3] as const) {
+        path = lookups.armorSlotIconPathBySetClassSlot.get(
+          armorItemIconLookupKey(resolvedSetHash, cls, slot),
+        );
+        if (path) break;
+      }
+    }
+
+    if (!path) path = lookups.slotFallbackIconPathBySlot.get(slot);
+    if (path) out[slot] = path;
+  }
+  return out;
 }
 
 let cached: { at: number; data: ManifestLookups } | null = null;
@@ -58,13 +105,25 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
   const cacheFresh = Boolean(cached && now - cached.at < TTL_MS);
 
   if (!force && cacheFresh && cached) {
-    if (cached.data.statIconByName.size > 0) {
+    const hasStats = cached.data.statIconByName.size > 0;
+    const hasArmorThumbs =
+      cached.data.armorSlotIconPathBySetClassSlot.size > 0;
+    if (hasStats && hasArmorThumbs) {
       return cached.data;
     }
+
     const { count: iconRows } = await sb
       .from("armor_stat_icons")
       .select("*", { count: "exact", head: true });
     if ((iconRows ?? 0) === 0) {
+      return cached.data;
+    }
+
+    const { count: armorThumbRows } = await sb
+      .from("armor_items")
+      .select("*", { count: "exact", head: true })
+      .neq("icon_path", "");
+    if ((armorThumbRows ?? 0) === 0) {
       return cached.data;
     }
   }
@@ -155,6 +214,23 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
     }
   }
 
+  const armorSlotIconPathBySetClassSlot = new Map<string, string>();
+  const slotFallbackIconPathBySlot = new Map<ArmorSlot, string>();
+  for (const r of armorItems) {
+    const path = String(r.icon_path ?? "").trim();
+    if (!path) continue;
+    const slot = r.slot as ArmorSlot;
+    const setHash = Number(r.set_hash);
+    const classType = Number(r.class_type);
+    const key = armorItemIconLookupKey(setHash, classType, slot);
+    if (!armorSlotIconPathBySetClassSlot.has(key)) {
+      armorSlotIconPathBySetClassSlot.set(key, path);
+    }
+    if (!slotFallbackIconPathBySlot.has(slot)) {
+      slotFallbackIconPathBySlot.set(slot, path);
+    }
+  }
+
   const data: ManifestLookups = {
     version: versionRes.data?.version ?? null,
     setNameByHash: new Map(armorSets.map((r) => [Number(r.set_hash), r.name])),
@@ -206,6 +282,8 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
         })
         .filter((e): e is readonly [ArmorStatName, string] => e !== null),
     ),
+    armorSlotIconPathBySetClassSlot,
+    slotFallbackIconPathBySlot,
   };
 
   cached = { at: Date.now(), data };

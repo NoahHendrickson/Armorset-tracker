@@ -990,6 +990,7 @@ export function CanvasWorkspace({
         const snapY = tgtLo.y;
         const mergedW = trackerWidthForTertiaryColumns(
           unionTertiaryStats(self, tgt).length,
+          { dualSlotRails: true },
         );
         const sourceLayout: WorkspaceLayoutJson = {
           ...selfLo,

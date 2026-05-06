@@ -570,6 +570,7 @@ function syntheticTrackerForClusterPlacement(draft: {
     className: draft.className,
     archetypePrimarySecondary: null,
     tertiaryStatIconPaths: {},
+    armorSlotIconPaths: {},
     tuningStatIconPath: null,
     needsClass: false,
     resolvedSetHash: draft.setHash,

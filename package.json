@@ -10,7 +10,8 @@
     "lint": "eslint",
     "db:push": "npx supabase db push",
     "db:push:dry-run": "npx supabase db push --dry-run",
-    "export:stat-icons": "node scripts/export-armor-stat-icons.mjs"
+    "export:stat-icons": "node scripts/export-armor-stat-icons.mjs",
+    "manifest:sync": "NODE_OPTIONS='--require ./scripts/stub-server-only.cjs' tsx --tsconfig tsconfig.json scripts/sync-manifest.ts --force"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
@@ -48,6 +49,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

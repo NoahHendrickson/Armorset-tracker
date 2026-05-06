@@ -1,9 +1,13 @@
 import "server-only";
+
 import { CLASS_NAMES, SLOT_ORDER } from "@/lib/bungie/constants";
 import type { ArmorStatName } from "@/lib/db/types";
 import type { DerivedArmorPieceJson, ViewRow } from "@/lib/db/types";
 import type { ManifestLookups } from "@/lib/manifest/lookups";
-import { resolveViewSetHash } from "@/lib/manifest/lookups";
+import {
+  armorSlotIconPathsForView,
+  resolveViewSetHash,
+} from "@/lib/manifest/lookups";
 import type { ViewProgress } from "@/lib/views/progress";
 import {
   computeViewProgress,
@@ -58,6 +62,12 @@ export function buildSerializableTrackerPayload(
     if (path) tertiaryStatIconPaths[t] = path;
   }
 
+  const armorSlotIconPaths = armorSlotIconPathsForView(
+    lookups,
+    resolvedSetHash,
+    Number(viewRow.class_type),
+  );
+
   const setName =
     lookups.setNameByHash.get(resolvedSetHash) ?? "Unknown set";
   const archetypeName =
@@ -102,6 +112,7 @@ export function buildSerializableTrackerPayload(
       ? { primary: archetypePair.primary, secondary: archetypePair.secondary }
       : null,
     tertiaryStatIconPaths: tertiaryStatIconPaths as Record<string, string>,
+    armorSlotIconPaths: armorSlotIconPaths as Record<string, string>,
     needsClass,
     resolvedSetHash,
   };

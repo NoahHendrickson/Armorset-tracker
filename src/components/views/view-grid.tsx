@@ -2,10 +2,11 @@
 
 import {
   CLASS_NAMES,
-  SLOT_LABELS,
   SLOT_ORDER,
+  type ArmorSlot,
   bungieIconUrl,
 } from "@/lib/bungie/constants";
+import { TRACKER_SLOT_COLUMN_WIDTH } from "@/lib/workspace/workspace-constants";
 import type { ArmorStatName, DerivedArmorPieceJson } from "@/lib/db/types";
 import type { ViewProgress } from "@/lib/views/progress";
 import {
@@ -13,6 +14,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ArmorSlotTrackerRowHeader } from "@/components/views/armor-slot-tracker-row-header";
 import { OwnershipIcon, type OwnershipState } from "./ownership-icon";
 
 interface ViewGridProps {
@@ -20,6 +22,8 @@ interface ViewGridProps {
   hasInventory: boolean;
   /** Relative manifest icon paths keyed by tertiary stat name. */
   tertiaryStatIconPaths?: Partial<Record<ArmorStatName, string>>;
+  /** Destiny bucket icons keyed by slot (helm / gauntlets / …). */
+  armorSlotIconPaths?: Partial<Record<ArmorSlot, string>>;
 }
 
 function matchSummary(match: DerivedArmorPieceJson): string {
@@ -65,6 +69,7 @@ export function ViewGrid({
   progress,
   hasInventory,
   tertiaryStatIconPaths = {},
+  armorSlotIconPaths = {},
 }: ViewGridProps) {
   const { tertiaryStats, cells } = progress;
 
@@ -78,8 +83,8 @@ export function ViewGrid({
   }
 
   return (
-    // Tracker width is sized exactly to fit the 5-column grid (120 slot col +
-    // 4 × 100 stat cols = 520px), so the inner table never needs to scroll
+    // Tracker width is sized exactly to fit the 5-column grid (slot icon col +
+    // 4 × 100 stat cols), so the inner table never needs to scroll
     // horizontally. We use `overflow-hidden` instead of `overflow-x-auto` to
     // prevent sub-pixel flex rounding from triggering a phantom scrollbar
     // — and so the canvas wheel handler doesn't defer two-finger trackpad
@@ -94,7 +99,8 @@ export function ViewGrid({
         <div role="row" className="flex items-center">
           <div
             role="columnheader"
-            className="flex h-6 w-[120px] items-center p-2 text-base text-white/45"
+            className="flex h-6 shrink-0 items-center p-2 text-base text-white/45"
+            style={{ width: TRACKER_SLOT_COLUMN_WIDTH }}
           >
             <span className="truncate">Tertiary stat</span>
           </div>
@@ -126,17 +132,17 @@ export function ViewGrid({
         {/* Body */}
         <div role="rowgroup" className="flex items-start">
           {/* Slot name column */}
-          <div className="flex w-[120px] shrink-0 flex-col">
+          <div
+            className="flex shrink-0 flex-col"
+            style={{ width: TRACKER_SLOT_COLUMN_WIDTH }}
+          >
             {SLOT_ORDER.map((slot, i) => (
-              <div
+              <ArmorSlotTrackerRowHeader
                 key={slot}
-                role="rowheader"
-                className={`flex h-12 items-center p-2 text-base font-medium text-white ${
-                  i < SLOT_ORDER.length - 1 ? "border-b border-white/10" : ""
-                }`}
-              >
-                <span className="truncate">{SLOT_LABELS[slot]}</span>
-              </div>
+                slot={slot}
+                iconPath={armorSlotIconPaths[slot]}
+                isLastRow={i >= SLOT_ORDER.length - 1}
+              />
             ))}
           </div>
 

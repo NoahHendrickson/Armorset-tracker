@@ -161,6 +161,7 @@ export function TrackerPanel({
     merged && mergePartnerPayload
       ? trackerWidthForTertiaryColumns(
           unionTertiaryStats(payload, mergePartnerPayload).length,
+          { dualSlotRails: true },
         )
       : TRACKER_WIDTH;
 
@@ -454,6 +455,7 @@ export function TrackerPanel({
                 progress={viewProgressForGrid}
                 hasInventory={hasInventory}
                 tertiaryStatIconPaths={tertiaryPaths}
+                armorSlotIconPaths={payload.armorSlotIconPaths}
               />
             )}
             </div>

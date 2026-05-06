@@ -5,26 +5,34 @@ export const WORKSPACE_CANVAS_HEIGHT = 12000;
 /** Target for pan/zoom math and debugging — the bounded tracker layer. */
 export const WORKSPACE_CANVAS_ELEMENT_ID = "workspace-canvas-root";
 
+/** Fixed width of the slot / row-label column in the tracker grid (px). */
+export const TRACKER_SLOT_COLUMN_WIDTH = 56;
+
 /**
  * Fixed tracker width — sized to fit the full stat grid without clipping.
  * Breakdown: 36px sidebar + 2px main-panel border + 32px body padding +
- * (120px slot column + 4 × 100px stat columns) = 590px. Height stays
- * user-resizable, width does not.
+ * ({@link TRACKER_SLOT_COLUMN_WIDTH}px slot column + 4 × 100px stat columns).
+ * Height stays user-resizable, width does not.
  */
-export const TRACKER_WIDTH = 590;
+export const TRACKER_WIDTH =
+  70 + TRACKER_SLOT_COLUMN_WIDTH + 4 * 100;
 
 /** Horizontal chrome around the stat table: sidebar, main border, body padding. */
-export const TRACKER_PANEL_CHROME_WIDTH = TRACKER_WIDTH - 120 - 4 * 100;
+export const TRACKER_PANEL_CHROME_WIDTH =
+  TRACKER_WIDTH - TRACKER_SLOT_COLUMN_WIDTH - 4 * 100;
 
 /**
- * Tracker shell width for a given number of tertiary stat columns (120px slot
- * column + 100px × stats). Used for merged views whose union has more than
- * four tertiaries so the grid does not need horizontal scrolling.
+ * Tracker shell width for merged views: chrome + left slot rail + tertiary columns × 100 +
+ * right slot rail.
  */
-export function trackerWidthForTertiaryColumns(tertiaryColumnCount: number): number {
+export function trackerWidthForTertiaryColumns(
+  tertiaryColumnCount: number,
+  options?: { dualSlotRails?: boolean },
+): number {
+  const slotRails = 1 + (options?.dualSlotRails ? 1 : 0);
   return (
     TRACKER_PANEL_CHROME_WIDTH +
-    120 +
+    TRACKER_SLOT_COLUMN_WIDTH * slotRails +
     Math.max(0, tertiaryColumnCount) * 100
   );
 }

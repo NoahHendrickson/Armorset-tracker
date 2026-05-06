@@ -82,6 +82,8 @@ export interface ManifestCollectibleDefinition {
 
 export interface ManifestInventoryBucketDefinition {
   hash: number;
+  redacted?: boolean;
+  blacklisted?: boolean;
   displayProperties?: DisplayProperties;
   category?: number;
   scope?: number;
