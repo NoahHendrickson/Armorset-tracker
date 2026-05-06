@@ -453,8 +453,6 @@ export function InventoryTableView({
                       <TableHead className="text-white/60">Armor set</TableHead>
                       <TableHead className="text-white/60">Archetype</TableHead>
                       <TableHead className="text-white/60">Tuning</TableHead>
-                      <TableHead className="text-white/60">Primary</TableHead>
-                      <TableHead className="text-white/60">Secondary</TableHead>
                       <TableHead className="text-white/60">Tertiary</TableHead>
                       <TableHead className="text-white/60">Location</TableHead>
                     </TableRow>
@@ -463,7 +461,7 @@ export function InventoryTableView({
                     {filteredRows.length === 0 ? (
                       <TableRow className="border-white/10 hover:bg-white/[0.02]">
                         <TableCell
-                          colSpan={7}
+                          colSpan={6}
                           className="py-8 text-center text-sm text-white/50"
                         >
                           No armor matches these filters.
@@ -502,12 +500,6 @@ export function InventoryTableView({
                           </TableCell>
                           <TableCell className="text-white/90">
                             {piece.tuningName ?? "—"}
-                          </TableCell>
-                          <TableCell className="text-white/80">
-                            {piece.primaryStat ?? "—"}
-                          </TableCell>
-                          <TableCell className="text-white/80">
-                            {piece.secondaryStat ?? "—"}
                           </TableCell>
                           <TableCell className="text-white/80">
                             {piece.tertiaryStat ?? "—"}
