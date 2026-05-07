@@ -35,7 +35,7 @@ export function AppHeader({
       <div className="pointer-events-none flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
         <Link
           href="/dashboard"
-          className="pointer-events-auto flex items-center gap-2 rounded-none border border-[#4d4e4e] bg-[#2e2f2f] px-2.5 py-2 text-left transition-colors hover:bg-[#353636] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+          className="pointer-events-auto flex h-10 shrink-0 items-center gap-2 rounded-none border border-white/10 bg-[#2d2e32] px-2.5 text-left text-white shadow-lg transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/35"
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset */}
           <img
@@ -46,7 +46,7 @@ export function AppHeader({
             className="h-6 w-auto shrink-0"
             aria-hidden
           />
-          <span className="min-w-0 text-sm font-medium tracking-tight text-white">
+          <span className="min-w-0 text-sm font-medium tracking-tight">
             D2 Tuning Tracker
           </span>
         </Link>
