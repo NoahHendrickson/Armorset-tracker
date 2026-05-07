@@ -30,8 +30,7 @@ export function WorkspaceViewModeTabs({
         aria-selected={mode === "canvas"}
         className={cn(
           segmentBtn,
-          mode === "canvas" &&
-            "bg-success/20 text-success hover:bg-success/25 hover:text-success",
+          mode === "canvas" && "bg-white/[0.08] text-white",
         )}
         onClick={() => onModeChange("canvas")}
       >
@@ -45,8 +44,7 @@ export function WorkspaceViewModeTabs({
         className={cn(
           segmentBtn,
           "border-l border-white/15",
-          mode === "table" &&
-            "bg-success/20 text-success hover:bg-success/25 hover:text-success",
+          mode === "table" && "bg-white/[0.08] text-white",
         )}
         onClick={() => onModeChange("table")}
       >
