@@ -24,8 +24,8 @@ import {
 import { TrackerIdentBadges } from "@/components/workspace/tracker-ident-badges";
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
-  TRACKER_DEFAULT_HEIGHT,
   TRACKER_WIDTH,
+  trackerShellHeightPx,
   trackerWidthForTertiaryColumns,
 } from "@/lib/workspace/workspace-constants";
 import {
@@ -156,6 +156,7 @@ export function TrackerPanel({
     parseWorkspaceLayout(view.layout),
   );
   const merged = Boolean(view.layout.mergedWith) && mergePartnerPayload !== null;
+  const shellHeightPx = trackerShellHeightPx(view.layout);
 
   const panelWidth =
     merged && mergePartnerPayload
@@ -234,7 +235,7 @@ export function TrackerPanel({
         bounds="parent"
         scale={rndScale}
         position={{ x: layout.x, y: layout.y }}
-        size={{ width: panelWidth, height: TRACKER_DEFAULT_HEIGHT }}
+        size={{ width: panelWidth, height: shellHeightPx }}
         enableResizing={false}
         enableDragging={false}
         style={
@@ -255,7 +256,7 @@ export function TrackerPanel({
       scale={rndScale}
       enableResizing={false}
       position={{ x: layout.x, y: layout.y }}
-      size={{ width: panelWidth, height: TRACKER_DEFAULT_HEIGHT }}
+      size={{ width: panelWidth, height: shellHeightPx }}
       style={easeMotionStyle}
       onDrag={(e, d) => {
         onDragPosition?.(view.id, d.x, d.y, e);
@@ -269,7 +270,7 @@ export function TrackerPanel({
           x: d.x,
           y: d.y,
           w: panelWidth,
-          h: TRACKER_DEFAULT_HEIGHT,
+          h: shellHeightPx,
         };
         layoutLiveRef.current = next;
         setLayout(next);
@@ -426,7 +427,7 @@ export function TrackerPanel({
 
             <div
               className={`flex min-h-0 flex-1 flex-col gap-4 px-4 pt-4 pb-2 ${
-                !showMergedGrid && payload.needsClass
+                showMergedGrid || payload.needsClass
                   ? "overflow-y-auto"
                   : "overflow-hidden"
               }`}

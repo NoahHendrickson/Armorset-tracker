@@ -20,7 +20,9 @@ import {
 import {
   arrangeLayoutEaseDurationMs,
   TRACKER_DEFAULT_HEIGHT,
+  TRACKER_MERGED_DEFAULT_HEIGHT,
   TRACKER_WIDTH,
+  trackerShellHeightPx,
   trackerWidthForTertiaryColumns,
   WORKSPACE_CANVAS_ELEMENT_ID,
   WORKSPACE_CANVAS_HEIGHT,
@@ -925,7 +927,10 @@ export function CanvasWorkspace({
       const self = current.find((t) => t.view.id === viewId);
       const selfLo = self ? parseWorkspaceLayout(self.view.layout) : null;
       const dragFootprint = selfLo
-        ? { w: selfLo.w, h: selfLo.h }
+        ? {
+            w: selfLo.w,
+            h: trackerShellHeightPx(selfLo),
+          }
         : { w: TRACKER_WIDTH, h: TRACKER_DEFAULT_HEIGHT };
 
       const { targetId, valid } = pickMergeDropTarget(
@@ -953,7 +958,9 @@ export function CanvasWorkspace({
       if (!self) return;
 
       const selfLo = parseWorkspaceLayout(self.view.layout);
-      const h = TRACKER_DEFAULT_HEIGHT;
+      const existingMergeWith =
+        (layout.mergedWith ?? selfLo.mergedWith) ?? null;
+      const h = trackerShellHeightPx({ mergedWith: existingMergeWith });
       const normalized: WorkspaceLayoutJson = {
         ...layout,
         h,
@@ -992,12 +999,13 @@ export function CanvasWorkspace({
           unionTertiaryStats(self, tgt).length,
           { dualSlotRails: true },
         );
+        const mergedPairH = TRACKER_MERGED_DEFAULT_HEIGHT;
         const sourceLayout: WorkspaceLayoutJson = {
           ...selfLo,
           x: snapX,
           y: snapY,
           w: mergedW,
-          h,
+          h: mergedPairH,
           z: maxZ + 2,
           mergedWith: tgt.view.id,
         };
@@ -1006,7 +1014,7 @@ export function CanvasWorkspace({
           x: snapX,
           y: snapY,
           w: mergedW,
-          h,
+          h: mergedPairH,
           z: maxZ + 1,
           mergedWith: self.view.id,
         };
@@ -1116,15 +1124,22 @@ export function CanvasWorkspace({
 
   const mergePreviewPath = useMemo(() => {
     if (!draggingId || !dragLive || !mergeDropTargetId) return null;
+    const dragT = trackers.find((t) => t.view.id === draggingId);
     const tgt = trackers.find((t) => t.view.id === mergeDropTargetId);
     if (!tgt) return null;
+    const dragLo = dragT ? parseWorkspaceLayout(dragT.view.layout) : null;
+    const tgtLoParsed = parseWorkspaceLayout(tgt.view.layout);
+    const previewH = Math.max(
+      dragLo ? trackerShellHeightPx(dragLo) : TRACKER_DEFAULT_HEIGHT,
+      trackerShellHeightPx(tgtLoParsed),
+    );
     const d = mergePreviewUnionPathD(
       dragLive.x,
       dragLive.y,
       tgt.view.layout.x,
       tgt.view.layout.y,
       TRACKER_WIDTH,
-      TRACKER_DEFAULT_HEIGHT,
+      previewH,
       14,
     );
     if (!d) return null;

@@ -2,6 +2,7 @@ import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
   TRACKER_DEFAULT_HEIGHT,
   TRACKER_WIDTH,
+  trackerShellHeightPx,
 } from "@/lib/workspace/workspace-constants";
 import { parseWorkspaceLayout } from "@/lib/workspace/workspace-schema";
 
@@ -87,10 +88,10 @@ export function pickMergeDropTarget(
     const ratio = mergeOverlapRatio(
       dragRect.x,
       dragRect.y,
-      t.view.layout.x,
-      t.view.layout.y,
+      tLo.x,
+      tLo.y,
       dragFootprint,
-      { w: tLo.w, h: tLo.h },
+      { w: tLo.w, h: trackerShellHeightPx(tLo) },
     );
     if (ratio < MERGE_OVERLAP_TRIGGER_RATIO) continue;
     if (!best || ratio > best.ratio) best = { id: t.view.id, ratio };
