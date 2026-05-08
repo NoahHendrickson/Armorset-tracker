@@ -1,6 +1,6 @@
 import type { SerializableTrackerPayload } from "@/lib/workspace/types";
 import {
-  TRACKER_DEFAULT_HEIGHT,
+  TRACKER_MAX_SHELL_HEIGHT_PX,
   TRACKER_WIDTH,
   WORKSPACE_CANVAS_HEIGHT,
   WORKSPACE_CANVAS_WIDTH,
@@ -93,7 +93,7 @@ function computeClassClusterLayouts(
   idToPayload: Map<string, SerializableTrackerPayload>,
 ): ArrangeGridComputation {
   const SLOT_W = TRACKER_WIDTH + GAP;
-  const SLOT_H = TRACKER_DEFAULT_HEIGHT + GAP;
+  const SLOT_H = TRACKER_MAX_SHELL_HEIGHT_PX + GAP;
 
   /** merge-group rectangles (canvas px) excluding outer gap */
   interface PlacedBucket {
@@ -352,7 +352,7 @@ function computeNestedPrimarySecondaryLayouts(
   });
 
   const SLOT_W = TRACKER_WIDTH + GAP;
-  const SLOT_H = TRACKER_DEFAULT_HEIGHT + GAP;
+  const SLOT_H = TRACKER_MAX_SHELL_HEIGHT_PX + GAP;
   const pillarW = innerGridWidthPx();
   const packMaxW = clusterPackMaxWidthPx();
 
@@ -497,7 +497,7 @@ export function computeWorkspaceGridLayouts(
 
   const orderedGroups = orderedBuckets.flat();
   const SLOT_W = TRACKER_WIDTH + GAP;
-  const SLOT_H = TRACKER_DEFAULT_HEIGHT + GAP;
+  const SLOT_H = TRACKER_MAX_SHELL_HEIGHT_PX + GAP;
   const rows = Math.ceil(orderedGroups.length / COLS);
   const gridW = Math.min(orderedGroups.length, COLS) * SLOT_W - GAP;
   const gridH = rows * SLOT_H - GAP;

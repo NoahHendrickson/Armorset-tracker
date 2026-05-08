@@ -46,6 +46,28 @@ export function trackerWidthForTertiaryColumns(
  */
 export const TRACKER_DEFAULT_HEIGHT = 384;
 
+/**
+ * Merged trackers need more vertical space than {@link TRACKER_DEFAULT_HEIGHT}:
+ * dual ident headers (badges wrap more in each half), optional “grid complete”
+ * copy, and the same stat table — without clipping the last armor row.
+ */
+export const TRACKER_MERGED_DEFAULT_HEIGHT = 456;
+
+/** Largest tracker shell height (used for arrange grid vertical pitch). */
+export const TRACKER_MAX_SHELL_HEIGHT_PX = Math.max(
+  TRACKER_DEFAULT_HEIGHT,
+  TRACKER_MERGED_DEFAULT_HEIGHT,
+);
+
+/** Canvas shell height from layout (height is not user-resizable). */
+export function trackerShellHeightPx(layout: {
+  mergedWith?: string | null;
+}): number {
+  return layout.mergedWith != null
+    ? TRACKER_MERGED_DEFAULT_HEIGHT
+    : TRACKER_DEFAULT_HEIGHT;
+}
+
 /** `transform` ease when trackers move programmatically (sort/cluster arrange). */
 export const ARRANGE_LAYOUT_EASE_DURATION_MS = 420;
 
