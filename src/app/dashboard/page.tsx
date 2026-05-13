@@ -86,7 +86,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       {!lookups.version ? (
         <div
           role="alert"
-          className="flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm sm:flex-row sm:items-start"
+          className="flex flex-col gap-3 rounded-none border border-amber-500/30 bg-amber-500/5 p-4 text-sm sm:flex-row sm:items-start"
         >
           <Warning weight="duotone" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
           <div className="flex-1">
@@ -104,7 +104,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       ) : versionCheck.schemaOutdated ? (
         <div
           role="alert"
-          className="flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm sm:flex-row sm:items-start"
+          className="flex flex-col gap-3 rounded-none border border-amber-500/30 bg-amber-500/5 p-4 text-sm sm:flex-row sm:items-start"
         >
           <Warning weight="duotone" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
           <div className="flex-1">
@@ -122,7 +122,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       ) : versionCheck.needsResync ? (
         <div
           role="status"
-          className="flex flex-col gap-3 rounded-lg border border-blue-500/30 bg-blue-500/5 p-4 text-sm sm:flex-row sm:items-start"
+          className="flex flex-col gap-3 rounded-none border border-blue-500/30 bg-blue-500/5 p-4 text-sm sm:flex-row sm:items-start"
         >
           <Info weight="duotone" className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
           <div className="flex-1">
