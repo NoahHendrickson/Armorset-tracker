@@ -3,53 +3,60 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Simple 3-color token system from Figma reference:
+   - background = page (#ffffff / #212121)
+   - surface    = single elevation for menus (#ececec / #2f2f2f)
+                  → card, popover, secondary, muted all collapse to this
+   - primary    = brand green (#07ad6b, same in both modes)
+   --accent is one shade off surface so menu-item hover/focus stays visible.
+   --success and --destructive remain their own status colors. */
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  --background: oklch(1 0 0);              /* #ffffff */
   --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
+  --card: oklch(0.928 0 0);                /* surface — #ececec */
   --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
+  --popover: oklch(0.928 0 0);             /* surface */
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.628 0.151 158.5);     /* brand green — #07ad6b */
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.928 0 0);           /* surface */
+  --secondary-foreground: oklch(0.145 0 0);
+  --muted: oklch(0.928 0 0);                /* surface */
+  --muted-foreground: oklch(0.45 0 0);
+  --accent: oklch(0.88 0 0);               /* one shade darker than surface */
+  --accent-foreground: oklch(0.145 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
   --success: oklch(0.62 0.15 152);
   --success-foreground: oklch(0.985 0 0);
+  --border: oklch(0.86 0 0);               /* visible against bg + surface */
+  --input: oklch(0.86 0 0);
+  --ring: oklch(0.628 0.151 158.5);        /* brand-tinted focus ring */
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: oklch(0.221 0 0);          /* #212121 */
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.298 0 0);                /* surface — #2f2f2f */
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.298 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+  --primary: oklch(0.628 0.151 158.5);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.298 0 0);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --muted: oklch(0.298 0 0);
+  --muted-foreground: oklch(0.7 0 0);
+  --accent: oklch(0.345 0 0);              /* one shade lighter than surface */
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
   --success: oklch(0.7 0.15 152);
   --success-foreground: oklch(0.145 0 0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.628 0.151 158.5);
 }
 
 @theme inline {
@@ -113,6 +120,32 @@
     image-rendering: pixelated;
     image-rendering: -webkit-optimize-contrast;
     -ms-interpolation-mode: nearest-neighbor;
+  }
+
+  /* Thin, theme-aware scrollbar for dropdown menus and listboxes.
+     macOS overlay scrollbars otherwise cover trailing affordances like the
+     armor-set pin button. `currentColor` tracks the menu's text token so it
+     works on both dark filter menus and light popover panels. */
+  .menu-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, currentColor 22%, transparent) transparent;
+  }
+  .menu-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .menu-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .menu-scrollbar::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, currentColor 22%, transparent);
+    border-radius: 3px;
+  }
+  .menu-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, currentColor 38%, transparent);
+  }
+  .menu-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
 

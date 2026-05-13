@@ -34,8 +34,8 @@ export function ArmorSlotTrackerRowHeader({
           role="rowheader"
           aria-label={label}
           className={cn(
-            "flex h-12 items-center justify-center p-2 text-base font-medium text-white",
-            !isLastRow && "border-b border-white/10",
+            "flex h-12 items-center justify-center p-2 text-base font-medium text-foreground",
+            !isLastRow && "border-b border-border",
             className,
           )}
         >

@@ -20,7 +20,7 @@ export function OwnershipIcon({ state, count }: OwnershipIconProps) {
       <span
         role="img"
         aria-label="Loading ownership state"
-        className={`${baseSquare} border-[1.5px] border-white/40 animate-pulse`}
+        className={`${baseSquare} border-[1.5px] border-foreground/40 animate-pulse`}
       >
         <span className="sr-only">Loading</span>
       </span>
@@ -55,7 +55,7 @@ export function OwnershipIcon({ state, count }: OwnershipIconProps) {
     <span
       role="img"
       aria-label="0 matching pieces"
-      className={`${baseSquare} border-[1.5px] border-white/40`}
+      className={`${baseSquare} border-[1.5px] border-foreground/40`}
     >
       <span className="sr-only">0 matching pieces</span>
     </span>

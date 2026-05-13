@@ -12,7 +12,7 @@ interface WorkspaceViewModeTabsProps {
 }
 
 const segmentBtn =
-  "flex h-10 shrink-0 items-center gap-1.5 px-3 text-xs font-medium uppercase tracking-wide text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/35 disabled:pointer-events-none disabled:opacity-50";
+  "flex h-10 shrink-0 items-center gap-1.5 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50";
 
 export function WorkspaceViewModeTabs({
   mode,
@@ -30,7 +30,7 @@ export function WorkspaceViewModeTabs({
         aria-selected={mode === "canvas"}
         className={cn(
           segmentBtn,
-          mode === "canvas" && "bg-white/[0.08] text-white",
+          mode === "canvas" && "bg-accent text-foreground",
         )}
         onClick={() => onModeChange("canvas")}
       >
@@ -43,8 +43,8 @@ export function WorkspaceViewModeTabs({
         aria-selected={mode === "table"}
         className={cn(
           segmentBtn,
-          "border-l border-white/15",
-          mode === "table" && "bg-white/[0.08] text-white",
+          "border-l border-border",
+          mode === "table" && "bg-accent text-foreground",
         )}
         onClick={() => onModeChange("table")}
       >

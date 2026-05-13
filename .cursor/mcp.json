@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "armor-checklist-sb-mcp": {
+      "type": "http",
+      "url": "http://localhost:6066/mcp"
+    }
+  }
+}

@@ -4,6 +4,7 @@ import * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check, CaretRight, Circle } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "@/lib/utils";
+import { checkboxBoxClassName, checkboxIconClassName } from "./checkbox";
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
@@ -40,7 +41,7 @@ const DropdownMenuSubContent = React.forwardRef<
   <DropdownMenuPrimitive.SubContent
     ref={ref}
     className={cn(
-      "z-50 min-w-32 overflow-hidden rounded-md border bg-popover px-0 py-1 text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+      "menu-scrollbar z-50 min-w-32 overflow-hidden rounded-none border bg-popover px-0 py-1 text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
       className,
     )}
     {...props}
@@ -57,7 +58,7 @@ const DropdownMenuContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        "z-50 min-w-32 overflow-hidden rounded-md border bg-popover px-0 py-1 text-popover-foreground shadow-md",
+        "menu-scrollbar z-50 min-w-32 overflow-hidden rounded-none border bg-popover px-0 py-1 text-popover-foreground shadow-md",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         className,
       )}
@@ -92,15 +93,26 @@ const DropdownMenuCheckboxItem = React.forwardRef<
   <DropdownMenuPrimitive.CheckboxItem
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-none py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "group relative flex w-full cursor-default select-none items-center rounded-none py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className,
     )}
     checked={checked}
     {...props}
   >
-    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+    {/* Always-visible square so users see at a glance that the menu accepts
+        multiple selections; the check fills in via Radix ItemIndicator. The
+        box styles are shared with the standalone `<Checkbox>` so both render
+        the same shape — see `checkboxBoxClassName` in ./checkbox. */}
+    <span
+      aria-hidden
+      className={cn(
+        checkboxBoxClassName,
+        "pointer-events-none absolute left-2 top-1/2 -translate-y-1/2",
+        "group-data-[state=checked]:border-primary group-data-[state=checked]:bg-primary group-data-[state=checked]:text-primary-foreground",
+      )}
+    >
       <DropdownMenuPrimitive.ItemIndicator>
-        <Check weight="duotone" className="h-4 w-4" />
+        <Check weight="bold" className={checkboxIconClassName} />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}

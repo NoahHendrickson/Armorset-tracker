@@ -37,3 +37,18 @@ The app uses Supabase (Postgres). Schema migrations live in `supabase/migrations
 - `src/app/api/` — all API route handlers
 - `src/components/workspace/` — dashboard canvas components
 - `supabase/migrations/` — ordered SQL migrations (never edit existing ones)
+
+## Storybook
+
+Stories live next to their components as `*.stories.tsx`. Run `npm run storybook` to start the dev server on `http://localhost:6066`. Vitest-based interaction + a11y tests are wired through `@storybook/addon-vitest`; run them with `npm run test-storybook` (or `npx vitest --project=storybook`).
+
+Shared mock fixtures (`ViewRow`, `ViewProgress`, `DerivedArmorPieceJson`, etc.) live in `.storybook/mocks/`. Reuse them when adding new stories instead of inventing fresh shapes — they import the canonical types from `src/lib/db/types.ts`.
+
+### Storybook MCP (`armor-checklist-sb-mcp`)
+
+When working on UI components, use the `armor-checklist-sb-mcp` MCP tools to access Storybook's component knowledge before answering or making changes. Storybook must be running (`npm run storybook`) for the MCP endpoint to be reachable at `http://localhost:6066/mcp`.
+
+- **Never hallucinate component props.** Before using any prop on a component from `src/components/`, query `list-all-documentation` and then `get-documentation` for that component to confirm the prop exists.
+- Use `get-storybook-story-instructions` when authoring or updating a `*.stories.tsx` file to follow current conventions.
+- After changing a component, run `run-story-tests` for that component's stories — it covers `play()` interaction tests *and* axe-core a11y checks. Fix violations and re-run.
+- If a prop isn't documented in the stories or component types, ask the user instead of guessing based on naming conventions from other libraries.

@@ -14,7 +14,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { chromeStandaloneSquareIconButtonClass } from "@/components/ui/chrome-square-icon-button";
 import {
   Tooltip,
   TooltipContent,
@@ -94,32 +93,32 @@ export function FeedbackHeaderDialog() {
       >
         <TooltipTrigger asChild>
           <DialogTrigger asChild>
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="icon"
               aria-label="Send feedback"
-              className={chromeStandaloneSquareIconButtonClass()}
               onPointerLeave={() => {
                 suppressTooltipUntilLeaveRef.current = false;
               }}
             >
-              <ChatCircleDots weight="duotone" className="h-5 w-5" />
-            </button>
+              <ChatCircleDots weight="duotone" />
+            </Button>
           </DialogTrigger>
         </TooltipTrigger>
         <TooltipContent>Feedback</TooltipContent>
       </Tooltip>
-      <DialogContent className="rounded-none border-[color:var(--border)] bg-[#2e2f2f] text-white sm:rounded-none">
+      <DialogContent className="rounded-none sm:rounded-none">
         <DialogHeader className="pb-4">
-          <DialogTitle className="text-white">Feedback</DialogTitle>
-          <DialogDescription className="text-white/70">
+          <DialogTitle>Feedback</DialogTitle>
+          <DialogDescription>
             Describe a bug or share a feature idea. Please be as detailed as possible.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-6">
           <div>
-            <Label className="mb-[12px] block text-white">
-              Type<span className="ml-0.5 text-red-400" aria-hidden>
+            <Label className="mb-[12px] block">
+              Type<span className="ml-0.5 text-destructive" aria-hidden>
                 *
               </span>
             </Label>
@@ -136,10 +135,10 @@ export function FeedbackHeaderDialog() {
                 disabled={sending}
                 onClick={() => setCategory("bug")}
                 className={cn(
-                  "rounded-none border px-3 py-2 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 sm:text-sm",
+                  "rounded-none border px-3 py-2 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm",
                   category === "bug"
-                    ? "border-white/40 bg-white/[0.12] text-white"
-                    : "border-white/10 bg-transparent text-white/75 hover:bg-white/[0.06]",
+                    ? "border-ring bg-accent text-foreground"
+                    : "border-border bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground",
                 )}
               >
                 Something broke
@@ -151,10 +150,10 @@ export function FeedbackHeaderDialog() {
                 disabled={sending}
                 onClick={() => setCategory("wishlist")}
                 className={cn(
-                  "rounded-none border px-3 py-2 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 sm:text-sm",
+                  "rounded-none border px-3 py-2 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm",
                   category === "wishlist"
-                    ? "border-white/40 bg-white/[0.12] text-white"
-                    : "border-white/10 bg-transparent text-white/75 hover:bg-white/[0.06]",
+                    ? "border-ring bg-accent text-foreground"
+                    : "border-border bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground",
                 )}
               >
                 Feature idea
@@ -163,8 +162,8 @@ export function FeedbackHeaderDialog() {
           </div>
 
           <div>
-            <Label htmlFor="feedback-message" className="mb-[12px] block text-white">
-              Details<span className="ml-0.5 text-red-400" aria-hidden>*</span>
+            <Label htmlFor="feedback-message" className="mb-[12px] block">
+              Details<span className="ml-0.5 text-destructive" aria-hidden>*</span>
             </Label>
             <textarea
               id="feedback-message"
@@ -176,12 +175,12 @@ export function FeedbackHeaderDialog() {
               onChange={(e) => setMessage(e.target.value)}
               rows={6}
               className={cn(
-                "flex min-h-[8rem] w-full rounded-none border px-3 py-2 text-sm shadow-sm outline-none placeholder:text-muted-foreground focus-visible:border-white/35 focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-[9rem]",
-                "resize-y border-white/15 bg-black/25 text-white",
+                "flex min-h-[8rem] w-full rounded-none border px-3 py-2 text-sm shadow-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-[9rem]",
+                "resize-y border-input bg-background text-foreground",
               )}
               maxLength={8000}
             />
-            <p className="mt-2 text-xs text-white/55">{message.length} / 8000</p>
+            <p className="mt-2 text-xs text-muted-foreground">{message.length} / 8000</p>
           </div>
         </div>
 

@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArmorSetCombobox } from "@/components/views/armor-set-combobox";
+import { usePinnedArmorSets } from "@/lib/views/use-pinned-armor-sets";
 
 export interface OptionItem {
   hash: number;
@@ -152,6 +153,7 @@ export const NewViewForm = forwardRef<NewViewFormHandle, NewViewFormProps>(
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [submitting, setSubmitting] = useState(false);
+  const { pinnedHashes, togglePin } = usePinnedArmorSets();
 
   useEffect(() => {
     onBusyChange?.(submitting || isPending);
@@ -407,6 +409,8 @@ export const NewViewForm = forwardRef<NewViewFormHandle, NewViewFormProps>(
           sharpCorners={sharpMenus}
           invalid={showSetError}
           portalContainer={armorSetComboboxPortalContainer}
+          pinnedHashes={pinnedHashes}
+          onTogglePin={togglePin}
         />
       </div>
 

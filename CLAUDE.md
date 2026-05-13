@@ -136,6 +136,29 @@ the main `tsconfig.json`) and is unrelated to the production build.
 - **Date / version handling**: a manual `manifest_versions` row tracks the active Bungie
   manifest version; `checkManifestVersion()` is what UI components use to detect drift.
 
+## Storybook
+
+Stories live next to their components as `*.stories.tsx`. Boot the dev server with
+`npm run storybook` (port 6066). Vitest-based interaction + a11y tests run via
+`npm run test-storybook` (or `npx vitest --project=storybook`). Shared mock fixtures live in
+`.storybook/mocks/` and import canonical types from `src/lib/db/types.ts` — reuse them when
+adding new stories instead of defining new shapes inline.
+
+### Storybook MCP (`armor-checklist-sb-mcp`)
+
+Use the `armor-checklist-sb-mcp` MCP tools to access Storybook's component knowledge before
+answering or making UI changes. Storybook must be running for the endpoint at
+`http://localhost:6066/mcp` to respond.
+
+- **Never hallucinate component props.** Before using any prop on a `src/components/`
+  component, query `list-all-documentation` and then `get-documentation` for that component
+  to confirm the prop exists.
+- Use `get-storybook-story-instructions` when authoring a `*.stories.tsx` file to follow
+  current conventions.
+- After changing a component, run `run-story-tests` for that component's stories — it covers
+  `play()` interaction tests and axe-core a11y checks. Fix violations and re-run.
+- If a prop isn't documented in stories or component types, ask instead of guessing.
+
 ## Production deploy
 
 Deployed on Vercel. The `vercel.json` cron re-runs `/api/admin/manifest/sync` every Tuesday at

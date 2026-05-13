@@ -72,7 +72,7 @@ export function ViewActions({
             type="button"
             aria-label="Delete tracker"
             onClick={() => setDeleteOpen(true)}
-            className="flex h-5 w-5 items-center justify-center text-white/70 transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            className="flex h-5 w-5 items-center justify-center text-muted-foreground transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Trash weight="duotone" className="h-5 w-5" />
           </button>

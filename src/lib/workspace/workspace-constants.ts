@@ -6,7 +6,7 @@ export const WORKSPACE_CANVAS_HEIGHT = 12000;
 export const WORKSPACE_CANVAS_ELEMENT_ID = "workspace-canvas-root";
 
 /** Fixed width of the slot / row-label column in the tracker grid (px). */
-export const TRACKER_SLOT_COLUMN_WIDTH = 56;
+export const TRACKER_SLOT_COLUMN_WIDTH = 136;
 
 /**
  * Fixed tracker width — sized to fit the full stat grid without clipping.

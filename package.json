@@ -11,7 +11,10 @@
     "db:push": "npx supabase db push",
     "db:push:dry-run": "npx supabase db push --dry-run",
     "export:stat-icons": "node scripts/export-armor-stat-icons.mjs",
-    "manifest:sync": "NODE_OPTIONS='--require ./scripts/stub-server-only.cjs' tsx --tsconfig tsconfig.json scripts/sync-manifest.ts --force"
+    "manifest:sync": "NODE_OPTIONS='--require ./scripts/stub-server-only.cjs' tsx --tsconfig tsconfig.json scripts/sync-manifest.ts --force",
+    "storybook": "storybook dev -p 6066",
+    "build-storybook": "storybook build",
+    "test-storybook": "vitest --project=storybook --run"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
@@ -42,14 +45,28 @@
     "zod": "^4.4.1"
   },
   "devDependencies": {
+    "@chromatic-com/storybook": "^5.1.2",
+    "@storybook/addon-a11y": "^10.3.6",
+    "@storybook/addon-docs": "^10.3.6",
+    "@storybook/addon-mcp": "^0.6.0",
+    "@storybook/addon-onboarding": "^10.3.6",
+    "@storybook/addon-vitest": "^10.3.6",
+    "@storybook/nextjs-vite": "^10.3.6",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/browser-playwright": "^4.1.6",
+    "@vitest/coverage-v8": "^4.1.6",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "eslint-plugin-storybook": "^10.3.6",
+    "playwright": "^1.60.0",
+    "storybook": "^10.3.6",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "^8.0.12",
+    "vitest": "^4.1.6"
   }
 }

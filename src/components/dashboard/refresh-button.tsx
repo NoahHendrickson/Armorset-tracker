@@ -10,7 +10,6 @@ import {
   BUNGIE_REAUTH_USER_MESSAGE,
 } from "@/lib/auth/bungie-reauth";
 import { Button } from "@/components/ui/button";
-import { chromeStandaloneSquareIconButtonClass } from "@/components/ui/chrome-square-icon-button";
 import {
   Tooltip,
   TooltipContent,
@@ -37,10 +36,10 @@ const refreshToastDefaults = {
 
 interface RefreshButtonProps {
   /**
-   * `button`      = outlined button with label (dashboards / older headers).
-   * `icon`        = 20px icon-only trigger styled for the tracker sidebar.
-   * `header-icon` = same bordered 40×40 chrome as `header-large` (kept for API compatibility).
-   * `header-large` = compact square nav control (inventory refresh).
+   * `button`                       = outlined button with label (dashboards / older headers).
+   * `icon`                         = 20px icon-only trigger styled for the tracker sidebar.
+   * `header-icon` / `header-large` = standardized outline icon Button (nav header). Both
+   *   render identically; both retained for API compatibility.
    */
   variant?: "button" | "icon" | "header-icon" | "header-large";
 }
@@ -142,7 +141,7 @@ export function RefreshButton({
             aria-label={
               isLoading ? "Refreshing inventory" : "Refresh inventory from Bungie"
             }
-            className="flex h-5 w-5 items-center justify-center text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:opacity-60"
+            className="flex h-5 w-5 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
           >
             <ArrowsCounterClockwise
               weight="duotone"
@@ -157,50 +156,24 @@ export function RefreshButton({
     );
   }
 
-  if (variant === "header-icon") {
+  if (variant === "header-icon" || variant === "header-large") {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="icon"
             onClick={refresh}
             disabled={isLoading}
             aria-label={
               isLoading ? "Refreshing inventory" : "Refresh inventory from Bungie"
             }
-            className={chromeStandaloneSquareIconButtonClass()}
           >
             <ArrowsCounterClockwise
               weight="duotone"
-              className={`h-5 w-5 ${isLoading ? "animate-spin" : ""}`}
+              className={isLoading ? "animate-spin" : ""}
             />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>
-          {isLoading ? "Refreshing inventory…" : "Refresh inventory"}
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  if (variant === "header-large") {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            onClick={refresh}
-            disabled={isLoading}
-            aria-label={
-              isLoading ? "Refreshing inventory" : "Refresh inventory from Bungie"
-            }
-            className={chromeStandaloneSquareIconButtonClass()}
-          >
-            <ArrowsCounterClockwise
-              weight="duotone"
-              className={`h-5 w-5 ${isLoading ? "animate-spin" : ""}`}
-            />
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>
           {isLoading ? "Refreshing inventory…" : "Refresh inventory"}

@@ -54,3 +54,8 @@ certificates
 
 # Supabase CLI local cache (never commit)
 supabase/.temp/
+
+# Storybook
+storybook-static/
+*storybook.log
+storybook-static

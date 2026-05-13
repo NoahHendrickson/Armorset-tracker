@@ -103,7 +103,7 @@ function MergeHalfSquare({
       <TrackerHalfTooltip label="Not applicable for this tracker">
         <div
           className={cn(
-            "relative flex h-full w-1/2 items-center justify-center bg-white/[0.08]",
+            "relative flex h-full w-1/2 items-center justify-center bg-accent",
             outerRounded,
           )}
           style={{ boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.12)" }}
@@ -125,12 +125,12 @@ function MergeHalfSquare({
       <TrackerHalfTooltip label="Loading inventory…">
         <div
           className={cn(
-            "flex h-full w-1/2 items-center justify-center border border-white/35",
+            "flex h-full w-1/2 items-center justify-center border border-foreground/35",
             outerRounded,
           )}
         >
           <span
-            className="block size-3 shrink-0 rounded-sm border border-white/40 animate-pulse"
+            className="block size-3 shrink-0 rounded-sm border border-foreground/40 animate-pulse"
             aria-hidden
           />
         </div>
@@ -143,7 +143,7 @@ function MergeHalfSquare({
       <TrackerHalfTooltip label="0 matching pieces">
         <div
           className={cn(
-            "flex h-full w-1/2 items-center justify-center border border-white/40",
+            "flex h-full w-1/2 items-center justify-center border border-foreground/40",
             outerRounded,
           )}
         />
@@ -218,7 +218,7 @@ export function MergedCompareGrid({
 
   if (tertiaries.length === 0) {
     return (
-      <div className="rounded-md border border-white/10 bg-white/5 p-4 text-sm text-white/60">
+      <div className="rounded-md border border-border bg-accent/40 p-4 text-sm text-muted-foreground">
         No tertiary stats to compare for these trackers yet.
       </div>
     );
@@ -242,7 +242,7 @@ export function MergedCompareGrid({
           {/* Left armor rail — anchor tracker (green header) */}
           <div
             aria-hidden
-            className="h-6 shrink-0 border-r border-white/[0.12] p-2"
+            className="h-6 shrink-0 border-r border-border p-2"
             style={{ width: TRACKER_SLOT_COLUMN_WIDTH }}
           />
           {tertiaries.map((t) => {
@@ -251,7 +251,7 @@ export function MergedCompareGrid({
               <div
                 key={t}
                 role="columnheader"
-                className="flex h-6 w-[100px] shrink-0 items-center gap-1 p-2 text-base text-white/45"
+                className="flex h-6 w-[100px] shrink-0 items-center gap-1 p-2 text-base text-muted-foreground/80"
               >
                 {iconPath ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -271,14 +271,14 @@ export function MergedCompareGrid({
           {/* Right armor rail — merge partner (blue header) */}
           <div
             aria-hidden
-            className="h-6 shrink-0 border-l border-white/[0.12] p-2"
+            className="h-6 shrink-0 border-l border-border p-2"
             style={{ width: TRACKER_SLOT_COLUMN_WIDTH }}
           />
         </div>
 
         <div role="rowgroup" className="flex items-start">
           <div
-            className="flex shrink-0 flex-col border-r border-white/[0.12]"
+            className="flex shrink-0 flex-col border-r border-border"
             style={{ width: TRACKER_SLOT_COLUMN_WIDTH }}
           >
             {SLOT_ORDER.map((slot, i) => (
@@ -317,7 +317,7 @@ export function MergedCompareGrid({
                     key={slot}
                     role="cell"
                     className={`flex h-12 items-center justify-center p-2 ${
-                      i < SLOT_ORDER.length - 1 ? "border-b border-white/10" : ""
+                      i < SLOT_ORDER.length - 1 ? "border-b border-border" : ""
                     }`}
                   >
                     {/*
@@ -325,7 +325,7 @@ export function MergedCompareGrid({
                      * right of the ownership square, vertically centered.
                      */}
                     <div className="relative inline-flex shrink-0">
-                      <div className="flex size-6 shrink-0 rounded-[5px] border border-white/15">
+                      <div className="flex size-6 shrink-0 rounded-[5px] border border-border">
                         <MergeHalfSquare
                           hasInventory={hasInventory}
                           state={st}
@@ -347,7 +347,7 @@ export function MergedCompareGrid({
                             <span
                               role="img"
                               aria-label={EXOTIC_SLOT_HINT_TITLE}
-                              className="pointer-events-auto overflow-hidden box-content absolute left-full top-1/2 ml-1.5 size-[8px] -translate-y-1/2 cursor-default rounded-[2px] border border-solid border-white/12 bg-[linear-gradient(140deg,rgba(232,184,74,1)_0%,rgba(218,186,114,1)_100%)] text-[rgba(255,255,255,0)] shadow-[0_0_4px_-1px_rgba(232,184,74,0.6)]"
+                              className="pointer-events-auto overflow-hidden box-content absolute left-full top-1/2 ml-1.5 size-[8px] -translate-y-1/2 cursor-default rounded-[2px] border border-solid border-foreground/12 bg-[linear-gradient(140deg,rgba(232,184,74,1)_0%,rgba(218,186,114,1)_100%)] text-transparent shadow-[0_0_4px_-1px_rgba(232,184,74,0.6)]"
                             />
                           </TooltipTrigger>
                           <TooltipContent>
@@ -362,7 +362,7 @@ export function MergedCompareGrid({
             </div>
           ))}
           <div
-            className="flex shrink-0 flex-col border-l border-white/[0.12]"
+            className="flex shrink-0 flex-col border-l border-border"
             style={{ width: TRACKER_SLOT_COLUMN_WIDTH }}
           >
             {SLOT_ORDER.map((slot, i) => (

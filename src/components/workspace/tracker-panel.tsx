@@ -201,7 +201,7 @@ export function TrackerPanel({
 
   const glyphClass =
     Number(view.class_type) < 0
-      ? "block h-[15px] w-[30px] shrink-0 text-white"
+      ? "block h-[15px] w-[30px] shrink-0 text-foreground"
       : Number(view.class_type) === 2
         ? "block h-3.5 w-auto shrink-0 object-contain"
         : "block h-7 w-auto shrink-0 object-contain";
@@ -289,7 +289,7 @@ export function TrackerPanel({
       >
         <aside
           aria-label="Tracker actions"
-          className="flex shrink-0 cursor-default flex-col items-center gap-2 self-start bg-[#424347] p-2"
+          className="flex shrink-0 cursor-default flex-col items-center gap-2 self-start bg-accent p-2"
         >
           <Tooltip>
             <TooltipTrigger asChild>
@@ -298,7 +298,7 @@ export function TrackerPanel({
                 aria-label="Drag tracker"
                 onPointerDownCapture={primeRndScaleForPointer}
                 onTouchStartCapture={primeRndScaleForPointer}
-                className="tracker-drag flex h-5 w-5 cursor-grab items-center justify-center text-white/70 transition-colors hover:text-white active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                className="tracker-drag flex h-5 w-5 cursor-grab items-center justify-center text-muted-foreground transition-colors hover:text-foreground active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <DotsSixVertical className="h-5 w-5" />
               </button>
@@ -306,7 +306,7 @@ export function TrackerPanel({
             <TooltipContent side="right">Drag tracker</TooltipContent>
           </Tooltip>
 
-          <span aria-hidden className="h-px w-full bg-white/10" />
+          <span aria-hidden className="h-px w-full bg-border" />
 
           <span className="no-drag inline-flex">
             <RefreshButton variant="icon" />
@@ -319,7 +319,7 @@ export function TrackerPanel({
                   type="button"
                   aria-label="Duplicate tracker"
                   onClick={() => onRequestDuplicate(payload)}
-                  className="no-drag flex h-5 w-5 cursor-pointer items-center justify-center text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  className="no-drag flex h-5 w-5 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <CopySimple className="h-5 w-5" weight="duotone" />
                 </button>
@@ -328,7 +328,7 @@ export function TrackerPanel({
             </Tooltip>
           : null}
 
-          <span aria-hidden className="h-px w-full bg-white/10" />
+          <span aria-hidden className="h-px w-full bg-border" />
 
           {showMergedGrid && onUnmerge ? (
             <>
@@ -345,7 +345,7 @@ export function TrackerPanel({
                 </TooltipTrigger>
                 <TooltipContent side="right">Split merged trackers</TooltipContent>
               </Tooltip>
-              <span aria-hidden className="h-px w-full bg-white/10" />
+              <span aria-hidden className="h-px w-full bg-border" />
             </>
           ) : null}
 
@@ -364,7 +364,7 @@ export function TrackerPanel({
           onPointerDownCapture={primeRndScaleForPointer}
           onTouchStartCapture={primeRndScaleForPointer}
         >
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#2d2e32]">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-card">
             {showMergedGrid && mergePartnerPayload ? (
             <header className="flex shrink-0 select-none items-stretch gap-0 px-4 pb-0 pt-4">
               <div
@@ -438,7 +438,7 @@ export function TrackerPanel({
                 className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200"
               >
                 <p className="font-medium">No class assigned</p>
-                <p className="text-white/60">
+                <p className="text-muted-foreground">
                   Created before class scoping. Delete and remake to filter by
                   class.
                 </p>

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { ArrowsClockwise, Database } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { chromeStandaloneSquareIconButtonClass } from "@/components/ui/chrome-square-icon-button";
 import {
   Tooltip,
   TooltipContent,
@@ -14,9 +13,9 @@ import {
 
 interface Props {
   /**
-   * `primary`/`secondary` = text + icon button (dashboard banners).
-   * `header-icon`         = same bordered 40×40 chrome as `header-large`.
-   * `header-large`        = compact square nav control (manifest sync).
+   * `primary`/`secondary`     = text + icon button (dashboard banners).
+   * `header-icon`/`header-large` = standardized outline icon Button (used in nav header).
+   *   These two render identically; both retained for API compatibility.
    */
   variant?: "primary" | "secondary" | "header-icon" | "header-large";
   label?: string;
@@ -71,52 +70,25 @@ export function SyncManifestButton({
     }
   }
 
-  if (variant === "header-icon") {
+  if (variant === "header-icon" || variant === "header-large") {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="icon"
             onClick={sync}
             disabled={isLoading}
             aria-label={
               isLoading ? "Syncing Bungie manifest" : "Sync Bungie manifest"
             }
-            className={chromeStandaloneSquareIconButtonClass()}
           >
             {isLoading ? (
-              <ArrowsClockwise weight="duotone" className="h-5 w-5 animate-spin" />
+              <ArrowsClockwise weight="duotone" className="animate-spin" />
             ) : (
-              <Database weight="duotone" className="h-5 w-5" />
+              <Database weight="duotone" />
             )}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>
-          {isLoading ? "Syncing manifest…" : "Sync Bungie manifest"}
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  if (variant === "header-large") {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            onClick={sync}
-            disabled={isLoading}
-            aria-label={
-              isLoading ? "Syncing Bungie manifest" : "Sync Bungie manifest"
-            }
-            className={chromeStandaloneSquareIconButtonClass()}
-          >
-            {isLoading ? (
-              <ArrowsClockwise weight="duotone" className="h-5 w-5 animate-spin" />
-            ) : (
-              <Database weight="duotone" className="h-5 w-5" />
-            )}
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>
           {isLoading ? "Syncing manifest…" : "Sync Bungie manifest"}

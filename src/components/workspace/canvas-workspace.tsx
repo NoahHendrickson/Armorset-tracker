@@ -54,6 +54,7 @@ import {
   type WorkspaceClusterDimension,
   type WorkspaceLayoutJson,
 } from "@/lib/workspace/workspace-schema";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -66,12 +67,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  chromeStandaloneSquareIconButtonClass,
-  chromeToolbarInsetPrimaryTileClass,
-  chromeToolbarInsetSegmentTileClass,
-  chromeToolbarShellClass,
-} from "@/components/ui/chrome-square-icon-button";
 import { DuplicateTrackerDialog } from "@/components/workspace/duplicate-tracker-dialog";
 import {
   NewTrackerDialog,
@@ -94,8 +89,6 @@ import {
   type ArrangeGroupMode,
   type ArrangeSortMode,
 } from "@/lib/workspace/workspace-arrange-grid";
-import { cn } from "@/lib/utils";
-
 type ArrangeRecipe = {
   sort: ArrangeSortMode;
   groupBy: ArrangeGroupMode;
@@ -1246,7 +1239,7 @@ export function CanvasWorkspace({
       ) : null}
 
       <div
-        className={`relative min-h-0 flex-1 overflow-hidden bg-[#1a1b1b] ${
+        className={`relative min-h-0 flex-1 overflow-hidden bg-background ${
           spacePan ? "canvas-space-pan" : ""
         }`}
       >
@@ -1362,10 +1355,10 @@ export function CanvasWorkspace({
             {trackers.length === 0 ? (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-8">
                 <div className="flex max-w-lg flex-col items-center text-center">
-                  <p className="text-[20px] font-normal leading-normal tracking-tight text-white">
+                  <p className="text-[20px] font-normal leading-normal tracking-tight text-foreground">
                     Welcome to D2 Tuning Tracker
                   </p>
-                  <p className="mt-2 max-w-xl text-sm font-normal leading-snug text-white/50">
+                  <p className="mt-2 max-w-xl text-sm font-normal leading-snug text-muted-foreground">
                     Create a tracker by class, armor set, archetype, and tuning.
                   </p>
                 </div>
@@ -1374,92 +1367,87 @@ export function CanvasWorkspace({
 
             {/* Zoom + recenter — bottom right */}
             <div className="pointer-events-none absolute bottom-6 right-6 z-30 flex gap-2">
-              <div className={cn("pointer-events-auto", chromeToolbarShellClass)}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="Arrange trackers in a 5-column grid (canvas order)"
-                      disabled={arrangeDisabled}
-                      onClick={() => void handleArrangeGrid()}
-                      className={chromeToolbarInsetPrimaryTileClass()}
-                    >
-                      <SquaresFour className="h-5 w-5" weight="duotone" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Arrange trackers in a 5-column grid
-                  </TooltipContent>
-                </Tooltip>
-                <DropdownMenu>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label="Canvas clustering options"
-                          disabled={arrangeDisabled}
-                          className={chromeToolbarInsetSegmentTileClass(
-                            "data-[state=open]:bg-[#3a3b3f] data-[state=open]:text-white",
-                          )}
-                        >
-                          <CaretDown className="h-4 w-4" weight="duotone" />
-                        </button>
-                      </DropdownMenuTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Choose how trackers group on the canvas
-                    </TooltipContent>
-                  </Tooltip>
-                  <DropdownMenuContent
-                    align="end"
-                    side="top"
-                    sideOffset={8}
-                    className="min-w-[14rem] rounded-none border border-white/15 bg-[#2d2e32] py-2 text-white shadow-xl"
-                  >
-                    <DropdownMenuLabel className="max-w-[16rem] px-3 pb-2 pt-1.5 text-xs font-normal leading-snug text-white/65">
-                      Pick up to two: first groups the workspace, second nests inside
-                      each group.
-                    </DropdownMenuLabel>
-                    {WORKSPACE_CLUSTER_DIMENSIONS.map((dim) => (
-                      <DropdownMenuCheckboxItem
-                        key={dim}
-                        disabled={arrangeDisabled}
-                        checked={clusterDimPickOrder.includes(dim)}
-                        onSelect={(e) => {
-                          /* Keep menu open so both cluster picks can be toggled without reopening */
-                          e.preventDefault();
-                        }}
-                        onCheckedChange={(c) => {
-                          const next = computeNextClusterPicks(
-                            clusterDimPickOrder,
-                            dim,
-                            c,
-                          );
-                          commitClusterPickOrder(next);
-                        }}
-                        className="rounded-none pl-3 pr-9 text-white focus:bg-white/10 focus:text-white data-[highlighted]:bg-white/10 [&>span]:left-auto [&>span]:right-2 [&>span]:top-1/2 [&>span]:-translate-y-1/2 [&>span]:text-white"
-                      >
-                        {clusterDimensionLabel(dim)}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label="Arrange trackers in a 5-column grid (canvas order)"
+                    disabled={arrangeDisabled}
+                    onClick={() => void handleArrangeGrid()}
+                    className="pointer-events-auto"
+                  >
+                    <SquaresFour weight="duotone" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Arrange trackers in a 5-column grid
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Canvas clustering options"
+                        disabled={arrangeDisabled}
+                        className="pointer-events-auto data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
+                      >
+                        <CaretDown weight="duotone" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Choose how trackers group on the canvas
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent
+                  align="end"
+                  side="top"
+                  sideOffset={8}
+                  className="min-w-[14rem] rounded-none shadow-xl"
+                >
+                  <DropdownMenuLabel className="max-w-[16rem] px-3 pb-2 pt-1.5 text-xs font-normal leading-snug text-muted-foreground">
+                    Pick up to two: first groups the workspace, second nests inside
+                    each group.
+                  </DropdownMenuLabel>
+                  {WORKSPACE_CLUSTER_DIMENSIONS.map((dim) => (
+                    <DropdownMenuCheckboxItem
+                      key={dim}
+                      disabled={arrangeDisabled}
+                      checked={clusterDimPickOrder.includes(dim)}
+                      onSelect={(e) => {
+                        /* Keep menu open so both cluster picks can be toggled without reopening */
+                        e.preventDefault();
+                      }}
+                      onCheckedChange={(c) => {
+                        const next = computeNextClusterPicks(
+                          clusterDimPickOrder,
+                          dim,
+                          c,
+                        );
+                        commitClusterPickOrder(next);
+                      }}
+                    >
+                      {clusterDimensionLabel(dim)}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
                     aria-label="Recenter workspace and trackers"
                     disabled={trackers.length === 0 || draggingId !== null}
                     onClick={() => void handleRecenterWorkspace()}
-                    className={cn(
-                      "pointer-events-auto",
-                      chromeStandaloneSquareIconButtonClass(),
-                    )}
+                    className="pointer-events-auto"
                   >
-                    <Crosshair className="h-5 w-5" weight="duotone" />
-                  </button>
+                    <Crosshair weight="duotone" />
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
                   Recenter workspace and trackers
@@ -1467,33 +1455,29 @@ export function CanvasWorkspace({
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="icon"
                     aria-label="Zoom out"
                     onClick={() => twRef.current?.zoomOut(0.2)}
-                    className={cn(
-                      "pointer-events-auto",
-                      chromeStandaloneSquareIconButtonClass(),
-                    )}
+                    className="pointer-events-auto"
                   >
-                    <MagnifyingGlassMinus className="h-5 w-5" weight="duotone" />
-                  </button>
+                    <MagnifyingGlassMinus weight="duotone" />
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top">Zoom out</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="icon"
                     aria-label="Zoom in"
                     onClick={() => twRef.current?.zoomIn(0.2)}
-                    className={cn(
-                      "pointer-events-auto",
-                      chromeStandaloneSquareIconButtonClass(),
-                    )}
+                    className="pointer-events-auto"
                   >
-                    <MagnifyingGlassPlus className="h-5 w-5" weight="duotone" />
-                  </button>
+                    <MagnifyingGlassPlus weight="duotone" />
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top">Zoom in</TooltipContent>
               </Tooltip>

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 
 const trackerBadgeClass =
-  "min-w-0 max-w-[min(100%,14rem)] shrink truncate rounded-none border border-[#00FF85] bg-[#00FF85]/14 px-3 py-1.5 text-sm font-medium leading-snug text-white shadow-none";
+  "min-w-0 max-w-[min(100%,14rem)] shrink truncate rounded-none border border-[#00FF85] bg-[#00FF85]/14 px-3 py-1.5 text-sm font-medium leading-snug text-foreground shadow-none";
 
 interface TrackerIdentBadgesProps {
   setName: string;

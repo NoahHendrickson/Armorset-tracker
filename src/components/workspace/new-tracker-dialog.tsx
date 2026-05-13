@@ -105,7 +105,7 @@ export function NewTrackerDialog({
         align="center"
         sideOffset={10}
         collisionPadding={16}
-        className="max-w-lg border-[#424347] bg-[#2d2e32] p-8 text-white shadow-xl [&_.text-muted-foreground]:text-white/65"
+        className="max-w-lg p-8 shadow-xl"
         onPointerDownOutside={(e) => {
           const target = e.detail.originalEvent.target;
           if (isFromFabShell(fabShellRef.current, target)) e.preventDefault();
@@ -125,7 +125,7 @@ export function NewTrackerDialog({
             <TooltipTrigger asChild>
               <PopoverClose
                 type="button"
-                className="shrink-0 rounded-none p-1.5 text-white/70 opacity-90 ring-offset-[#2d2e32] transition-opacity hover:bg-white/10 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-[#2d2e32]"
+                className="shrink-0 rounded-none p-1.5 text-muted-foreground opacity-90 ring-offset-popover transition-opacity hover:bg-accent hover:text-foreground hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-popover"
                 aria-label="Close"
               >
                 <X weight="duotone" className="h-4 w-4" />

@@ -61,7 +61,8 @@ function cellTitle(
 
 /**
  * Tracker body grid — implements the Figma "tertiary × slot" table:
- *   120px slot column + one 100px column per tertiary stat, 48px rows.
+ *   {@link TRACKER_SLOT_COLUMN_WIDTH}px slot column + one 100px column per
+ *   tertiary stat, 48px rows.
  *   Header row is muted; body rows are white medium weight with a subtle
  *   bottom border between rows. Cells center a rounded square ownership mark.
  */
@@ -75,7 +76,7 @@ export function ViewGrid({
 
   if (tertiaryStats.length === 0) {
     return (
-      <div className="rounded-md border border-white/10 bg-white/5 p-4 text-sm text-white/60">
+      <div className="rounded-md border border-border bg-accent/40 p-4 text-sm text-muted-foreground">
         No tertiary stats available for this archetype yet. Sync the manifest
         to populate archetype stat pairs.
       </div>
@@ -99,10 +100,10 @@ export function ViewGrid({
         <div role="row" className="flex items-center">
           <div
             role="columnheader"
-            className="flex h-6 shrink-0 items-center p-2 text-base text-white/45"
+            className="flex h-6 shrink-0 items-center p-2 text-base text-muted-foreground/80"
             style={{ width: TRACKER_SLOT_COLUMN_WIDTH }}
           >
-            <span className="truncate">Tertiary stat</span>
+            <span className="whitespace-nowrap">Tertiary stat</span>
           </div>
           {tertiaryStats.map((t) => {
             const iconPath = tertiaryStatIconPaths[t];
@@ -110,7 +111,7 @@ export function ViewGrid({
               <div
                 key={t}
                 role="columnheader"
-                className="flex h-6 w-[100px] items-center gap-1 p-2 text-base text-white/45"
+                className="flex h-6 w-[100px] items-center gap-1 p-2 text-base text-muted-foreground/80"
               >
                 {iconPath ? (
                   // eslint-disable-next-line @next/next/no-img-element -- Bungie CDN; plain img avoids next/image remote config
@@ -164,7 +165,7 @@ export function ViewGrid({
                         role="cell"
                         className={`flex h-12 items-center justify-center p-2 ${
                           i < SLOT_ORDER.length - 1
-                            ? "border-b border-white/10"
+                            ? "border-b border-border"
                             : ""
                         }`}
                       >

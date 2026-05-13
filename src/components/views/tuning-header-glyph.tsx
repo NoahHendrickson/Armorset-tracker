@@ -10,7 +10,7 @@ import {
 
 /** Same border, fill, type scale as set/archetype badges on the tracker header. */
 const tuningBadgeClass =
-  "inline-flex shrink-0 cursor-default items-center gap-2 rounded-none border border-[#00FF85] bg-[#00FF85]/14 px-3 py-1.5 text-sm font-medium leading-snug text-white shadow-none";
+  "inline-flex shrink-0 cursor-default items-center gap-2 rounded-none border border-[#00FF85] bg-[#00FF85]/14 px-3 py-1.5 text-sm font-medium leading-snug text-foreground shadow-none";
 
 interface TuningHeaderGlyphProps {
   tuningName: string;
@@ -49,7 +49,7 @@ export function TuningHeaderGlyph({ tuningName, iconPath }: TuningHeaderGlyphPro
           ) : (
             <span
               aria-hidden
-              className="flex h-5 w-5 shrink-0 items-center justify-center text-xs font-semibold text-white/80"
+              className="flex h-5 w-5 shrink-0 items-center justify-center text-xs font-semibold text-foreground/80"
             >
               +
             </span>

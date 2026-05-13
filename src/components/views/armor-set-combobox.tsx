@@ -1,7 +1,13 @@
 "use client";
 
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { CaretDown, Check, MagnifyingGlass } from "@phosphor-icons/react/dist/ssr";
+import {
+  CaretDown,
+  Check,
+  MagnifyingGlass,
+  PushPin,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 import {
   Popover,
   PopoverContent,
@@ -12,6 +18,126 @@ import type { TrackerOptionItem } from "@/lib/views/tracker-option";
 
 const TRIGGER_CLASSES =
   "flex h-9 w-full items-center justify-between gap-2 text-left whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1";
+
+/**
+ * Splits options into a `pinned` (in pin order) and `unpinned` (catalog order)
+ * pair. Pinned options that are no longer in the catalog are silently dropped.
+ * When `query` is non-empty, the pinned section is suppressed and all matches
+ * appear in a single flat list so search results are not visually fragmented.
+ */
+function partitionByPin<T extends { hash: number | string }>(
+  filtered: readonly T[],
+  pinnedHashes: readonly string[] | undefined,
+  query: string,
+): { pinned: T[]; unpinned: T[]; sectioned: boolean } {
+  if (!pinnedHashes || pinnedHashes.length === 0 || query.trim().length > 0) {
+    return { pinned: [], unpinned: filtered.slice(), sectioned: false };
+  }
+  const pinSet = new Set(pinnedHashes);
+  const byHash = new Map(filtered.map((o) => [String(o.hash), o]));
+  const pinned: T[] = [];
+  for (const h of pinnedHashes) {
+    const opt = byHash.get(h);
+    if (opt) pinned.push(opt);
+  }
+  const unpinned = filtered.filter((o) => !pinSet.has(String(o.hash)));
+  return { pinned, unpinned, sectioned: pinned.length > 0 };
+}
+
+interface PinButtonProps {
+  pinned: boolean;
+  name: string;
+  onToggle: () => void;
+}
+
+/**
+ * Trailing pin/unpin affordance on each option row. Not in tab order — the
+ * listbox uses Arrow keys for navigation, and clicking the pin must not
+ * trigger row selection.
+ */
+function PinButton({ pinned, name, onToggle }: PinButtonProps) {
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={pinned ? `Unpin ${name}` : `Pin ${name} to top`}
+      title={pinned ? "Unpin" : "Pin to top"}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggle();
+      }}
+      onMouseDown={(e) => {
+        /* Keep input focus / prevent the row's onMouseEnter highlight churn. */
+        e.preventDefault();
+      }}
+      className={cn(
+        "absolute right-1.5 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity",
+        "hover:bg-foreground/10 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        pinned
+          ? "opacity-100 text-popover-foreground"
+          : "text-popover-foreground/60 opacity-0 group-hover:opacity-100",
+      )}
+    >
+      <PushPin
+        weight={pinned ? "fill" : "regular"}
+        aria-hidden
+        className="h-3.5 w-3.5"
+      />
+    </button>
+  );
+}
+
+function PinnedSectionLabel() {
+  return (
+    <li
+      role="presentation"
+      aria-hidden
+      className="px-2 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+    >
+      Pinned sets
+    </li>
+  );
+}
+
+function PinnedSectionDivider() {
+  return (
+    <li
+      role="presentation"
+      aria-hidden
+      className="mx-2 mb-1 mt-1 border-t border-border"
+    />
+  );
+}
+
+interface SearchClearButtonProps {
+  onClear: () => void;
+}
+
+/**
+ * Trailing affordance inside the search bar that wipes the typed query.
+ * `onMouseDown` preventDefault keeps focus on the input across the click so
+ * the user can keep typing without an extra Tab — matches the pattern used by
+ * `PinButton` above.
+ */
+function SearchClearButton({ onClear }: SearchClearButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-label="Clear search"
+      title="Clear search"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClear}
+      className={cn(
+        "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors",
+        "text-muted-foreground hover:bg-foreground/10 hover:text-popover-foreground",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      )}
+    >
+      <X weight="bold" aria-hidden className="h-3.5 w-3.5" />
+    </button>
+  );
+}
 
 interface ArmorSetComboboxProps {
   id?: string;
@@ -31,6 +157,18 @@ interface ArmorSetComboboxProps {
    * Required for wheel scrolling inside a Radix modal (RemoveScroll only allows scroll in dialog shards).
    */
   portalContainer?: HTMLElement | null;
+  /**
+   * Hashes (as strings) of armor sets to surface at the top in a "Pinned sets"
+   * section. Order is preserved. When `onTogglePin` is also provided, each row
+   * gets a trailing pin/unpin button.
+   */
+  pinnedHashes?: readonly string[];
+  /**
+   * Called when the user toggles a pin from a row's pin button. When omitted,
+   * pin affordances are hidden (the section can still be shown read-only via
+   * `pinnedHashes`).
+   */
+  onTogglePin?: (hash: string) => void;
   "aria-label"?: string;
 }
 
@@ -45,6 +183,8 @@ export function ArmorSetCombobox({
   sharpCorners = false,
   invalid = false,
   portalContainer,
+  pinnedHashes,
+  onTogglePin,
   "aria-label": ariaLabel,
 }: ArmorSetComboboxProps) {
   const listboxId = useId();
@@ -60,6 +200,20 @@ export function ArmorSetCombobox({
     if (!q.length) return options;
     return options.filter((o) => o.name.toLowerCase().includes(q));
   }, [options, query]);
+
+  const { pinned, unpinned, sectioned } = useMemo(
+    () => partitionByPin(filtered, pinnedHashes, query),
+    [filtered, pinnedHashes, query],
+  );
+  const displayedOptions = useMemo(
+    () => [...pinned, ...unpinned],
+    [pinned, unpinned],
+  );
+
+  const pinnedSet = useMemo(
+    () => new Set(pinnedHashes ?? []),
+    [pinnedHashes],
+  );
 
   const selectedOption = options.find((o) => String(o.hash) === value);
   const displayLabel =
@@ -86,7 +240,9 @@ export function ArmorSetCombobox({
   }
 
   const focusedIndex =
-    filtered.length === 0 ? 0 : Math.min(Math.max(0, highlightIndex), filtered.length - 1);
+    displayedOptions.length === 0
+      ? 0
+      : Math.min(Math.max(0, highlightIndex), displayedOptions.length - 1);
 
   return (
     <Popover open={open} onOpenChange={closeAndReset}>
@@ -100,8 +256,8 @@ export function ArmorSetCombobox({
           aria-haspopup="listbox"
           aria-controls={open ? listboxId : undefined}
           aria-activedescendant={
-            open && filtered[focusedIndex]
-              ? `${listboxId}-${filtered[focusedIndex].hash}`
+            open && displayedOptions[focusedIndex]
+              ? `${listboxId}-${displayedOptions[focusedIndex].hash}`
               : undefined
           }
           aria-label={ariaLabel}
@@ -144,7 +300,7 @@ export function ArmorSetCombobox({
           queueMicrotask(() => searchRef.current?.focus({ preventScroll: true }));
         }}
       >
-        <div className="flex max-h-[min(90vh,24rem)] flex-col overflow-hidden">
+        <div className="flex max-h-[min(90vh,26rem)] flex-col overflow-hidden">
           <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-2 pb-2 pt-1.5">
             <MagnifyingGlass
               weight="regular"
@@ -167,11 +323,11 @@ export function ArmorSetCombobox({
                 sharpCorners ? "rounded-none" : "rounded-md",
               )}
               onKeyDown={(e) => {
-                if (!filtered.length) return;
+                if (!displayedOptions.length) return;
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
                   setHighlightIndex((i) =>
-                    Math.min(i + 1, filtered.length - 1),
+                    Math.min(i + 1, displayedOptions.length - 1),
                   );
                 }
                 if (e.key === "ArrowUp") {
@@ -180,7 +336,7 @@ export function ArmorSetCombobox({
                 }
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  const picked = filtered[focusedIndex];
+                  const picked = displayedOptions[focusedIndex];
                   if (picked) select(String(picked.hash));
                 }
                 if (e.key === "Home") {
@@ -189,53 +345,125 @@ export function ArmorSetCombobox({
                 }
                 if (e.key === "End") {
                   e.preventDefault();
-                  setHighlightIndex(filtered.length - 1);
+                  setHighlightIndex(displayedOptions.length - 1);
                 }
               }}
             />
+            {query.length > 0 ? (
+              <SearchClearButton
+                onClear={() => {
+                  setQuery("");
+                  setHighlightIndex(0);
+                  searchRef.current?.focus({ preventScroll: true });
+                }}
+              />
+            ) : null}
           </div>
           <ul
             id={listboxId}
             role="listbox"
             data-skip-canvas-wheel=""
-            className="max-h-60 min-h-0 touch-pan-y overflow-y-auto overscroll-contain px-0 py-1 motion-reduce:scroll-auto"
+            className="menu-scrollbar max-h-72 min-h-0 touch-pan-y overflow-y-auto overscroll-contain px-0 py-1 motion-reduce:scroll-auto"
           >
-            {filtered.length === 0 ? (
-            <li className="px-2 py-2.5 text-sm text-muted-foreground">
-              {options.length === 0 ? emptyCatalogMessage : "No matches."}
-            </li>
-          ) : (
-            filtered.map((opt, idx) => {
-              const sel = String(opt.hash) === value;
-              const active = idx === focusedIndex;
-              return (
-                <li
-                  key={opt.hash}
-                  id={`${listboxId}-${opt.hash}`}
-                  role="option"
-                  aria-selected={sel}
-                  className={cn(
-                    "relative flex w-full cursor-pointer select-none items-center rounded-none px-2 py-1.5 pr-9 text-sm text-popover-foreground outline-none transition-colors",
-                    active && "bg-accent text-accent-foreground",
-                  )}
-                  onMouseEnter={() => setHighlightIndex(idx)}
-                  onClick={() => select(String(opt.hash))}
-                >
-                  <span className="truncate">{opt.name}</span>
-                  {sel ? (
-                    <span className="pointer-events-none absolute right-2 top-1/2 flex h-3.5 w-3.5 -translate-y-1/2 items-center justify-center">
-                      <Check
-                        weight="duotone"
-                        className={cn(
-                          "h-4 w-4 shrink-0",
-                          active ? "text-accent-foreground" : "text-popover-foreground",
-                        )}
-                      />
-                    </span>
-                  ) : null}
-                </li>
-              );
-            })
+            {displayedOptions.length === 0 ? (
+              <li className="px-2 py-2.5 text-sm text-muted-foreground">
+                {options.length === 0 ? emptyCatalogMessage : "No matches."}
+              </li>
+            ) : (
+              <>
+                {sectioned ? <PinnedSectionLabel /> : null}
+                {pinned.map((opt, pinIdx) => {
+                  const idx = pinIdx;
+                  const sel = String(opt.hash) === value;
+                  const active = idx === focusedIndex;
+                  const isPinned = pinnedSet.has(String(opt.hash));
+                  return (
+                    <li
+                      key={opt.hash}
+                      id={`${listboxId}-${opt.hash}`}
+                      role="option"
+                      aria-selected={sel}
+                      className={cn(
+                        "group relative flex w-full cursor-pointer select-none items-center rounded-none px-2 py-1.5 pr-16 text-sm text-popover-foreground outline-none transition-colors",
+                        active && "bg-accent text-accent-foreground",
+                      )}
+                      onMouseEnter={() => setHighlightIndex(idx)}
+                      onClick={() => select(String(opt.hash))}
+                    >
+                      <span className="truncate">{opt.name}</span>
+                      {sel ? (
+                        <span className="pointer-events-none absolute right-9 top-1/2 flex h-3.5 w-3.5 -translate-y-1/2 items-center justify-center">
+                          <Check
+                            weight="duotone"
+                            className={cn(
+                              "h-4 w-4 shrink-0",
+                              active
+                                ? "text-accent-foreground"
+                                : "text-popover-foreground",
+                            )}
+                          />
+                        </span>
+                      ) : null}
+                      {onTogglePin ? (
+                        <PinButton
+                          pinned={isPinned}
+                          name={opt.name}
+                          onToggle={() => onTogglePin(String(opt.hash))}
+                        />
+                      ) : null}
+                    </li>
+                  );
+                })}
+                {sectioned ? <PinnedSectionDivider /> : null}
+                {unpinned.map((opt, unpinnedIdx) => {
+                  const idx = pinned.length + unpinnedIdx;
+                  const sel = String(opt.hash) === value;
+                  const active = idx === focusedIndex;
+                  const isPinned = pinnedSet.has(String(opt.hash));
+                  return (
+                    <li
+                      key={opt.hash}
+                      id={`${listboxId}-${opt.hash}`}
+                      role="option"
+                      aria-selected={sel}
+                      className={cn(
+                        "group relative flex w-full cursor-pointer select-none items-center rounded-none px-2 py-1.5 text-sm text-popover-foreground outline-none transition-colors",
+                        onTogglePin ? "pr-16" : "pr-9",
+                        active && "bg-accent text-accent-foreground",
+                      )}
+                      onMouseEnter={() => setHighlightIndex(idx)}
+                      onClick={() => select(String(opt.hash))}
+                    >
+                      <span className="truncate">{opt.name}</span>
+                      {sel ? (
+                        <span
+                          className={cn(
+                            "pointer-events-none absolute top-1/2 flex h-3.5 w-3.5 -translate-y-1/2 items-center justify-center",
+                            onTogglePin ? "right-9" : "right-2",
+                          )}
+                        >
+                          <Check
+                            weight="duotone"
+                            className={cn(
+                              "h-4 w-4 shrink-0",
+                              active
+                                ? "text-accent-foreground"
+                                : "text-popover-foreground",
+                            )}
+                          />
+                        </span>
+                      ) : null}
+                      {onTogglePin ? (
+                        <PinButton
+                          pinned={isPinned}
+                          name={opt.name}
+                          onToggle={() => onTogglePin(String(opt.hash))}
+                        />
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </>
             )}
           </ul>
         </div>
@@ -264,6 +492,10 @@ export interface ArmorSetMultiComboboxProps {
   summaryEmptyClassName?: string;
   caretClassName?: string;
   portalContainer?: HTMLElement | null;
+  /** See {@link ArmorSetComboboxProps.pinnedHashes}. */
+  pinnedHashes?: readonly string[];
+  /** See {@link ArmorSetComboboxProps.onTogglePin}. */
+  onTogglePin?: (hash: string) => void;
   "aria-label"?: string;
 }
 
@@ -295,6 +527,8 @@ export function ArmorSetMultiCombobox({
   summaryEmptyClassName,
   caretClassName,
   portalContainer,
+  pinnedHashes,
+  onTogglePin,
   "aria-label": ariaLabel,
 }: ArmorSetMultiComboboxProps) {
   const listboxId = useId();
@@ -312,6 +546,20 @@ export function ArmorSetMultiCombobox({
     if (!q.length) return options;
     return options.filter((o) => o.name.toLowerCase().includes(q));
   }, [options, query]);
+
+  const { pinned, unpinned, sectioned } = useMemo(
+    () => partitionByPin(filtered, pinnedHashes, query),
+    [filtered, pinnedHashes, query],
+  );
+  const displayedOptions = useMemo(
+    () => [...pinned, ...unpinned],
+    [pinned, unpinned],
+  );
+
+  const pinnedSet = useMemo(
+    () => new Set(pinnedHashes ?? []),
+    [pinnedHashes],
+  );
 
   const summary = armorSetMultiSummary(values, options, placeholder);
 
@@ -336,7 +584,9 @@ export function ArmorSetMultiCombobox({
   }
 
   const focusedIndex =
-    filtered.length === 0 ? 0 : Math.min(Math.max(0, highlightIndex), filtered.length - 1);
+    displayedOptions.length === 0
+      ? 0
+      : Math.min(Math.max(0, highlightIndex), displayedOptions.length - 1);
 
   return (
     <Popover open={open} onOpenChange={closeAndReset}>
@@ -394,7 +644,7 @@ export function ArmorSetMultiCombobox({
           queueMicrotask(() => searchRef.current?.focus({ preventScroll: true }));
         }}
       >
-        <div className="flex max-h-[min(90vh,24rem)] flex-col overflow-hidden">
+        <div className="flex max-h-[min(90vh,26rem)] flex-col overflow-hidden">
           <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-2 pb-2 pt-1.5">
             <MagnifyingGlass
               weight="regular"
@@ -417,11 +667,11 @@ export function ArmorSetMultiCombobox({
                 sharpCorners ? "rounded-none" : "rounded-md",
               )}
               onKeyDown={(e) => {
-                if (!filtered.length) return;
+                if (!displayedOptions.length) return;
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
                   setHighlightIndex((i) =>
-                    Math.min(i + 1, filtered.length - 1),
+                    Math.min(i + 1, displayedOptions.length - 1),
                   );
                 }
                 if (e.key === "ArrowUp") {
@@ -430,7 +680,7 @@ export function ArmorSetMultiCombobox({
                 }
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  const picked = filtered[focusedIndex];
+                  const picked = displayedOptions[focusedIndex];
                   if (picked) toggle(String(picked.hash));
                 }
                 if (e.key === "Home") {
@@ -439,54 +689,107 @@ export function ArmorSetMultiCombobox({
                 }
                 if (e.key === "End") {
                   e.preventDefault();
-                  setHighlightIndex(filtered.length - 1);
+                  setHighlightIndex(displayedOptions.length - 1);
                 }
               }}
             />
+            {query.length > 0 ? (
+              <SearchClearButton
+                onClear={() => {
+                  setQuery("");
+                  setHighlightIndex(0);
+                  searchRef.current?.focus({ preventScroll: true });
+                }}
+              />
+            ) : null}
           </div>
           <ul
             id={listboxId}
             role="listbox"
             aria-multiselectable
             data-skip-canvas-wheel=""
-            className="max-h-60 min-h-0 touch-pan-y overflow-y-auto overscroll-contain px-0 py-1 motion-reduce:scroll-auto"
+            className="menu-scrollbar max-h-72 min-h-0 touch-pan-y overflow-y-auto overscroll-contain px-0 py-1 motion-reduce:scroll-auto"
           >
-            {filtered.length === 0 ? (
+            {displayedOptions.length === 0 ? (
               <li className="px-2 py-2.5 text-sm text-muted-foreground">
                 {options.length === 0 ? emptyCatalogMessage : "No matches."}
               </li>
             ) : (
-              filtered.map((opt, idx) => {
-                const sel = valueSet.has(String(opt.hash));
-                const active = idx === focusedIndex;
-                return (
-                  <li
-                    key={opt.hash}
-                    id={`${listboxId}-${opt.hash}`}
-                    role="option"
-                    aria-selected={sel}
-                    className={cn(
-                      "relative flex w-full cursor-pointer select-none items-center rounded-none px-2 py-1.5 pr-9 text-sm text-popover-foreground outline-none transition-colors",
-                      active && "bg-accent text-accent-foreground",
-                    )}
-                    onMouseEnter={() => setHighlightIndex(idx)}
-                    onClick={() => toggle(String(opt.hash))}
-                  >
-                    <span className="truncate">{opt.name}</span>
-                    {sel ? (
-                      <span className="pointer-events-none absolute right-2 top-1/2 flex h-3.5 w-3.5 -translate-y-1/2 items-center justify-center">
-                        <Check
-                          weight="duotone"
-                          className={cn(
-                            "h-4 w-4 shrink-0",
-                            active ? "text-accent-foreground" : "text-popover-foreground",
-                          )}
-                        />
+              <>
+                {sectioned ? <PinnedSectionLabel /> : null}
+                {pinned.map((opt, pinIdx) => {
+                  const idx = pinIdx;
+                  const sel = valueSet.has(String(opt.hash));
+                  const active = idx === focusedIndex;
+                  const isPinned = pinnedSet.has(String(opt.hash));
+                  return (
+                    <li
+                      key={opt.hash}
+                      id={`${listboxId}-${opt.hash}`}
+                      role="option"
+                      aria-selected={sel}
+                      className={cn(
+                        "group relative flex w-full cursor-pointer select-none items-center rounded-none py-1.5 pl-8 pr-9 text-sm text-popover-foreground outline-none transition-colors",
+                        active && "bg-accent text-accent-foreground",
+                      )}
+                      onMouseEnter={() => setHighlightIndex(idx)}
+                      onClick={() => toggle(String(opt.hash))}
+                    >
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute left-2 top-1/2 flex h-4 w-4 -translate-y-1/2 shrink-0 items-center justify-center border border-current/40"
+                      >
+                        {sel ? <Check weight="bold" className="h-3 w-3" /> : null}
                       </span>
-                    ) : null}
-                  </li>
-                );
-              })
+                      <span className="truncate">{opt.name}</span>
+                      {onTogglePin ? (
+                        <PinButton
+                          pinned={isPinned}
+                          name={opt.name}
+                          onToggle={() => onTogglePin(String(opt.hash))}
+                        />
+                      ) : null}
+                    </li>
+                  );
+                })}
+                {sectioned ? <PinnedSectionDivider /> : null}
+                {unpinned.map((opt, unpinnedIdx) => {
+                  const idx = pinned.length + unpinnedIdx;
+                  const sel = valueSet.has(String(opt.hash));
+                  const active = idx === focusedIndex;
+                  const isPinned = pinnedSet.has(String(opt.hash));
+                  return (
+                    <li
+                      key={opt.hash}
+                      id={`${listboxId}-${opt.hash}`}
+                      role="option"
+                      aria-selected={sel}
+                      className={cn(
+                        "group relative flex w-full cursor-pointer select-none items-center rounded-none py-1.5 pl-8 text-sm text-popover-foreground outline-none transition-colors",
+                        onTogglePin ? "pr-9" : "pr-2",
+                        active && "bg-accent text-accent-foreground",
+                      )}
+                      onMouseEnter={() => setHighlightIndex(idx)}
+                      onClick={() => toggle(String(opt.hash))}
+                    >
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute left-2 top-1/2 flex h-4 w-4 -translate-y-1/2 shrink-0 items-center justify-center border border-current/40"
+                      >
+                        {sel ? <Check weight="bold" className="h-3 w-3" /> : null}
+                      </span>
+                      <span className="truncate">{opt.name}</span>
+                      {onTogglePin ? (
+                        <PinButton
+                          pinned={isPinned}
+                          name={opt.name}
+                          onToggle={() => onTogglePin(String(opt.hash))}
+                        />
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </>
             )}
           </ul>
         </div>

@@ -64,16 +64,16 @@ export function DuplicateTrackerDialog({
     >
       <DialogContent
         ref={dialogContentRef}
-        className="max-h-[min(90vh,44rem)] max-w-lg overflow-y-auto rounded-none border-[#424347] bg-[#2d2e32] p-8 text-white shadow-xl sm:rounded-none [&_.text-muted-foreground]:text-white/65"
+        className="max-h-[min(90vh,44rem)] max-w-lg overflow-y-auto rounded-none p-8 shadow-xl sm:rounded-none"
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
         {source ?
           <>
             <DialogHeader className="space-y-2 text-left">
-              <DialogTitle className="text-lg font-semibold text-white">
+              <DialogTitle className="text-lg font-semibold text-foreground">
                 Duplicate tracker
               </DialogTitle>
-              <DialogDescription className="text-sm text-white/65">
+              <DialogDescription className="text-sm text-muted-foreground">
                 Adjust anything that should differ from your current tracker&apos;s
                 build, then create the new tracker on your canvas.
               </DialogDescription>

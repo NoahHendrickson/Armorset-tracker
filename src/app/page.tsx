@@ -22,7 +22,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const { auth_error } = await searchParams;
 
   return (
-    <main className="flex min-h-[100dvh] flex-1 flex-col items-center justify-center overflow-auto bg-[#1a1b1b] px-6 py-16 text-white">
+    <main className="flex min-h-[100dvh] flex-1 flex-col items-center justify-center overflow-auto bg-background px-6 py-16 text-foreground">
       <div className="mx-auto flex w-full max-w-[min(100%,52rem)] flex-col items-center gap-10 lg:w-fit lg:max-w-none lg:flex-row lg:items-center lg:gap-8 xl:gap-10">
         <Image
           src="/skull.svg"
@@ -36,10 +36,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
         <div className="flex w-full max-w-md flex-col items-start gap-6 text-left sm:max-w-xl lg:w-auto lg:max-w-[778px] lg:gap-10">
           <div className="flex flex-col items-start gap-2 lg:gap-2.5">
-            <h1 className="text-base font-normal leading-snug tracking-tight text-white/70 sm:text-lg lg:text-xl">
+            <h1 className="text-base font-normal leading-snug tracking-tight text-muted-foreground sm:text-lg lg:text-xl">
               D2 Tuning Tracker
             </h1>
-            <p className="text-2xl font-semibold leading-snug tracking-tight text-white sm:text-3xl lg:text-[28px] lg:leading-snug">
+            <p className="text-2xl font-semibold leading-snug tracking-tight text-foreground sm:text-3xl lg:text-[28px] lg:leading-snug">
               Make a tracker for a certain
               <br />
               armor set, archtype and tuning
