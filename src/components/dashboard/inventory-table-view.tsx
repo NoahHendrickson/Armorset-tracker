@@ -209,8 +209,8 @@ export function InventoryTableView({
         </div>
       ) : null}
 
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 pb-8 pt-[4.75rem] sm:px-6">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-background">
+        <div className="flex min-h-0 flex-col gap-4 px-4 pb-8 pt-[4.75rem] sm:px-6">
           {!hasInventory ? (
             <p className="text-sm text-muted-foreground">
               No armor inventory loaded yet. Use Refresh in the header after
@@ -480,33 +480,32 @@ export function InventoryTableView({
                 {CLASS_NAMES[inventoryClass] ?? "class"}.
               </p>
 
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-none border border-border bg-card">
-                <div className="min-h-0 flex-1 overflow-auto">
-                  <Table containerClassName="overflow-visible">
-                    <TableHeader className="[&_tr]:border-b-0">
-                      <TableRow className="border-border hover:bg-transparent">
-                        <TableHead
-                          className="sticky top-0 z-10 w-px border-b border-border bg-card pe-2 text-muted-foreground"
-                          aria-label="Icon"
-                        />
-                        <TableHead className="sticky top-0 z-10 border-b border-border bg-card text-muted-foreground">
-                          Armor set
-                        </TableHead>
-                        <TableHead className="sticky top-0 z-10 border-b border-border bg-card text-muted-foreground">
-                          Archetype
-                        </TableHead>
-                        <TableHead className="sticky top-0 z-10 border-b border-border bg-card text-muted-foreground">
-                          Tertiary
-                        </TableHead>
-                        <TableHead className="sticky top-0 z-10 border-b border-border bg-card text-muted-foreground">
-                          Tuning
-                        </TableHead>
-                        <TableHead className="sticky top-0 z-10 border-b border-border bg-card text-muted-foreground">
-                          Location
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+              <div className="min-w-0 rounded-none border border-border bg-card">
+                <Table containerClassName="overflow-visible">
+                  <TableHeader className="[&_tr]:border-b-0">
+                    <TableRow className="border-border hover:bg-transparent">
+                      <TableHead
+                        className="sticky top-0 z-10 w-px border-b border-border bg-card pe-2 text-muted-foreground"
+                        aria-label="Icon"
+                      />
+                      <TableHead className="sticky top-0 z-10 border-b border-border bg-card text-muted-foreground">
+                        Armor set
+                      </TableHead>
+                      <TableHead className="sticky top-0 z-10 border-b border-border bg-card text-muted-foreground">
+                        Archetype
+                      </TableHead>
+                      <TableHead className="sticky top-0 z-10 border-b border-border bg-card text-muted-foreground">
+                        Tertiary
+                      </TableHead>
+                      <TableHead className="sticky top-0 z-10 border-b border-border bg-card text-muted-foreground">
+                        Tuning
+                      </TableHead>
+                      <TableHead className="sticky top-0 z-10 border-b border-border bg-card text-muted-foreground">
+                        Location
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {filteredRows.length === 0 ? (
                       <TableRow className="border-border hover:bg-transparent">
                         <TableCell
@@ -559,9 +558,8 @@ export function InventoryTableView({
                         </TableRow>
                       ))
                     )}
-                    </TableBody>
-                  </Table>
-                </div>
+                  </TableBody>
+                </Table>
               </div>
             </>
           )}
