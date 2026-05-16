@@ -12,7 +12,7 @@ interface WorkspaceViewModeTabsProps {
 }
 
 const segmentBtn =
-  "flex h-10 shrink-0 items-center gap-1.5 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50";
+  "flex h-9 shrink-0 items-center gap-1.5 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50";
 
 export function WorkspaceViewModeTabs({
   mode,

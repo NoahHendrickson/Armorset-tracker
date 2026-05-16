@@ -5,4 +5,4 @@
  * file only retains the shared shell wrapper.
  */
 export const chromeToolbarShellClass =
-  "flex h-10 shrink-0 overflow-hidden rounded-none border border-border bg-card shadow-lg";
+  "flex h-9 shrink-0 overflow-hidden rounded-none border border-border bg-card shadow-lg";
