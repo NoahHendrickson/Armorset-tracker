@@ -3,10 +3,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Simple 3-color token system from Figma reference:
+/* Token system from Figma reference:
    - background = page (#ffffff / #212121)
    - surface    = single elevation for menus (#ececec / #2f2f2f)
                   → card, popover, secondary, muted all collapse to this
+   - table-header = band behind sticky column labels (+ top control row)
    - primary    = brand green (#07ad6b, same in both modes)
    --accent is one shade off surface so menu-item hover/focus stays visible.
    --success and --destructive remain their own status colors. */
@@ -24,6 +25,8 @@
   --secondary-foreground: oklch(0.145 0 0);
   --muted: oklch(0.928 0 0);                /* surface */
   --muted-foreground: oklch(0.45 0 0);
+  --table-header: oklch(0.91 0 0);         /* slightly darker than card */
+  --table-header-foreground: oklch(0.45 0 0);
   --accent: oklch(0.88 0 0);               /* one shade darker than surface */
   --accent-foreground: oklch(0.145 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -48,6 +51,8 @@
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.298 0 0);
   --muted-foreground: oklch(0.7 0 0);
+  --table-header: oklch(0.315 0 0);        /* slightly lighter than card */
+  --table-header-foreground: oklch(0.7 0 0);
   --accent: oklch(0.345 0 0);              /* one shade lighter than surface */
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
@@ -72,6 +77,8 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-table-header: var(--table-header);
+  --color-table-header-foreground: var(--table-header-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);

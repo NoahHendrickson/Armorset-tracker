@@ -19,7 +19,7 @@ type Story = StoryObj<typeof InventoryTableView>;
 
 export const Loaded: Story = {
   render: () => (
-    <div className="h-[80vh] bg-background">
+    <div className="flex h-[80vh] flex-col bg-background">
       <InventoryTableView
         hasInventory
         inventory={MOCK_INVENTORY}
@@ -32,7 +32,7 @@ export const Loaded: Story = {
 
 export const NoInventory: Story = {
   render: () => (
-    <div className="h-[80vh] bg-background">
+    <div className="flex h-[80vh] flex-col bg-background">
       <InventoryTableView
         hasInventory={false}
         inventory={EMPTY_INVENTORY}
@@ -45,7 +45,7 @@ export const NoInventory: Story = {
 
 export const SyncWarning: Story = {
   render: () => (
-    <div className="h-[80vh] bg-background">
+    <div className="flex h-[80vh] flex-col bg-background">
       <InventoryTableView
         hasInventory
         inventory={MOCK_INVENTORY}
