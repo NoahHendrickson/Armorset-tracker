@@ -4,7 +4,7 @@ import { SquaresFour, Table } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "@/lib/utils";
 import { chromeToolbarShellClass } from "@/components/ui/chrome-square-icon-button";
 
-export type WorkspaceViewMode = "canvas" | "table";
+export type WorkspaceViewMode = "grid" | "table";
 
 interface WorkspaceViewModeTabsProps {
   mode: WorkspaceViewMode;
@@ -27,15 +27,15 @@ export function WorkspaceViewModeTabs({
       <button
         type="button"
         role="tab"
-        aria-selected={mode === "canvas"}
+        aria-selected={mode === "grid"}
         className={cn(
           segmentBtn,
-          mode === "canvas" && "bg-accent text-foreground",
+          mode === "grid" && "bg-accent text-foreground",
         )}
-        onClick={() => onModeChange("canvas")}
+        onClick={() => onModeChange("grid")}
       >
         <SquaresFour className="h-4 w-4" weight="duotone" aria-hidden />
-        Canvas
+        Tracker
       </button>
       <button
         type="button"

@@ -7,37 +7,25 @@ import {
   syncUserInventory,
   InventoryNotReady,
 } from "@/lib/inventory/sync";
-import { listViewsForUser } from "@/lib/views/queries";
 import { getManifestLookups } from "@/lib/manifest/lookups";
 import { checkManifestVersion } from "@/lib/manifest/version-check";
 import { SyncManifestButton } from "@/components/dashboard/sync-manifest-button";
-import { buildSerializableTrackerPayload } from "@/lib/workspace/build-tracker-payload";
 import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
 import { manifestSelectorsFromLookups } from "@/lib/views/manifest-selectors-from-lookup";
-import { parseWorkspaceCamera } from "@/lib/workspace/workspace-schema";
+import { buildGridLookupPayload } from "@/lib/views/grid-lookup-payload.server";
+import { parseGridFilters } from "@/lib/workspace/grid-filters-schema";
 import { bungieIconUrl } from "@/lib/bungie/constants";
 
 export const dynamic = "force-dynamic";
 
-interface DashboardPageProps {
-  searchParams: Promise<{ tracker?: string }>;
-}
-
-export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/");
-
-  const sp = await searchParams;
-  const rawTracker = typeof sp?.tracker === "string" ? sp.tracker.trim() : "";
-  const focusTrackerId =
-    rawTracker.length > 0 && /^[\da-f-]{36}$/i.test(rawTracker)
-      ? rawTracker
-      : null;
 
   const sb = getServiceRoleClient();
   const { data: userRow } = await sb
     .from("users")
-    .select("display_name, workspace_camera, profile_picture_path")
+    .select("display_name, profile_picture_path, grid_filters")
     .eq("id", session.userId)
     .maybeSingle();
   const displayName = userRow?.display_name ?? session.displayName;
@@ -46,7 +34,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     userRow.profile_picture_path.trim().length > 0
       ? bungieIconUrl(userRow.profile_picture_path.trim())
       : null;
-  const initialCamera = parseWorkspaceCamera(userRow?.workspace_camera ?? null);
+  const initialGridFilters = parseGridFilters(userRow?.grid_filters ?? null);
 
   let syncWarning: string | null = null;
   try {
@@ -66,8 +54,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     }
   }
 
-  const [views, cached, lookups, versionCheck] = await Promise.all([
-    listViewsForUser(session.userId),
+  const [cached, lookups, versionCheck] = await Promise.all([
     getCachedInventoryWithSyncedAt(session.userId),
     getManifestLookups(),
     checkManifestVersion(),
@@ -75,11 +62,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const inventory = cached?.items ?? [];
 
-  const trackerPayloads = views.map((view) =>
-    buildSerializableTrackerPayload(view, lookups, inventory),
-  );
-
   const selectors = manifestSelectorsFromLookups(lookups);
+  const lookupPayload = buildGridLookupPayload(lookups);
 
   const banners = (
     <>
@@ -148,13 +132,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       displayName={displayName}
       profilePictureUrl={profilePictureUrl}
       banners={banners}
-      initialTrackers={trackerPayloads}
-      initialCamera={initialCamera}
-      focusTrackerId={focusTrackerId}
       syncWarning={syncWarning}
       hasInventory={cached !== null}
       selectors={selectors}
       inventory={inventory}
+      lookupPayload={lookupPayload}
+      initialGridFilters={initialGridFilters}
     />
   );
 }

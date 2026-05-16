@@ -22,6 +22,7 @@ export type Database = {
           created_at: string;
           updated_at: string;
           workspace_camera: Json;
+          grid_filters: Json;
         };
         Insert: {
           id?: string;
@@ -32,6 +33,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           workspace_camera?: Json;
+          grid_filters?: Json;
         };
         Update: {
           id?: string;
@@ -42,6 +44,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           workspace_camera?: Json;
+          grid_filters?: Json;
         };
         Relationships: [];
       };

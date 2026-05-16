@@ -3,11 +3,11 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
-import type { SerializableTrackerPayload } from "@/lib/workspace/types";
-import type { WorkspaceCameraJson } from "@/lib/workspace/workspace-schema";
+import type { GridLookupPayload } from "@/lib/views/grid-lookup-payload";
+import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
 import type { TrackerFormSelectors } from "@/components/workspace/new-tracker-dialog";
 import { AppHeader } from "@/components/app-header";
-import { CanvasWorkspace } from "@/components/workspace/canvas-workspace";
+import { GridWorkspace } from "@/components/workspace/grid-workspace";
 import { InventoryTableView } from "@/components/dashboard/inventory-table-view";
 import {
   WorkspaceViewModeTabs,
@@ -18,28 +18,26 @@ export interface DashboardWorkspaceProps {
   displayName: string;
   profilePictureUrl: string | null;
   banners: ReactNode;
-  initialTrackers: SerializableTrackerPayload[];
-  initialCamera: WorkspaceCameraJson;
-  focusTrackerId: string | null;
   syncWarning: string | null;
   hasInventory: boolean;
   selectors: TrackerFormSelectors;
   inventory: DerivedArmorPieceJson[];
+  lookupPayload: GridLookupPayload;
+  initialGridFilters: GridFiltersJson;
 }
 
 export function DashboardWorkspace({
   displayName,
   profilePictureUrl,
   banners,
-  initialTrackers,
-  initialCamera,
-  focusTrackerId,
   syncWarning,
   hasInventory,
   selectors,
   inventory,
+  lookupPayload,
+  initialGridFilters,
 }: DashboardWorkspaceProps) {
-  const [mode, setMode] = useState<WorkspaceViewMode>("canvas");
+  const [mode, setMode] = useState<WorkspaceViewMode>("grid");
   const tabs = <WorkspaceViewModeTabs mode={mode} onModeChange={setMode} />;
 
   return (
@@ -58,14 +56,14 @@ export function DashboardWorkspace({
           selectors={selectors}
         />
       ) : (
-        <CanvasWorkspace
+        <GridWorkspace
           banners={banners}
-          initialTrackers={initialTrackers}
-          initialCamera={initialCamera}
-          focusTrackerId={focusTrackerId}
           syncWarning={syncWarning}
           hasInventory={hasInventory}
           selectors={selectors}
+          inventory={inventory}
+          lookupPayload={lookupPayload}
+          initialFilters={initialGridFilters}
         />
       )}
     </div>
