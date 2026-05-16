@@ -29,7 +29,10 @@ import {
   type CompareTrackerDescriptor,
 } from "@/components/workspace/compare-dialog";
 import {
-  TRACKER_DEFAULT_HEIGHT,
+  TRACKER_GRID_TILE_DISPLAY_HEIGHT_PX,
+  TRACKER_GRID_TILE_DISPLAY_WIDTH_PX,
+  TRACKER_GRID_TILE_HEIGHT,
+  TRACKER_GRID_VISUAL_SCALE,
   TRACKER_WIDTH,
 } from "@/lib/workspace/workspace-constants";
 import { tertiaryStatsForArchetype } from "@/lib/views/progress";
@@ -37,8 +40,17 @@ import { usePinnedArmorSets } from "@/lib/views/use-pinned-armor-sets";
 
 const PERSIST_DEBOUNCE_MS = 500;
 const ROW_GAP_PX = 16;
-/** Visual row height including the configured gap. */
-const ROW_PITCH_PX = TRACKER_DEFAULT_HEIGHT + ROW_GAP_PX;
+/** Virtual row height for scaled tiles + vertical gap. */
+const ROW_PITCH_PX = TRACKER_GRID_TILE_DISPLAY_HEIGHT_PX + ROW_GAP_PX;
+const GRID_MAX_COLUMNS = 3;
+
+function trackerGridColumnCountForWidth(scrollerClientWidth: number): number {
+  const tile = TRACKER_GRID_TILE_DISPLAY_WIDTH_PX;
+  const raw = Math.floor(
+    (scrollerClientWidth + ROW_GAP_PX) / (tile + ROW_GAP_PX),
+  );
+  return Math.min(GRID_MAX_COLUMNS, Math.max(1, raw));
+}
 
 interface GridWorkspaceProps {
   banners: ReactNode;
@@ -205,17 +217,15 @@ export function GridWorkspace({
     lookupPayload.archetypeStatPair,
   ]);
 
-  // ---- Responsive column count via ResizeObserver ----
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-  const [columnCount, setColumnCount] = useState(1);
+  const [columnCount, setColumnCount] = useState(GRID_MAX_COLUMNS);
 
   useLayoutEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
     const tick = () => {
-      const width = el.clientWidth;
-      const cols = Math.max(1, Math.floor((width + ROW_GAP_PX) / (TRACKER_WIDTH + ROW_GAP_PX)));
-      setColumnCount((prev) => (prev === cols ? prev : cols));
+      const next = trackerGridColumnCountForWidth(el.clientWidth);
+      setColumnCount((prev) => (prev === next ? prev : next));
     };
     tick();
     const ro = new ResizeObserver(tick);
@@ -323,9 +333,9 @@ export function GridWorkspace({
                       }}
                     >
                       <div
-                        className="grid h-full gap-4"
+                        className="grid h-full w-max max-w-none justify-start gap-4"
                         style={{
-                          gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+                          gridTemplateColumns: `repeat(${columnCount}, ${TRACKER_GRID_TILE_DISPLAY_WIDTH_PX}px)`,
                         }}
                       >
                         {rowItems.map((d) => (
@@ -384,10 +394,27 @@ function GridTile({
     [descriptor, inventory, lookupPayload],
   );
   return (
-    <TrackerGridContent
-      payload={payload}
-      hasInventory={hasInventory}
-      onCompareClick={onCompareClick}
-    />
+    <div
+      className="shrink-0 overflow-hidden"
+      style={{
+        width: TRACKER_GRID_TILE_DISPLAY_WIDTH_PX,
+        height: TRACKER_GRID_TILE_DISPLAY_HEIGHT_PX,
+      }}
+    >
+      <div
+        style={{
+          width: TRACKER_WIDTH,
+          height: TRACKER_GRID_TILE_HEIGHT,
+          transform: `scale(${TRACKER_GRID_VISUAL_SCALE})`,
+          transformOrigin: "top left",
+        }}
+      >
+        <TrackerGridContent
+          payload={payload}
+          hasInventory={hasInventory}
+          onCompareClick={onCompareClick}
+        />
+      </div>
+    </div>
   );
 }

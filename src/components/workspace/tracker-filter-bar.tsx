@@ -166,10 +166,13 @@ export function TrackerFilterBar({
     });
   }
 
+  /** Match expanded search (`h-[52px]` input rail) so the bar height stays fixed when collapsed. */
+  const barMinH = "min-h-[52px]";
+
   const wrapperClass =
     variant === "table-header"
-      ? "grid min-h-[52px] min-w-0 grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2"
-      : "flex min-w-0 items-center gap-2 sm:gap-3";
+      ? cn("grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2", barMinH)
+      : cn("flex min-w-0 items-center gap-2 sm:gap-3", barMinH);
 
   return (
     <div className={cn(wrapperClass, className)}>
