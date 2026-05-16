@@ -43,7 +43,7 @@ export function DashboardWorkspace({
   const tabs = <WorkspaceViewModeTabs mode={mode} onModeChange={setMode} />;
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col">
       <AppHeader
         displayName={displayName}
         profilePictureUrl={profilePictureUrl}
@@ -68,6 +68,6 @@ export function DashboardWorkspace({
           selectors={selectors}
         />
       )}
-    </>
+    </div>
   );
 }
