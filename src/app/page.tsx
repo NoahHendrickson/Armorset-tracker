@@ -49,7 +49,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           {auth_error ? (
             <div
               role="alert"
-              className="flex w-full items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive-foreground"
+              className="flex w-full items-start gap-3 rounded-none border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive-foreground"
             >
               <Warning weight="duotone" className="mt-0.5 h-5 w-5 shrink-0" />
               <span>Couldn&rsquo;t complete sign-in: {auth_error}</span>
