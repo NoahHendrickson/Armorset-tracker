@@ -278,7 +278,7 @@ export function GridWorkspace({
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-[4.75rem] sm:px-6">
-          <div className="shrink-0 rounded-none border border-border bg-card px-3">
+          <div className="shrink-0 rounded-none border border-border bg-table-header px-3 shadow-[inset_0_-1px_0_0_var(--border)]">
             <TrackerFilterBar
               selectors={selectors}
               value={filters}
