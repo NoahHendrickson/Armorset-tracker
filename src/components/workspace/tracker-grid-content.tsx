@@ -62,7 +62,7 @@ const TRACKER_HEADER_CONTENT_DIVIDER =
 
 /**
  * Inline tracker tile (no Rnd / merge chrome). Same inner layout as the
- * canvas `TrackerPanel`'s solo branch — header + ViewGrid + a Compare action.
+ * canvas `TrackerPanel`'s solo branch — header + ViewGrid; Compare sits top-right in the header when enabled.
  */
 export function TrackerGridContent({
   payload,
@@ -105,20 +105,36 @@ export function TrackerGridContent({
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-card">
         <header className="flex shrink-0 select-none items-center gap-4 p-4">
-          <ClassGlyph
-            classType={Number(view.class_type)}
-            className={glyphClass}
-          />
-          <TrackerIdentBadges
-            setName={payload.setName}
-            archetypeName={payload.archetypeName}
-            tuning={
-              <TuningHeaderGlyph
-                tuningName={payload.tuningName}
-                iconPath={payload.tuningStatIconPath}
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <ClassGlyph
+              classType={Number(view.class_type)}
+              className={glyphClass}
+            />
+            <TrackerIdentBadges
+              setName={payload.setName}
+              archetypeName={payload.archetypeName}
+              tuning={
+                <TuningHeaderGlyph
+                  tuningName={payload.tuningName}
+                  iconPath={payload.tuningStatIconPath}
+                />
+              }
+            />
+          </div>
+          {onCompareClick ? (
+            <button
+              type="button"
+              onClick={onCompareClick}
+              className="inline-flex h-8 shrink-0 items-center gap-2 rounded-none border border-border bg-card px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <SquareSplitHorizontal
+                weight="duotone"
+                aria-hidden
+                className="h-4 w-4 shrink-0"
               />
-            }
-          />
+              Compare
+            </button>
+          ) : null}
         </header>
 
         <div className={TRACKER_HEADER_CONTENT_DIVIDER} aria-hidden />
@@ -143,23 +159,6 @@ export function TrackerGridContent({
             tertiaryStatIconPaths={tertiaryPaths}
             armorSlotIconPaths={payload.armorSlotIconPaths}
           />
-
-          {onCompareClick ? (
-            <div className="mt-auto flex shrink-0 justify-end pt-1">
-              <button
-                type="button"
-                onClick={onCompareClick}
-                className="inline-flex h-7 items-center gap-1.5 rounded-none border border-border bg-card px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <SquareSplitHorizontal
-                  weight="duotone"
-                  aria-hidden
-                  className="h-3.5 w-3.5"
-                />
-                Compare
-              </button>
-            </div>
-          ) : null}
         </div>
       </div>
     </div>

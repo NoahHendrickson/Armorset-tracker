@@ -108,7 +108,12 @@ export function CompareDialog({
             <TrackerIdentBadges
               setName={anchor.setName}
               archetypeName={anchor.archetypeName}
-              tuning={<TuningHeaderGlyph tuningName={anchor.tuningName} iconPath={null} />}
+              tuning={
+                <TuningHeaderGlyph
+                  tuningName={anchor.tuningName}
+                  iconPath={anchorPayload?.tuningStatIconPath ?? null}
+                />
+              }
             />
           </div>
         ) : null}
@@ -123,7 +128,10 @@ export function CompareDialog({
                 setName={partner.setName}
                 archetypeName={partner.archetypeName}
                 tuning={
-                  <TuningHeaderGlyph tuningName={partner.tuningName} iconPath={null} />
+                  <TuningHeaderGlyph
+                    tuningName={partner.tuningName}
+                    iconPath={partnerPayload?.tuningStatIconPath ?? null}
+                  />
                 }
               />
             </div>

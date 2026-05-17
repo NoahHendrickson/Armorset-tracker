@@ -31,6 +31,35 @@ const CLASS_TABS: Array<{ value: GridFilterClass; label: string }> = [
   { value: 2, label: "Warlock" },
 ];
 
+/** Per-dimension badge on submenu rows — mirrors the aggregate count on Filters. */
+function FilterDimensionSubTrigger({
+  label,
+  selectionCount,
+}: {
+  label: string;
+  selectionCount: number;
+}) {
+  const active = selectionCount > 0;
+  return (
+    <DropdownMenuSubTrigger
+      inset
+      className={cn(active && "font-medium text-foreground")}
+    >
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {active ? (
+          <span
+            className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-none bg-primary px-1 text-[10px] font-semibold leading-none tabular-nums text-primary-foreground"
+            title={`${selectionCount} selected`}
+          >
+            {selectionCount}
+          </span>
+        ) : null}
+      </span>
+    </DropdownMenuSubTrigger>
+  );
+}
+
 interface ResultNoun {
   singular: string;
   plural: string;
@@ -220,7 +249,10 @@ export function TrackerFilterBar({
             className="min-w-48 rounded-none py-1"
           >
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger inset>Armor sets</DropdownMenuSubTrigger>
+              <FilterDimensionSubTrigger
+                label="Armor sets"
+                selectionCount={value.setHashes.length}
+              />
               <DropdownMenuSubContent
                 className="w-[min(90vw,22rem)] min-w-[18rem] rounded-none border-border p-0 shadow-xl"
                 collisionPadding={16}
@@ -241,7 +273,10 @@ export function TrackerFilterBar({
             </DropdownMenuSub>
 
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger inset>Archetypes</DropdownMenuSubTrigger>
+              <FilterDimensionSubTrigger
+                label="Archetypes"
+                selectionCount={value.archetypeHashes.length}
+              />
               <DropdownMenuSubContent
                 className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-64")}
                 collisionPadding={16}
@@ -269,7 +304,10 @@ export function TrackerFilterBar({
             </DropdownMenuSub>
 
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger inset>Tertiary stats</DropdownMenuSubTrigger>
+              <FilterDimensionSubTrigger
+                label="Tertiary stats"
+                selectionCount={value.tertiaryStats.length}
+              />
               <DropdownMenuSubContent
                 className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-48")}
                 collisionPadding={16}
@@ -288,7 +326,10 @@ export function TrackerFilterBar({
             </DropdownMenuSub>
 
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger inset>Tuning stats</DropdownMenuSubTrigger>
+              <FilterDimensionSubTrigger
+                label="Tuning stats"
+                selectionCount={value.tuningHashes.length}
+              />
               <DropdownMenuSubContent
                 className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-56")}
                 collisionPadding={16}

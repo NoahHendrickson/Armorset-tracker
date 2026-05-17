@@ -55,11 +55,9 @@ export const TRACKER_MERGED_DEFAULT_HEIGHT = 456;
 
 /**
  * Tracker height for each tile in dashboard grid/list mode ({@link GridWorkspace}
- * virtualization). Matches canvas {@link TRACKER_DEFAULT_HEIGHT}, plus {@link TrackerGridContent}'s
- * Compare footer: `gap-4` below the stat grid (16px) + row padding `pt-1` (4px) + button `h-7` (28px).
+ * virtualization). Matches canvas {@link TRACKER_DEFAULT_HEIGHT}; Compare lives in the header.
  */
-export const TRACKER_GRID_TILE_HEIGHT =
-  TRACKER_DEFAULT_HEIGHT + 16 + 4 + 28;
+export const TRACKER_GRID_TILE_HEIGHT = TRACKER_DEFAULT_HEIGHT;
 
 /**
  * Grid list renders the full-pixel tracker DOM, then scales for display (≈25% smaller).

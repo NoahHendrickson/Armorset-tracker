@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  useCallback,
-  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -10,7 +8,6 @@ import {
   type ReactNode,
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { toast } from "sonner";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import type { TrackerFormSelectors } from "@/components/workspace/new-tracker-dialog";
 import type { GridLookupPayload } from "@/lib/views/grid-lookup-payload";
@@ -38,7 +35,6 @@ import {
 import { tertiaryStatsForArchetype } from "@/lib/views/progress";
 import { usePinnedArmorSets } from "@/lib/views/use-pinned-armor-sets";
 
-const PERSIST_DEBOUNCE_MS = 500;
 const ROW_GAP_PX = 16;
 /** Virtual row height for scaled tiles + vertical gap. */
 const ROW_PITCH_PX = TRACKER_GRID_TILE_DISPLAY_HEIGHT_PX + ROW_GAP_PX;
@@ -59,7 +55,8 @@ interface GridWorkspaceProps {
   selectors: TrackerFormSelectors;
   inventory: DerivedArmorPieceJson[];
   lookupPayload: GridLookupPayload;
-  initialFilters: GridFiltersJson;
+  filters: GridFiltersJson;
+  onFiltersChange: (next: GridFiltersJson) => void;
 }
 
 type TrackerDescriptor = CompareTrackerDescriptor;
@@ -71,9 +68,9 @@ export function GridWorkspace({
   selectors,
   inventory,
   lookupPayload,
-  initialFilters,
+  filters,
+  onFiltersChange,
 }: GridWorkspaceProps) {
-  const [filters, setFilters] = useState<GridFiltersJson>(initialFilters);
   const { pinnedHashes, togglePin } = usePinnedArmorSets();
 
   // Class-bucketed inventory; cheap to re-compute when `inventory` changes.
@@ -88,49 +85,6 @@ export function GridWorkspace({
   }, [inventory]);
 
   const inventoryForClass = inventoryByClass[filters.class] ?? [];
-
-  // ---- Debounced persistence ----
-  const pendingFiltersRef = useRef<GridFiltersJson | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flush = useCallback(async () => {
-    if (timerRef.current !== null) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    const next = pendingFiltersRef.current;
-    if (next === null) return;
-    pendingFiltersRef.current = null;
-    try {
-      const res = await fetch("/api/me/workspace", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gridFilters: next }),
-      });
-      if (!res.ok) {
-        toast.error("Could not save filter selections.");
-      }
-    } catch {
-      toast.error("Could not save filter selections.");
-    }
-  }, []);
-  useEffect(() => {
-    return () => {
-      if (pendingFiltersRef.current !== null) {
-        // Best-effort flush on unmount.
-        void flush();
-      }
-    };
-  }, [flush]);
-
-  const handleFiltersChange = useCallback(
-    (next: GridFiltersJson) => {
-      setFilters(next);
-      pendingFiltersRef.current = next;
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => void flush(), PERSIST_DEBOUNCE_MS);
-    },
-    [flush],
-  );
 
   // ---- Visible trackers (enumerate filtered cross-product) ----
   const unblocked = gridFiltersHaveUnblockingSelection(filters);
@@ -278,11 +232,11 @@ export function GridWorkspace({
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-[4.75rem] sm:px-6">
-          <div className="shrink-0 rounded-none border border-border bg-table-header px-3 shadow-[inset_0_-1px_0_0_var(--border)]">
+          <div className="shrink-0 rounded-none border border-border bg-table-header px-3">
             <TrackerFilterBar
               selectors={selectors}
               value={filters}
-              onChange={handleFiltersChange}
+              onChange={onFiltersChange}
               pinnedHashes={pinnedHashes}
               onTogglePin={togglePin}
               resultCount={visibleTrackers.length}

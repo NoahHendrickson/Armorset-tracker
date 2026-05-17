@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import type { GridLookupPayload } from "@/lib/views/grid-lookup-payload";
 import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
+import { useGridFiltersPersistence } from "@/lib/workspace/use-grid-filters-persistence";
 import type { TrackerFormSelectors } from "@/components/workspace/new-tracker-dialog";
 import { AppHeader } from "@/components/app-header";
 import { GridWorkspace } from "@/components/workspace/grid-workspace";
@@ -39,6 +40,8 @@ export function DashboardWorkspace({
 }: DashboardWorkspaceProps) {
   const [mode, setMode] = useState<WorkspaceViewMode>("grid");
   const tabs = <WorkspaceViewModeTabs mode={mode} onModeChange={setMode} />;
+  const { filters, onFiltersChange } =
+    useGridFiltersPersistence(initialGridFilters);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -54,6 +57,8 @@ export function DashboardWorkspace({
           hasInventory={hasInventory}
           inventory={inventory}
           selectors={selectors}
+          filters={filters}
+          onFiltersChange={onFiltersChange}
         />
       ) : (
         <GridWorkspace
@@ -63,7 +68,8 @@ export function DashboardWorkspace({
           selectors={selectors}
           inventory={inventory}
           lookupPayload={lookupPayload}
-          initialFilters={initialGridFilters}
+          filters={filters}
+          onFiltersChange={onFiltersChange}
         />
       )}
     </div>

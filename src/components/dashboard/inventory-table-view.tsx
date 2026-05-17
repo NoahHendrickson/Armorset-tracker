@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { ReactNode } from "react";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import {
@@ -20,10 +20,7 @@ import {
 import type { TrackerFormSelectors } from "@/components/workspace/new-tracker-dialog";
 import { usePinnedArmorSets } from "@/lib/views/use-pinned-armor-sets";
 import { TrackerFilterBar } from "@/components/workspace/tracker-filter-bar";
-import {
-  defaultGridFilters,
-  type GridFiltersJson,
-} from "@/lib/workspace/grid-filters-schema";
+import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
 
 /** Shared by header + body tables so columns line up (`table-fixed`). */
 const INVENTORY_TABLE_COLGROUP = (
@@ -55,6 +52,8 @@ interface InventoryTableViewProps {
   hasInventory: boolean;
   inventory: DerivedArmorPieceJson[];
   selectors: TrackerFormSelectors;
+  filters: GridFiltersJson;
+  onFiltersChange: (next: GridFiltersJson) => void;
 }
 
 export function InventoryTableView({
@@ -64,10 +63,9 @@ export function InventoryTableView({
   hasInventory,
   inventory,
   selectors,
+  filters,
+  onFiltersChange,
 }: InventoryTableViewProps) {
-  const [filters, setFilters] = useState<GridFiltersJson>(() =>
-    defaultGridFilters(),
-  );
   const { pinnedHashes, togglePin } = usePinnedArmorSets();
 
   const filteredRows = useMemo(() => {
@@ -166,7 +164,7 @@ export function InventoryTableView({
                           <TrackerFilterBar
                             selectors={selectors}
                             value={filters}
-                            onChange={setFilters}
+                            onChange={onFiltersChange}
                             pinnedHashes={pinnedHashes}
                             onTogglePin={togglePin}
                             resultCount={filteredRows.length}

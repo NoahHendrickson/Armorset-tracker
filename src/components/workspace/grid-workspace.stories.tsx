@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { GridWorkspace } from "./grid-workspace";
 import { MOCK_TRACKER_FORM_SELECTORS } from "../../../.storybook/mocks/tracker-options";
@@ -16,8 +17,9 @@ export default meta;
 
 type Story = StoryObj<typeof GridWorkspace>;
 
-export const EmptyState: Story = {
-  render: () => (
+function EmptyStory() {
+  const [filters, setFilters] = useState(MOCK_GRID_FILTERS_EMPTY);
+  return (
     <div style={{ height: "100vh" }}>
       <GridWorkspace
         banners={null}
@@ -26,24 +28,35 @@ export const EmptyState: Story = {
         selectors={MOCK_TRACKER_FORM_SELECTORS}
         inventory={[]}
         lookupPayload={MOCK_GRID_LOOKUP_PAYLOAD}
-        initialFilters={MOCK_GRID_FILTERS_EMPTY}
+        filters={filters}
+        onFiltersChange={setFilters}
       />
     </div>
-  ),
+  );
+}
+
+function PopulatedStory() {
+  const [filters, setFilters] = useState(MOCK_GRID_FILTERS_POPULATED);
+  return (
+    <div style={{ height: "100vh" }}>
+      <GridWorkspace
+        banners={null}
+        syncWarning={null}
+        hasInventory={false}
+        selectors={MOCK_TRACKER_FORM_SELECTORS}
+        inventory={[]}
+        lookupPayload={MOCK_GRID_LOOKUP_PAYLOAD}
+        filters={filters}
+        onFiltersChange={setFilters}
+      />
+    </div>
+  );
+}
+
+export const EmptyState: Story = {
+  render: EmptyStory,
 };
 
 export const PopulatedFilters: Story = {
-  render: () => (
-    <div style={{ height: "100vh" }}>
-      <GridWorkspace
-        banners={null}
-        syncWarning={null}
-        hasInventory={false}
-        selectors={MOCK_TRACKER_FORM_SELECTORS}
-        inventory={[]}
-        lookupPayload={MOCK_GRID_LOOKUP_PAYLOAD}
-        initialFilters={MOCK_GRID_FILTERS_POPULATED}
-      />
-    </div>
-  ),
+  render: PopulatedStory,
 };
