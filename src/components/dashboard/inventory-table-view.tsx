@@ -208,7 +208,7 @@ export function InventoryTableView({
                     {INVENTORY_TABLE_COLGROUP}
                     <TableBody>
                       {filteredRows.length === 0 ? (
-                        <TableRow className="border-border hover:bg-transparent">
+                        <TableRow className="border-b-0 border-border hover:bg-transparent shadow-[inset_0_-1px_0_0_var(--border)]">
                           <TableCell
                             colSpan={6}
                             className="py-8 text-center text-sm text-muted-foreground/80"
@@ -220,7 +220,7 @@ export function InventoryTableView({
                         filteredRows.map((piece) => (
                           <TableRow
                             key={piece.itemInstanceId}
-                            className="border-border hover:bg-accent/60"
+                            className="border-b-0 shadow-[inset_0_-1px_0_0_var(--border)] hover:bg-accent/60"
                           >
                             <TableCell className="w-px whitespace-nowrap py-1 pe-2 align-middle">
                               {piece.iconPath ? (

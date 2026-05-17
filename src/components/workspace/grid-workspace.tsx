@@ -32,7 +32,6 @@ import {
   TRACKER_GRID_VISUAL_SCALE,
   TRACKER_WIDTH,
 } from "@/lib/workspace/workspace-constants";
-import { tertiaryStatsForArchetype } from "@/lib/views/progress";
 import { usePinnedArmorSets } from "@/lib/views/use-pinned-armor-sets";
 
 const ROW_GAP_PX = 16;
@@ -105,10 +104,6 @@ export function GridWorkspace({
       filters.tuningHashes.length > 0
         ? new Set(filters.tuningHashes)
         : null;
-    const tertiarySet =
-      filters.tertiaryStats.length > 0
-        ? new Set(filters.tertiaryStats)
-        : null;
     const searchTerm = filters.search.trim().toLowerCase();
 
     const sets = setOptions.filter((s) => (setIds ? setIds.has(s.hash) : true));
@@ -122,11 +117,6 @@ export function GridWorkspace({
     const out: TrackerDescriptor[] = [];
     for (const set of sets) {
       for (const arch of archetypes) {
-        if (tertiarySet) {
-          const pair = lookupPayload.archetypeStatPair[String(arch.hash)];
-          const stats = tertiaryStatsForArchetype(pair);
-          if (!stats.some((s) => tertiarySet.has(s))) continue;
-        }
         for (const tun of tunings) {
           if (searchTerm) {
             const haystack =
@@ -163,12 +153,10 @@ export function GridWorkspace({
     filters.setHashes,
     filters.archetypeHashes,
     filters.tuningHashes,
-    filters.tertiaryStats,
     filters.search,
     selectors.setsByClass,
     selectors.archetypes,
     selectors.tunings,
-    lookupPayload.archetypeStatPair,
   ]);
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -241,6 +229,7 @@ export function GridWorkspace({
               onTogglePin={togglePin}
               resultCount={visibleTrackers.length}
               resultNoun={{ singular: "tracker", plural: "trackers" }}
+              showTertiaryStatFilter={false}
             />
           </div>
 

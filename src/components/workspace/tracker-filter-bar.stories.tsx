@@ -17,7 +17,13 @@ export default meta;
 
 type Story = StoryObj<typeof TrackerFilterBar>;
 
-function Render({ initial }: { initial: GridFiltersJson }) {
+function Render({
+  initial,
+  showTertiaryStatFilter = true,
+}: {
+  initial: GridFiltersJson;
+  showTertiaryStatFilter?: boolean;
+}) {
   const [value, setValue] = useState<GridFiltersJson>(initial);
   return (
     <div className="border border-border bg-card px-3" style={{ width: 960 }}>
@@ -29,6 +35,7 @@ function Render({ initial }: { initial: GridFiltersJson }) {
         onTogglePin={() => {}}
         resultCount={42}
         resultNoun={{ singular: "tracker", plural: "trackers" }}
+        showTertiaryStatFilter={showTertiaryStatFilter}
       />
     </div>
   );
@@ -40,4 +47,10 @@ export const EmptyFilters: Story = {
 
 export const PopulatedFilters: Story = {
   render: () => <Render initial={MOCK_GRID_FILTERS_POPULATED} />,
+};
+
+export const TrackerGridNoTertiaryMenu: Story = {
+  render: () => (
+    <Render initial={MOCK_GRID_FILTERS_POPULATED} showTertiaryStatFilter={false} />
+  ),
 };

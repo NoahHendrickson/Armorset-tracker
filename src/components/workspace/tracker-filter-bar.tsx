@@ -75,13 +75,15 @@ interface TrackerFilterBarProps {
   resultNoun: ResultNoun;
   /** Render inside the table-view header (uses TableHead container styles). */
   variant?: "standalone" | "table-header";
+  /** Tracker grid hides tertiary filtering; inventory table keeps it enabled. */
+  showTertiaryStatFilter?: boolean;
   className?: string;
 }
 
 /**
  * Filter + class-tab + search bar shared between the Tracker grid view and the
- * Table view. Mirrors the table view's prior inline filter dropdown — class
- * change prunes set selections to class-valid options.
+ * Table view (`showTertiaryStatFilter`). Mirrors the table view's prior inline
+ * filter dropdown — class change prunes set selections to class-valid options.
  */
 export function TrackerFilterBar({
   selectors,
@@ -92,6 +94,7 @@ export function TrackerFilterBar({
   resultCount,
   resultNoun,
   variant = "standalone",
+  showTertiaryStatFilter = true,
   className,
 }: TrackerFilterBarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -117,9 +120,9 @@ export function TrackerFilterBar({
     if (value.setHashes.length > 0) n += 1;
     if (value.archetypeHashes.length > 0) n += 1;
     if (value.tuningHashes.length > 0) n += 1;
-    if (value.tertiaryStats.length > 0) n += 1;
+    if (showTertiaryStatFilter && value.tertiaryStats.length > 0) n += 1;
     return n;
-  }, [value]);
+  }, [value, showTertiaryStatFilter]);
 
   const setHashesAsStrings = useMemo(
     () => value.setHashes.map(String),
@@ -303,27 +306,29 @@ export function TrackerFilterBar({
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            <DropdownMenuSub>
-              <FilterDimensionSubTrigger
-                label="Tertiary stats"
-                selectionCount={value.tertiaryStats.length}
-              />
-              <DropdownMenuSubContent
-                className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-48")}
-                collisionPadding={16}
-              >
-                {ARMOR_STAT_NAMES.map((stat) => (
-                  <DropdownMenuCheckboxItem
-                    key={stat}
-                    checked={value.tertiaryStats.includes(stat)}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(c) => toggleStat(stat, c)}
-                  >
-                    {stat}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            {showTertiaryStatFilter ? (
+              <DropdownMenuSub>
+                <FilterDimensionSubTrigger
+                  label="Tertiary stats"
+                  selectionCount={value.tertiaryStats.length}
+                />
+                <DropdownMenuSubContent
+                  className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-48")}
+                  collisionPadding={16}
+                >
+                  {ARMOR_STAT_NAMES.map((stat) => (
+                    <DropdownMenuCheckboxItem
+                      key={stat}
+                      checked={value.tertiaryStats.includes(stat)}
+                      onSelect={(e) => e.preventDefault()}
+                      onCheckedChange={(c) => toggleStat(stat, c)}
+                    >
+                      {stat}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            ) : null}
 
             <DropdownMenuSub>
               <FilterDimensionSubTrigger
