@@ -3,12 +3,18 @@ import { z } from "zod";
 import { crossSiteOriginBlockResponse } from "@/lib/auth/api-origin-check";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
-import type { Json } from "@/lib/db/types";
+import type { Json, TablesUpdate } from "@/lib/db/types";
 import { workspaceCameraSchema } from "@/lib/workspace/workspace-schema";
+import { gridFiltersSchema } from "@/lib/workspace/grid-filters-schema";
 
-const patchSchema = z.object({
-  camera: workspaceCameraSchema,
-});
+const patchSchema = z
+  .object({
+    camera: workspaceCameraSchema.optional(),
+    gridFilters: gridFiltersSchema.optional(),
+  })
+  .refine((d) => d.camera !== undefined || d.gridFilters !== undefined, {
+    message: "Must include camera or gridFilters",
+  });
 
 export async function PATCH(req: NextRequest) {
   const blocked = crossSiteOriginBlockResponse(req);
@@ -34,13 +40,20 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
+  const update: TablesUpdate<"users"> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (parsed.data.camera !== undefined) {
+    update.workspace_camera = parsed.data.camera as Json;
+  }
+  if (parsed.data.gridFilters !== undefined) {
+    update.grid_filters = parsed.data.gridFilters as Json;
+  }
+
   const sb = getServiceRoleClient();
   const { error } = await sb
     .from("users")
-    .update({
-      workspace_camera: parsed.data.camera as Json,
-      updated_at: new Date().toISOString(),
-    })
+    .update(update)
     .eq("id", session.userId);
 
   if (error) {

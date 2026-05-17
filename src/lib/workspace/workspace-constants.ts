@@ -53,6 +53,26 @@ export const TRACKER_DEFAULT_HEIGHT = 384;
  */
 export const TRACKER_MERGED_DEFAULT_HEIGHT = 456;
 
+/**
+ * Tracker height for each tile in dashboard grid/list mode ({@link GridWorkspace}
+ * virtualization). Matches canvas {@link TRACKER_DEFAULT_HEIGHT}; Compare lives in the header.
+ */
+export const TRACKER_GRID_TILE_HEIGHT = TRACKER_DEFAULT_HEIGHT;
+
+/**
+ * Grid list renders the full-pixel tracker DOM, then scales for display (≈25% smaller).
+ * Virtual row pitch and breakpoints use display dimensions so the page need not scroll horizontally.
+ */
+export const TRACKER_GRID_VISUAL_SCALE = 0.75;
+
+export const TRACKER_GRID_TILE_DISPLAY_WIDTH_PX = Math.round(
+  TRACKER_WIDTH * TRACKER_GRID_VISUAL_SCALE,
+);
+
+export const TRACKER_GRID_TILE_DISPLAY_HEIGHT_PX = Math.round(
+  TRACKER_GRID_TILE_HEIGHT * TRACKER_GRID_VISUAL_SCALE,
+);
+
 /** Largest tracker shell height (used for arrange grid vertical pitch). */
 export const TRACKER_MAX_SHELL_HEIGHT_PX = Math.max(
   TRACKER_DEFAULT_HEIGHT,

@@ -15,9 +15,9 @@ export default meta;
 
 type Story = StoryObj<typeof WorkspaceViewModeTabs>;
 
-export const CanvasSelected: Story = {
+export const GridSelected: Story = {
   render: function Render() {
-    const [mode, setMode] = useState<WorkspaceViewMode>("canvas");
+    const [mode, setMode] = useState<WorkspaceViewMode>("grid");
     return <WorkspaceViewModeTabs mode={mode} onModeChange={setMode} />;
   },
 };
