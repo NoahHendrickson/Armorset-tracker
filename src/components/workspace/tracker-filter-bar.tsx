@@ -42,7 +42,11 @@ const FILTER_MENU_CONTENT_CLASS =
   "max-h-[min(60vh,20rem)] min-w-56 overflow-y-auto rounded-none py-2 shadow-xl";
 
 const INLINE_TRIGGER_CLASS =
-  "group/filter h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs data-[state=open]:bg-accent data-[state=open]:text-accent-foreground";
+  "group/inline-trigger h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs data-[state=open]:bg-accent data-[state=open]:text-accent-foreground";
+
+/** Wraps Trigger + sibling clear `<button>`; `focus-within` ring avoids nested focus chrome. */
+const INLINE_TRIGGER_FRAME_CLASS =
+  "relative isolate shrink-0 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background";
 
 const CLASS_TABS: Array<{ value: GridFilterClass; label: string }> = [
   { value: 0, label: "Titan" },
@@ -63,17 +67,26 @@ interface InlineFilterTriggerProps
   label: string;
   selectedNames: readonly string[];
   active: boolean;
+  /**
+   * When true, the frame mounts a sibling clear button + this trigger reserves
+   * a `w-5` spacer between label and caret so the overlay aligns like
+   * `label · ✕ · ⌄`.
+   */
+  clearSibling?: boolean;
 }
 
 /**
- * Button trigger shared by every inline per-dimension dropdown. Uses
- * `forwardRef` so Radix's `Trigger asChild` can forward ref + props (including
- * `data-state`) onto the rendered Button.
+ * Dropdown / popover trigger for one filter dimension. Uses `forwardRef` so
+ * Radix `Trigger asChild` can attach ref + props (including `data-state`).
+ *
+ * When `clearSibling`, pair with `<InlineFilterClearButton />` inside a wrapper
+ * with `INLINE_TRIGGER_FRAME_CLASS` — the clear control must not live inside
+ * this `<button>` for valid HTML / accessibility.
  */
 const InlineFilterTrigger = forwardRef<
   HTMLButtonElement,
   InlineFilterTriggerProps
->(({ label, selectedNames, active, className, ...props }, ref) => {
+>(({ label, selectedNames, active, clearSibling, className, ...props }, ref) => {
   const summary = summarizeSelection(selectedNames, label);
   return (
     <Button
@@ -83,21 +96,58 @@ const InlineFilterTrigger = forwardRef<
       aria-label={`${label} filter`}
       className={cn(
         INLINE_TRIGGER_CLASS,
-        active && "border-primary/60 font-medium text-foreground",
+        "focus-visible:ring-0 focus-visible:ring-offset-0",
+        active &&
+          "border-primary/60 bg-primary/10 font-medium text-foreground hover:border-primary/70 hover:bg-primary/20 hover:text-foreground",
         className,
       )}
       {...props}
     >
-      <span className="min-w-0 max-w-[14rem] truncate">{summary}</span>
+      <span className="min-w-0 max-w-[14rem] flex-1 truncate text-left">{summary}</span>
+      {clearSibling ? (
+        /* Reserves horizontal space between label and caret; clear overlays this slot */
+        <span aria-hidden className="inline-block w-5 shrink-0" />
+      ) : null}
       <CaretDown
-        weight="bold"
+        weight="duotone"
         aria-hidden
-        className="!size-3 shrink-0 opacity-60 transition-transform group-data-[state=open]/filter:rotate-180"
+        className="!size-3.5 shrink-0 opacity-60 transition group-hover/inline-trigger:opacity-90 group-data-[state=open]/inline-trigger:rotate-180"
       />
     </Button>
   );
 });
 InlineFilterTrigger.displayName = "InlineFilterTrigger";
+
+/** Sibling clear button for an inline dimension; sits in the same wrapper as `INLINE_TRIGGER_FRAME_CLASS`. */
+function InlineFilterClearButton({
+  label,
+  visible,
+  onClear,
+}: {
+  label: string;
+  visible: boolean;
+  onClear: () => void;
+}) {
+  if (!visible) return null;
+
+  return (
+    <button
+      type="button"
+      aria-label={`Clear ${label} filter`}
+      title={`Clear ${label} filter`}
+      onClick={() => {
+        onClear();
+      }}
+      className="group/clear pointer-events-auto absolute inset-y-0 right-8 z-10 flex w-5 items-center justify-center rounded-none border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:text-foreground focus-visible:outline-none"
+    >
+      <X
+        weight="bold"
+        aria-hidden
+        className="!size-3.5 opacity-60 transition group-hover/clear:opacity-90"
+      />
+    </button>
+  );
+}
 
 /** Per-dimension badge on the stowed submenu rows. */
 function FilterDimensionSubTrigger({
@@ -437,15 +487,25 @@ export function TrackerFilterBar({
         ))}
       </div>
 
+      <div aria-hidden className="h-6 w-px shrink-0 self-center bg-border" />
+
       <Popover open={setsOpen} onOpenChange={setSetsOpen}>
-        <PopoverTrigger asChild>
-          <InlineFilterTrigger
+        <div className={cn(INLINE_TRIGGER_FRAME_CLASS, "hidden md:inline-flex")}>
+          <PopoverTrigger asChild>
+            <InlineFilterTrigger
+              label="Sets"
+              selectedNames={selectedSetNames}
+              active={value.setHashes.length > 0}
+              clearSibling={value.setHashes.length > 0}
+              className="inline-flex min-w-0"
+            />
+          </PopoverTrigger>
+          <InlineFilterClearButton
             label="Sets"
-            selectedNames={selectedSetNames}
-            active={value.setHashes.length > 0}
-            className="hidden md:inline-flex"
+            visible={value.setHashes.length > 0}
+            onClear={() => onChange({ ...value, setHashes: [] })}
           />
-        </PopoverTrigger>
+        </div>
         <PopoverContent
           align="start"
           sideOffset={4}
@@ -468,14 +528,22 @@ export function TrackerFilterBar({
       </Popover>
 
       <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <InlineFilterTrigger
+        <div className={cn(INLINE_TRIGGER_FRAME_CLASS, "hidden md:inline-flex")}>
+          <DropdownMenuTrigger asChild>
+            <InlineFilterTrigger
+              label="Archetypes"
+              selectedNames={selectedArchetypeNames}
+              active={value.archetypeHashes.length > 0}
+              clearSibling={value.archetypeHashes.length > 0}
+              className="inline-flex min-w-0"
+            />
+          </DropdownMenuTrigger>
+          <InlineFilterClearButton
             label="Archetypes"
-            selectedNames={selectedArchetypeNames}
-            active={value.archetypeHashes.length > 0}
-            className="hidden md:inline-flex"
+            visible={value.archetypeHashes.length > 0}
+            onClear={() => onChange({ ...value, archetypeHashes: [] })}
           />
-        </DropdownMenuTrigger>
+        </div>
         <DropdownMenuContent
           align="start"
           className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-64")}
@@ -504,14 +572,22 @@ export function TrackerFilterBar({
       </DropdownMenu>
 
       <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <InlineFilterTrigger
+        <div className={cn(INLINE_TRIGGER_FRAME_CLASS, "hidden lg:inline-flex")}>
+          <DropdownMenuTrigger asChild>
+            <InlineFilterTrigger
+              label="Tunings"
+              selectedNames={selectedTuningNames}
+              active={value.tuningHashes.length > 0}
+              clearSibling={value.tuningHashes.length > 0}
+              className="inline-flex min-w-0"
+            />
+          </DropdownMenuTrigger>
+          <InlineFilterClearButton
             label="Tunings"
-            selectedNames={selectedTuningNames}
-            active={value.tuningHashes.length > 0}
-            className="hidden lg:inline-flex"
+            visible={value.tuningHashes.length > 0}
+            onClear={() => onChange({ ...value, tuningHashes: [] })}
           />
-        </DropdownMenuTrigger>
+        </div>
         <DropdownMenuContent
           align="start"
           className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-56")}
@@ -541,14 +617,22 @@ export function TrackerFilterBar({
 
       {showTertiaryStatFilter ? (
         <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <InlineFilterTrigger
+          <div className={cn(INLINE_TRIGGER_FRAME_CLASS, "hidden lg:inline-flex")}>
+            <DropdownMenuTrigger asChild>
+              <InlineFilterTrigger
+                label="Tertiary stats"
+                selectedNames={value.tertiaryStats}
+                active={value.tertiaryStats.length > 0}
+                clearSibling={value.tertiaryStats.length > 0}
+                className="inline-flex min-w-0"
+              />
+            </DropdownMenuTrigger>
+            <InlineFilterClearButton
               label="Tertiary stats"
-              selectedNames={value.tertiaryStats}
-              active={value.tertiaryStats.length > 0}
-              className="hidden lg:inline-flex"
+              visible={value.tertiaryStats.length > 0}
+              onClear={() => onChange({ ...value, tertiaryStats: [] })}
             />
-          </DropdownMenuTrigger>
+          </div>
           <DropdownMenuContent
             align="start"
             className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-48")}

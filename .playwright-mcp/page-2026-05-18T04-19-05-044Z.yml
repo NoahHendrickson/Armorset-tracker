@@ -1,0 +1,15 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - heading "D2 Tuning Tracker" [level=1] [ref=e6]
+        - paragraph [ref=e7]:
+          - text: Make a tracker for a certain
+          - text: armor set, archtype and tuning
+      - link "Sign in with Bungie" [ref=e8] [cursor=pointer]:
+        - /url: /api/auth/bungie/login
+        - text: Sign in with Bungie
+        - img [ref=e9]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e17] [cursor=pointer]:
+    - img [ref=e18]
