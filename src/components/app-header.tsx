@@ -35,7 +35,7 @@ export function AppHeader({
       <div className="pointer-events-none flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
         <Link
           href="/dashboard"
-          className="pointer-events-auto flex items-center gap-2 rounded-none border border-border bg-card px-2.5 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="pointer-events-auto flex h-9 items-center gap-2 rounded-none border border-border bg-card px-2.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset */}
           <img
