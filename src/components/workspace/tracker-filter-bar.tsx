@@ -91,7 +91,7 @@ const InlineFilterTrigger = forwardRef<
       className={cn(
         INLINE_TRIGGER_CLASS,
         active &&
-          "border-primary/60 bg-primary/10 font-medium text-foreground",
+          "border-primary/60 bg-primary/10 font-medium text-foreground hover:border-primary/70 hover:bg-primary/20 hover:text-foreground",
         className,
       )}
       {...props}
@@ -118,15 +118,19 @@ const InlineFilterTrigger = forwardRef<
               onClear?.();
             }
           }}
-          className="-mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="group/clear -mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded-none text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
-          <X weight="bold" aria-hidden className="size-3" />
+          <X
+            weight="bold"
+            aria-hidden
+            className="!size-3.5 opacity-60 transition group-hover/clear:opacity-90"
+          />
         </span>
       ) : null}
       <CaretDown
         weight="duotone"
         aria-hidden
-        className="!size-3.5 shrink-0 opacity-60 transition-transform group-data-[state=open]/filter:rotate-180"
+        className="!size-3.5 shrink-0 opacity-60 transition group-hover/filter:opacity-90 group-data-[state=open]/filter:rotate-180"
       />
     </Button>
   );
