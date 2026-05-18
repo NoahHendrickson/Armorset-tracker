@@ -42,7 +42,7 @@ const FILTER_MENU_CONTENT_CLASS =
   "max-h-[min(60vh,20rem)] min-w-56 overflow-y-auto rounded-none py-2 shadow-xl";
 
 const INLINE_TRIGGER_CLASS =
-  "group/filter h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs data-[state=open]:bg-accent data-[state=open]:text-accent-foreground";
+  "group/inline-trigger h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs data-[state=open]:bg-accent data-[state=open]:text-accent-foreground";
 
 /** Wraps Trigger + sibling clear `<button>`; `focus-within` ring avoids nested focus chrome. */
 const INLINE_TRIGGER_FRAME_CLASS =
@@ -68,9 +68,9 @@ interface InlineFilterTriggerProps
   selectedNames: readonly string[];
   active: boolean;
   /**
-   * When true, the frame mounts a sibling clear button and reserves space so
-   * the opener text does not collide with it (clear is layered between summary
-   * and chevron via absolute positioning — not nested inside this button).
+   * When true, the frame mounts a sibling clear button + this trigger reserves
+   * a `w-5` spacer between label and caret so the overlay aligns like
+   * `label · ✕ · ⌄`.
    */
   clearSibling?: boolean;
 }
@@ -99,16 +99,19 @@ const InlineFilterTrigger = forwardRef<
         "focus-visible:ring-0 focus-visible:ring-offset-0",
         active &&
           "border-primary/60 bg-primary/10 font-medium text-foreground hover:border-primary/70 hover:bg-primary/20 hover:text-foreground",
-        clearSibling && "pr-9",
         className,
       )}
       {...props}
     >
-      <span className="min-w-0 max-w-[14rem] truncate">{summary}</span>
+      <span className="min-w-0 max-w-[14rem] flex-1 truncate text-left">{summary}</span>
+      {clearSibling ? (
+        /* Reserves horizontal space between label and caret; clear overlays this slot */
+        <span aria-hidden className="inline-block w-5 shrink-0" />
+      ) : null}
       <CaretDown
         weight="duotone"
         aria-hidden
-        className="!size-3.5 shrink-0 opacity-60 transition group-hover/filter:opacity-90 group-data-[state=open]/filter:rotate-180"
+        className="!size-3.5 shrink-0 opacity-60 transition group-hover/inline-trigger:opacity-90 group-data-[state=open]/inline-trigger:rotate-180"
       />
     </Button>
   );
@@ -135,7 +138,7 @@ function InlineFilterClearButton({
       onClick={() => {
         onClear();
       }}
-      className="group/clear pointer-events-auto absolute top-1/2 right-[1.4375rem] z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded-none border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:text-foreground focus-visible:outline-none"
+      className="group/clear pointer-events-auto absolute inset-y-0 right-8 z-10 flex w-5 items-center justify-center rounded-none border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:text-foreground focus-visible:outline-none"
     >
       <X
         weight="bold"
