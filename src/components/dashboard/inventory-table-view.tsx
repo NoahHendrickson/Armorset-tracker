@@ -172,7 +172,6 @@ export function InventoryTableView({
                               singular: "piece",
                               plural: "pieces",
                             }}
-                            variant="table-header"
                           />
                         </TableHead>
                       </TableRow>

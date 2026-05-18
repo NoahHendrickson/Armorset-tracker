@@ -1,7 +1,18 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { MagnifyingGlass, SlidersHorizontal, X } from "@phosphor-icons/react/dist/ssr";
+import {
+  forwardRef,
+  useMemo,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+} from "react";
+import {
+  CaretDown,
+  MagnifyingGlass,
+  SlidersHorizontal,
+  X,
+} from "@phosphor-icons/react/dist/ssr";
 import { CLASS_NAMES } from "@/lib/bungie/constants";
 import { ARMOR_STAT_NAMES, type ArmorStatName } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
@@ -15,6 +26,11 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ArmorSetMultiSelectPanel } from "@/components/views/armor-set-combobox";
 import type { TrackerFormSelectors } from "@/components/workspace/new-tracker-dialog";
 import {
@@ -25,25 +41,79 @@ import {
 const FILTER_MENU_CONTENT_CLASS =
   "max-h-[min(60vh,20rem)] min-w-56 overflow-y-auto rounded-none py-2 shadow-xl";
 
+const INLINE_TRIGGER_CLASS =
+  "group/filter h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs data-[state=open]:bg-accent data-[state=open]:text-accent-foreground";
+
 const CLASS_TABS: Array<{ value: GridFilterClass; label: string }> = [
   { value: 0, label: "Titan" },
   { value: 1, label: "Hunter" },
   { value: 2, label: "Warlock" },
 ];
 
-/** Per-dimension badge on submenu rows — mirrors the aggregate count on Filters. */
+/** Comma-joined summary capped at two names, then "+N". Falls back to label when empty. */
+function summarizeSelection(names: readonly string[], fallback: string): string {
+  if (names.length === 0) return fallback;
+  if (names.length === 1) return names[0]!;
+  if (names.length === 2) return `${names[0]}, ${names[1]}`;
+  return `${names[0]}, ${names[1]} +${names.length - 2}`;
+}
+
+interface InlineFilterTriggerProps
+  extends ButtonHTMLAttributes<HTMLButtonElement> {
+  label: string;
+  selectedNames: readonly string[];
+  active: boolean;
+}
+
+/**
+ * Button trigger shared by every inline per-dimension dropdown. Uses
+ * `forwardRef` so Radix's `Trigger asChild` can forward ref + props (including
+ * `data-state`) onto the rendered Button.
+ */
+const InlineFilterTrigger = forwardRef<
+  HTMLButtonElement,
+  InlineFilterTriggerProps
+>(({ label, selectedNames, active, className, ...props }, ref) => {
+  const summary = summarizeSelection(selectedNames, label);
+  return (
+    <Button
+      ref={ref}
+      type="button"
+      variant="outline"
+      aria-label={`${label} filter`}
+      className={cn(
+        INLINE_TRIGGER_CLASS,
+        active && "border-primary/60 font-medium text-foreground",
+        className,
+      )}
+      {...props}
+    >
+      <span className="min-w-0 max-w-[14rem] truncate">{summary}</span>
+      <CaretDown
+        weight="bold"
+        aria-hidden
+        className="!size-3 shrink-0 opacity-60 transition-transform group-data-[state=open]/filter:rotate-180"
+      />
+    </Button>
+  );
+});
+InlineFilterTrigger.displayName = "InlineFilterTrigger";
+
+/** Per-dimension badge on the stowed submenu rows. */
 function FilterDimensionSubTrigger({
   label,
   selectionCount,
+  className,
 }: {
   label: string;
   selectionCount: number;
+  className?: string;
 }) {
   const active = selectionCount > 0;
   return (
     <DropdownMenuSubTrigger
       inset
-      className={cn(active && "font-medium text-foreground")}
+      className={cn(active && "font-medium text-foreground", className)}
     >
       <span className="flex min-w-0 flex-1 items-center gap-2">
         <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -73,8 +143,6 @@ interface TrackerFilterBarProps {
   onTogglePin: (hash: string) => void;
   resultCount: number;
   resultNoun: ResultNoun;
-  /** Render inside the table-view header (uses TableHead container styles). */
-  variant?: "standalone" | "table-header";
   /** Tracker grid hides tertiary filtering; inventory table keeps it enabled. */
   showTertiaryStatFilter?: boolean;
   className?: string;
@@ -82,8 +150,9 @@ interface TrackerFilterBarProps {
 
 /**
  * Filter + class-tab + search bar shared between the Tracker grid view and the
- * Table view (`showTertiaryStatFilter`). Mirrors the table view's prior inline
- * filter dropdown — class change prunes set selections to class-valid options.
+ * Table view. Each filter dimension is its own inline dropdown trigger at wide
+ * widths; below `lg` the secondary dimensions collapse into a single Filters
+ * dropdown, and below `md` all dimensions collapse — matching the prior UX.
  */
 export function TrackerFilterBar({
   selectors,
@@ -93,12 +162,12 @@ export function TrackerFilterBar({
   onTogglePin,
   resultCount,
   resultNoun,
-  variant = "standalone",
   showTertiaryStatFilter = true,
   className,
 }: TrackerFilterBarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchUiOpen, setSearchUiOpen] = useState(false);
+  const [setsOpen, setSetsOpen] = useState(false);
   const searchExpanded = searchUiOpen || value.search.trim().length > 0;
 
   const sortedSets = useMemo(
@@ -115,15 +184,6 @@ export function TrackerFilterBar({
     [selectors.tunings],
   );
 
-  const activeFilterDimCount = useMemo(() => {
-    let n = 0;
-    if (value.setHashes.length > 0) n += 1;
-    if (value.archetypeHashes.length > 0) n += 1;
-    if (value.tuningHashes.length > 0) n += 1;
-    if (showTertiaryStatFilter && value.tertiaryStats.length > 0) n += 1;
-    return n;
-  }, [value, showTertiaryStatFilter]);
-
   const setHashesAsStrings = useMemo(
     () => value.setHashes.map(String),
     [value.setHashes],
@@ -136,6 +196,29 @@ export function TrackerFilterBar({
     () => value.tuningHashes.map(String),
     [value.tuningHashes],
   );
+
+  const selectedSetNames = useMemo(() => {
+    const byHash = new Map(sortedSets.map((o) => [o.hash, o.name] as const));
+    return value.setHashes
+      .map((h) => byHash.get(h))
+      .filter((n): n is string => Boolean(n));
+  }, [sortedSets, value.setHashes]);
+
+  const selectedArchetypeNames = useMemo(() => {
+    const byHash = new Map(
+      sortedArchetypes.map((o) => [o.hash, o.name] as const),
+    );
+    return value.archetypeHashes
+      .map((h) => byHash.get(h))
+      .filter((n): n is string => Boolean(n));
+  }, [sortedArchetypes, value.archetypeHashes]);
+
+  const selectedTuningNames = useMemo(() => {
+    const byHash = new Map(sortedTunings.map((o) => [o.hash, o.name] as const));
+    return value.tuningHashes
+      .map((h) => byHash.get(h))
+      .filter((n): n is string => Boolean(n));
+  }, [sortedTunings, value.tuningHashes]);
 
   const armorSetEmptyCopy = selectors.manifestEmpty
     ? "Sync the manifest first."
@@ -198,16 +281,144 @@ export function TrackerFilterBar({
     });
   }
 
+  /**
+   * Sets inline trigger is hidden under `md`; Archetypes inline trigger hidden
+   * under `md`; Tunings & Tertiary inline triggers hidden under `lg`. The
+   * legacy Filters button is hidden at `lg` (nothing left to stow) and renders
+   * only the dimensions that are NOT currently inline. We use CSS responsive
+   * utilities so both versions live in the DOM and there's no JS breakpoint.
+   */
+  const renderSetsSubmenu = (
+    <DropdownMenuSub>
+      <FilterDimensionSubTrigger
+        label="Armor sets"
+        selectionCount={value.setHashes.length}
+        className="md:hidden"
+      />
+      <DropdownMenuSubContent
+        className="w-[min(90vw,22rem)] min-w-[18rem] rounded-none border-border p-0 shadow-xl md:hidden"
+        collisionPadding={16}
+      >
+        <ArmorSetMultiSelectPanel
+          key={`stowed-${value.class}`}
+          options={sortedSets}
+          values={setHashesAsStrings}
+          onValuesChange={setSetHashesFromStrings}
+          emptyCatalogMessage={armorSetEmptyCopy}
+          sharpCorners
+          pinnedHashes={pinnedHashes}
+          onTogglePin={onTogglePin}
+          autoFocusSearch
+          className="max-h-[min(70vh,22rem)]"
+        />
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+
+  const renderArchetypesSubmenu = (
+    <DropdownMenuSub>
+      <FilterDimensionSubTrigger
+        label="Archetypes"
+        selectionCount={value.archetypeHashes.length}
+        className="md:hidden"
+      />
+      <DropdownMenuSubContent
+        className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-64 md:hidden")}
+        collisionPadding={16}
+      >
+        {sortedArchetypes.length === 0 ? (
+          <div className="px-3 py-2.5 text-sm text-muted-foreground/80">
+            No archetypes — sync the manifest first.
+          </div>
+        ) : (
+          sortedArchetypes.map((a) => {
+            const id = String(a.hash);
+            return (
+              <DropdownMenuCheckboxItem
+                key={a.hash}
+                checked={archetypeHashesAsStrings.includes(id)}
+                onSelect={(e) => e.preventDefault()}
+                onCheckedChange={(c) => toggleArchetype(id, c)}
+              >
+                {a.name}
+              </DropdownMenuCheckboxItem>
+            );
+          })
+        )}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+
+  const renderTuningsSubmenu = (
+    <DropdownMenuSub>
+      <FilterDimensionSubTrigger
+        label="Tuning stats"
+        selectionCount={value.tuningHashes.length}
+        className="lg:hidden"
+      />
+      <DropdownMenuSubContent
+        className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-56 lg:hidden")}
+        collisionPadding={16}
+      >
+        {sortedTunings.length === 0 ? (
+          <div className="px-3 py-2.5 text-sm text-muted-foreground/80">
+            No tunings — sync the manifest first.
+          </div>
+        ) : (
+          sortedTunings.map((t) => {
+            const id = String(t.hash);
+            return (
+              <DropdownMenuCheckboxItem
+                key={t.hash}
+                checked={tuningHashesAsStrings.includes(id)}
+                onSelect={(e) => e.preventDefault()}
+                onCheckedChange={(c) => toggleTuning(id, c)}
+              >
+                {t.name}
+              </DropdownMenuCheckboxItem>
+            );
+          })
+        )}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+
+  const renderTertiarySubmenu = showTertiaryStatFilter ? (
+    <DropdownMenuSub>
+      <FilterDimensionSubTrigger
+        label="Tertiary stats"
+        selectionCount={value.tertiaryStats.length}
+        className="lg:hidden"
+      />
+      <DropdownMenuSubContent
+        className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-48 lg:hidden")}
+        collisionPadding={16}
+      >
+        {ARMOR_STAT_NAMES.map((stat) => (
+          <DropdownMenuCheckboxItem
+            key={stat}
+            checked={value.tertiaryStats.includes(stat)}
+            onSelect={(e) => e.preventDefault()}
+            onCheckedChange={(c) => toggleStat(stat, c)}
+          >
+            {stat}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  ) : null;
+
   /** Match expanded search (`h-[52px]` input rail) so the bar height stays fixed when collapsed. */
   const barMinH = "min-h-[52px]";
 
-  const wrapperClass =
-    variant === "table-header"
-      ? cn("grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2", barMinH)
-      : cn("flex min-w-0 items-center gap-2 sm:gap-3", barMinH);
-
   return (
-    <div className={cn(wrapperClass, className)}>
+    <div
+      className={cn(
+        "flex min-w-0 flex-wrap items-center gap-2 sm:gap-3",
+        barMinH,
+        className,
+      )}
+    >
       <div className="flex min-w-0 shrink-0 overflow-hidden rounded-none bg-card">
         {CLASS_TABS.map((tab) => (
           <button
@@ -226,153 +437,172 @@ export function TrackerFilterBar({
         ))}
       </div>
 
-      <div className="flex min-w-0 shrink-0 items-center gap-2 self-center sm:gap-3">
+      <Popover open={setsOpen} onOpenChange={setSetsOpen}>
+        <PopoverTrigger asChild>
+          <InlineFilterTrigger
+            label="Sets"
+            selectedNames={selectedSetNames}
+            active={value.setHashes.length > 0}
+            className="hidden md:inline-flex"
+          />
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          sideOffset={4}
+          className="w-[min(90vw,22rem)] min-w-[18rem] rounded-none border-border p-0 shadow-xl"
+          collisionPadding={16}
+        >
+          <ArmorSetMultiSelectPanel
+            key={value.class}
+            options={sortedSets}
+            values={setHashesAsStrings}
+            onValuesChange={setSetHashesFromStrings}
+            emptyCatalogMessage={armorSetEmptyCopy}
+            sharpCorners
+            pinnedHashes={pinnedHashes}
+            onTogglePin={onTogglePin}
+            autoFocusSearch={setsOpen}
+            className="max-h-[min(70vh,22rem)]"
+          />
+        </PopoverContent>
+      </Popover>
+
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <InlineFilterTrigger
+            label="Archetypes"
+            selectedNames={selectedArchetypeNames}
+            active={value.archetypeHashes.length > 0}
+            className="hidden md:inline-flex"
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-64")}
+          collisionPadding={16}
+        >
+          {sortedArchetypes.length === 0 ? (
+            <div className="px-3 py-2.5 text-sm text-muted-foreground/80">
+              No archetypes — sync the manifest first.
+            </div>
+          ) : (
+            sortedArchetypes.map((a) => {
+              const id = String(a.hash);
+              return (
+                <DropdownMenuCheckboxItem
+                  key={a.hash}
+                  checked={archetypeHashesAsStrings.includes(id)}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={(c) => toggleArchetype(id, c)}
+                >
+                  {a.name}
+                </DropdownMenuCheckboxItem>
+              );
+            })
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <InlineFilterTrigger
+            label="Tunings"
+            selectedNames={selectedTuningNames}
+            active={value.tuningHashes.length > 0}
+            className="hidden lg:inline-flex"
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-56")}
+          collisionPadding={16}
+        >
+          {sortedTunings.length === 0 ? (
+            <div className="px-3 py-2.5 text-sm text-muted-foreground/80">
+              No tunings — sync the manifest first.
+            </div>
+          ) : (
+            sortedTunings.map((t) => {
+              const id = String(t.hash);
+              return (
+                <DropdownMenuCheckboxItem
+                  key={t.hash}
+                  checked={tuningHashesAsStrings.includes(id)}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={(c) => toggleTuning(id, c)}
+                >
+                  {t.name}
+                </DropdownMenuCheckboxItem>
+              );
+            })
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {showTertiaryStatFilter ? (
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              aria-label="Armor filters"
-              className="relative h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs"
-            >
-              <SlidersHorizontal weight="duotone" aria-hidden className="size-4" />
-              <span className="hidden sm:inline">Filters</span>
-              {activeFilterDimCount > 0 ? (
-                <span
-                  className="flex h-4 min-w-4 items-center justify-center rounded-none bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
-                  aria-hidden
-                >
-                  {activeFilterDimCount}
-                </span>
-              ) : null}
-            </Button>
+            <InlineFilterTrigger
+              label="Tertiary stats"
+              selectedNames={value.tertiaryStats}
+              active={value.tertiaryStats.length > 0}
+              className="hidden lg:inline-flex"
+            />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            className="min-w-48 rounded-none py-1"
+            className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-48")}
+            collisionPadding={16}
           >
-            <DropdownMenuSub>
-              <FilterDimensionSubTrigger
-                label="Armor sets"
-                selectionCount={value.setHashes.length}
-              />
-              <DropdownMenuSubContent
-                className="w-[min(90vw,22rem)] min-w-[18rem] rounded-none border-border p-0 shadow-xl"
-                collisionPadding={16}
+            {ARMOR_STAT_NAMES.map((stat) => (
+              <DropdownMenuCheckboxItem
+                key={stat}
+                checked={value.tertiaryStats.includes(stat)}
+                onSelect={(e) => e.preventDefault()}
+                onCheckedChange={(c) => toggleStat(stat, c)}
               >
-                <ArmorSetMultiSelectPanel
-                  key={value.class}
-                  options={sortedSets}
-                  values={setHashesAsStrings}
-                  onValuesChange={setSetHashesFromStrings}
-                  emptyCatalogMessage={armorSetEmptyCopy}
-                  sharpCorners
-                  pinnedHashes={pinnedHashes}
-                  onTogglePin={onTogglePin}
-                  autoFocusSearch
-                  className="max-h-[min(70vh,22rem)]"
-                />
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-
-            <DropdownMenuSub>
-              <FilterDimensionSubTrigger
-                label="Archetypes"
-                selectionCount={value.archetypeHashes.length}
-              />
-              <DropdownMenuSubContent
-                className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-64")}
-                collisionPadding={16}
-              >
-                {sortedArchetypes.length === 0 ? (
-                  <div className="px-3 py-2.5 text-sm text-muted-foreground/80">
-                    No archetypes — sync the manifest first.
-                  </div>
-                ) : (
-                  sortedArchetypes.map((a) => {
-                    const id = String(a.hash);
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={a.hash}
-                        checked={archetypeHashesAsStrings.includes(id)}
-                        onSelect={(e) => e.preventDefault()}
-                        onCheckedChange={(c) => toggleArchetype(id, c)}
-                      >
-                        {a.name}
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })
-                )}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-
-            {showTertiaryStatFilter ? (
-              <DropdownMenuSub>
-                <FilterDimensionSubTrigger
-                  label="Tertiary stats"
-                  selectionCount={value.tertiaryStats.length}
-                />
-                <DropdownMenuSubContent
-                  className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-48")}
-                  collisionPadding={16}
-                >
-                  {ARMOR_STAT_NAMES.map((stat) => (
-                    <DropdownMenuCheckboxItem
-                      key={stat}
-                      checked={value.tertiaryStats.includes(stat)}
-                      onSelect={(e) => e.preventDefault()}
-                      onCheckedChange={(c) => toggleStat(stat, c)}
-                    >
-                      {stat}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            ) : null}
-
-            <DropdownMenuSub>
-              <FilterDimensionSubTrigger
-                label="Tuning stats"
-                selectionCount={value.tuningHashes.length}
-              />
-              <DropdownMenuSubContent
-                className={cn(FILTER_MENU_CONTENT_CLASS, "min-w-56")}
-                collisionPadding={16}
-              >
-                {sortedTunings.length === 0 ? (
-                  <div className="px-3 py-2.5 text-sm text-muted-foreground/80">
-                    No tunings — sync the manifest first.
-                  </div>
-                ) : (
-                  sortedTunings.map((t) => {
-                    const id = String(t.hash);
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={t.hash}
-                        checked={tuningHashesAsStrings.includes(id)}
-                        onSelect={(e) => e.preventDefault()}
-                        onCheckedChange={(c) => toggleTuning(id, c)}
-                      >
-                        {t.name}
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })
-                )}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+                {stat}
+              </DropdownMenuCheckboxItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <p
-          className="min-w-0 text-xs leading-snug text-muted-foreground/80"
-          aria-live="polite"
-        >
-          Showing {resultCount}{" "}
-          {resultCount === 1 ? resultNoun.singular : resultNoun.plural} for{" "}
-          {CLASS_NAMES[value.class] ?? "class"}.
-        </p>
-      </div>
+      ) : null}
 
-      <div className="min-w-0 justify-self-end">
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            aria-label="More filters"
+            className={cn(
+              "relative h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs lg:hidden",
+            )}
+          >
+            <SlidersHorizontal weight="duotone" aria-hidden className="size-4" />
+            <span className="hidden sm:inline">Filters</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          className="min-w-48 rounded-none py-1"
+        >
+          {renderSetsSubmenu}
+          {renderArchetypesSubmenu}
+          {renderTertiarySubmenu}
+          {renderTuningsSubmenu}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <p
+        className="min-w-0 flex-1 text-xs leading-snug text-muted-foreground/80"
+        aria-live="polite"
+      >
+        Showing {resultCount}{" "}
+        {resultCount === 1 ? resultNoun.singular : resultNoun.plural} for{" "}
+        {CLASS_NAMES[value.class] ?? "class"}.
+      </p>
+
+      <div className="ml-auto min-w-0">
         {searchExpanded ? (
           <div
             role="search"

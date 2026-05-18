@@ -20,13 +20,15 @@ type Story = StoryObj<typeof TrackerFilterBar>;
 function Render({
   initial,
   showTertiaryStatFilter = true,
+  width = 960,
 }: {
   initial: GridFiltersJson;
   showTertiaryStatFilter?: boolean;
+  width?: number;
 }) {
   const [value, setValue] = useState<GridFiltersJson>(initial);
   return (
-    <div className="border border-border bg-card px-3" style={{ width: 960 }}>
+    <div className="border border-border bg-card px-3" style={{ width }}>
       <TrackerFilterBar
         selectors={MOCK_TRACKER_FORM_SELECTORS}
         value={value}
@@ -53,4 +55,8 @@ export const TrackerGridNoTertiaryMenu: Story = {
   render: () => (
     <Render initial={MOCK_GRID_FILTERS_POPULATED} showTertiaryStatFilter={false} />
   ),
+};
+
+export const NarrowViewport: Story = {
+  render: () => <Render initial={MOCK_GRID_FILTERS_POPULATED} width={480} />,
 };
