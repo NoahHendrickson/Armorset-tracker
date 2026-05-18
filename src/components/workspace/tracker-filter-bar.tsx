@@ -90,7 +90,8 @@ const InlineFilterTrigger = forwardRef<
       aria-label={`${label} filter`}
       className={cn(
         INLINE_TRIGGER_CLASS,
-        active && "border-primary/60 font-medium text-foreground",
+        active &&
+          "border-primary/60 bg-primary/10 font-medium text-foreground",
         className,
       )}
       {...props}
@@ -123,9 +124,9 @@ const InlineFilterTrigger = forwardRef<
         </span>
       ) : null}
       <CaretDown
-        weight="bold"
+        weight="duotone"
         aria-hidden
-        className="!size-3 shrink-0 opacity-60 transition-transform group-data-[state=open]/filter:rotate-180"
+        className="!size-3.5 shrink-0 opacity-60 transition-transform group-data-[state=open]/filter:rotate-180"
       />
     </Button>
   );
