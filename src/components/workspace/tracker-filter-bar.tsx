@@ -63,18 +63,25 @@ interface InlineFilterTriggerProps
   label: string;
   selectedNames: readonly string[];
   active: boolean;
+  /** Optional clear callback — when provided and `active`, renders an inline X. */
+  onClear?: () => void;
 }
 
 /**
  * Button trigger shared by every inline per-dimension dropdown. Uses
  * `forwardRef` so Radix's `Trigger asChild` can forward ref + props (including
  * `data-state`) onto the rendered Button.
+ *
+ * When `active && onClear`, an X clear affordance is rendered between the
+ * summary text and the chevron. It stops pointer/key events from bubbling so
+ * activating it clears the dimension without opening the dropdown.
  */
 const InlineFilterTrigger = forwardRef<
   HTMLButtonElement,
   InlineFilterTriggerProps
->(({ label, selectedNames, active, className, ...props }, ref) => {
+>(({ label, selectedNames, active, onClear, className, ...props }, ref) => {
   const summary = summarizeSelection(selectedNames, label);
+  const showClear = active && Boolean(onClear);
   return (
     <Button
       ref={ref}
@@ -89,6 +96,32 @@ const InlineFilterTrigger = forwardRef<
       {...props}
     >
       <span className="min-w-0 max-w-[14rem] truncate">{summary}</span>
+      {showClear ? (
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={`Clear ${label} filter`}
+          title={`Clear ${label} filter`}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onClear?.();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              onClear?.();
+            }
+          }}
+          className="-mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <X weight="bold" aria-hidden className="size-3" />
+        </span>
+      ) : null}
       <CaretDown
         weight="bold"
         aria-hidden
@@ -437,12 +470,15 @@ export function TrackerFilterBar({
         ))}
       </div>
 
+      <div aria-hidden className="h-6 w-px shrink-0 self-center bg-border" />
+
       <Popover open={setsOpen} onOpenChange={setSetsOpen}>
         <PopoverTrigger asChild>
           <InlineFilterTrigger
             label="Sets"
             selectedNames={selectedSetNames}
             active={value.setHashes.length > 0}
+            onClear={() => onChange({ ...value, setHashes: [] })}
             className="hidden md:inline-flex"
           />
         </PopoverTrigger>
@@ -473,6 +509,7 @@ export function TrackerFilterBar({
             label="Archetypes"
             selectedNames={selectedArchetypeNames}
             active={value.archetypeHashes.length > 0}
+            onClear={() => onChange({ ...value, archetypeHashes: [] })}
             className="hidden md:inline-flex"
           />
         </DropdownMenuTrigger>
@@ -509,6 +546,7 @@ export function TrackerFilterBar({
             label="Tunings"
             selectedNames={selectedTuningNames}
             active={value.tuningHashes.length > 0}
+            onClear={() => onChange({ ...value, tuningHashes: [] })}
             className="hidden lg:inline-flex"
           />
         </DropdownMenuTrigger>
@@ -546,6 +584,7 @@ export function TrackerFilterBar({
               label="Tertiary stats"
               selectedNames={value.tertiaryStats}
               active={value.tertiaryStats.length > 0}
+              onClear={() => onChange({ ...value, tertiaryStats: [] })}
               className="hidden lg:inline-flex"
             />
           </DropdownMenuTrigger>
