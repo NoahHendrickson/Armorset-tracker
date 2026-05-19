@@ -149,12 +149,12 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
     : [];
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col">
       <AppHeader
         displayName={headerDisplayName}
         profilePictureUrl={profilePictureUrl}
       />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-8 pt-[92px] sm:px-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 overflow-auto px-4 pb-8 pt-6 sm:px-6">
         <h1 className="text-2xl font-semibold tracking-tight">Debug</h1>
 
         <h2 className="mt-6 text-lg font-semibold">Manifest table counts</h2>
@@ -257,7 +257,7 @@ export default async function DebugPage({ searchParams }: DebugPageProps) {
           </>
         ) : null}
       </main>
-    </>
+    </div>
   );
 }
 

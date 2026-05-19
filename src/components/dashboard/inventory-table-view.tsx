@@ -123,7 +123,7 @@ export function InventoryTableView({
   return (
     <div className={`flex min-h-0 flex-1 flex-col ${className}`}>
       {hasTopMessage ? (
-        <div className="shrink-0 pt-[76px]">
+        <div className="shrink-0">
           {banners ? (
             <div className="space-y-2 border-b border-border bg-background px-4 py-3 sm:px-6">
               {banners}
@@ -140,7 +140,7 @@ export function InventoryTableView({
       ) : null}
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-[4.75rem] sm:px-6">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-4 sm:px-6">
           {!hasInventory ? (
             <p className="text-sm text-muted-foreground">
               No armor inventory loaded yet. Use Refresh in the header after

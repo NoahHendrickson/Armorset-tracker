@@ -37,14 +37,12 @@ import { usePinnedArmorSets } from "@/lib/views/use-pinned-armor-sets";
 const ROW_GAP_PX = 16;
 /** Virtual row height for scaled tiles + vertical gap. */
 const ROW_PITCH_PX = TRACKER_GRID_TILE_DISPLAY_HEIGHT_PX + ROW_GAP_PX;
-const GRID_MAX_COLUMNS = 3;
-
 function trackerGridColumnCountForWidth(scrollerClientWidth: number): number {
   const tile = TRACKER_GRID_TILE_DISPLAY_WIDTH_PX;
   const raw = Math.floor(
     (scrollerClientWidth + ROW_GAP_PX) / (tile + ROW_GAP_PX),
   );
-  return Math.min(GRID_MAX_COLUMNS, Math.max(1, raw));
+  return Math.max(1, raw);
 }
 
 interface GridWorkspaceProps {
@@ -160,7 +158,7 @@ export function GridWorkspace({
   ]);
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-  const [columnCount, setColumnCount] = useState(GRID_MAX_COLUMNS);
+  const [columnCount, setColumnCount] = useState(1);
 
   useLayoutEffect(() => {
     const el = scrollerRef.current;
@@ -202,7 +200,7 @@ export function GridWorkspace({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {hasTopMessage ? (
-        <div className="shrink-0 pt-[76px]">
+        <div className="shrink-0">
           {banners ? (
             <div className="space-y-2 border-b border-border bg-background px-4 py-3 sm:px-6">
               {banners}
@@ -219,7 +217,7 @@ export function GridWorkspace({
       ) : null}
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-[4.75rem] sm:px-6">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-4 sm:px-6">
           <div className="shrink-0 rounded-none border border-border bg-table-header px-3">
             <TrackerFilterBar
               selectors={selectors}

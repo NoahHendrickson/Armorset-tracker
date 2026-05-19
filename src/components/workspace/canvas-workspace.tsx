@@ -1222,7 +1222,7 @@ export function CanvasWorkspace({
   return (
     <div className={`flex min-h-0 flex-1 flex-col ${className}`}>
       {hasTopMessage ? (
-        <div className="shrink-0 pt-[76px]">
+        <div className="shrink-0">
           {banners ? (
             <div className="space-y-2 border-b border-border bg-background px-4 py-3 sm:px-6">
               {banners}

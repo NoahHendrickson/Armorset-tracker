@@ -13,6 +13,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  checkboxBoxClassName,
+  checkboxIconClassName,
+} from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { TrackerOptionItem } from "@/lib/views/tracker-option";
 
@@ -107,6 +111,25 @@ function PinnedSectionDivider() {
       aria-hidden
       className="mx-2 mb-1 mt-1 border-t border-border"
     />
+  );
+}
+
+/** Matches {@link DropdownMenuCheckboxItem} indicator styling in filter menus. */
+function ListboxCheckboxIndicator({ checked }: { checked: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        checkboxBoxClassName,
+        "pointer-events-none absolute left-2 top-1/2 -translate-y-1/2",
+        checked &&
+          "border-primary bg-primary text-primary-foreground",
+      )}
+    >
+      {checked ? (
+        <Check weight="bold" className={checkboxIconClassName} />
+      ) : null}
+    </span>
   );
 }
 
@@ -676,12 +699,7 @@ export function ArmorSetMultiSelectPanel({
                   onMouseEnter={() => setHighlightIndex(idx)}
                   onClick={() => toggle(String(opt.hash))}
                 >
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute left-2 top-1/2 flex h-4 w-4 -translate-y-1/2 shrink-0 items-center justify-center border border-current/40"
-                  >
-                    {sel ? <Check weight="bold" className="h-3 w-3" /> : null}
-                  </span>
+                  <ListboxCheckboxIndicator checked={sel} />
                   <span className="truncate">{opt.name}</span>
                   {onTogglePin ? (
                     <PinButton
@@ -713,12 +731,7 @@ export function ArmorSetMultiSelectPanel({
                   onMouseEnter={() => setHighlightIndex(idx)}
                   onClick={() => toggle(String(opt.hash))}
                 >
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute left-2 top-1/2 flex h-4 w-4 -translate-y-1/2 shrink-0 items-center justify-center border border-current/40"
-                  >
-                    {sel ? <Check weight="bold" className="h-3 w-3" /> : null}
-                  </span>
+                  <ListboxCheckboxIndicator checked={sel} />
                   <span className="truncate">{opt.name}</span>
                   {onTogglePin ? (
                     <PinButton
