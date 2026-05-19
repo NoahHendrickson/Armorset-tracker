@@ -10,7 +10,7 @@ import {
 
 /** Same border, fill, type scale as set/archetype badges on the tracker header. */
 const tuningBadgeClass =
-  "inline-flex shrink-0 cursor-default items-center gap-2 rounded-none border border-[#00FF85] bg-[#00FF85]/14 px-3 py-1.5 text-sm font-medium leading-snug text-foreground shadow-none";
+  "inline-flex shrink-0 cursor-default items-center gap-2 rounded-none border border-primary bg-primary/14 px-3 py-1.5 text-sm font-medium leading-snug text-foreground shadow-none";
 
 interface TuningHeaderGlyphProps {
   tuningName: string;

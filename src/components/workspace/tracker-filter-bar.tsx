@@ -41,8 +41,8 @@ import {
 const FILTER_MENU_CONTENT_CLASS =
   "max-h-[min(60vh,20rem)] min-w-56 overflow-y-auto rounded-none py-2 shadow-xl";
 
-const INLINE_TRIGGER_CLASS =
-  "group/inline-trigger h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs data-[state=open]:bg-accent data-[state=open]:text-accent-foreground";
+const INLINE_TRIGGER_BASE_CLASS =
+  "group/inline-trigger h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs";
 
 /** Wraps Trigger + sibling clear `<button>`; `focus-within` ring avoids nested focus chrome. */
 const INLINE_TRIGGER_FRAME_CLASS =
@@ -95,10 +95,11 @@ const InlineFilterTrigger = forwardRef<
       variant="outline"
       aria-label={`${label} filter`}
       className={cn(
-        INLINE_TRIGGER_CLASS,
+        INLINE_TRIGGER_BASE_CLASS,
         "focus-visible:ring-0 focus-visible:ring-offset-0",
-        active &&
-          "border-primary/60 bg-primary/10 font-medium text-foreground hover:border-primary/70 hover:bg-primary/20 hover:text-foreground",
+        active
+          ? "border-primary/60 bg-primary/10 font-medium text-foreground hover:border-primary/70 hover:bg-primary/20 hover:text-foreground data-[state=open]:border-primary/60 data-[state=open]:bg-primary/10 data-[state=open]:text-foreground"
+          : "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
         className,
       )}
       {...props}

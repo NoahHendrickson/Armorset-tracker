@@ -40,7 +40,7 @@ export const TrackerPill: Story = {
   render: () => (
     <Badge
       variant="outline"
-      className="border-[#00FF85] bg-[#00FF85]/14 px-3 py-1.5 text-sm font-medium text-foreground shadow-none"
+      className="border-primary bg-primary/14 px-3 py-1.5 text-sm font-medium text-foreground shadow-none"
     >
       Iron Will Suit
     </Badge>
