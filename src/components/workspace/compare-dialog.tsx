@@ -15,10 +15,24 @@ import { TrackerIdentBadges } from "@/components/workspace/tracker-ident-badges"
 import { TuningHeaderGlyph } from "@/components/views/tuning-header-glyph";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import type { GridLookupPayload } from "@/lib/views/grid-lookup-payload";
+import { tuningPositiveArmorStat } from "@/lib/views/tuning-positive-stat";
 import {
   buildEphemeralTrackerPayload,
   ephemeralTrackerId,
 } from "@/lib/workspace/build-tracker-payload-core";
+
+function tuningStatIconPathFromLookup(
+  tuningName: string,
+  lookup: GridLookupPayload,
+): string | null {
+  const positive = tuningPositiveArmorStat(tuningName);
+  return positive !== null
+    ? (lookup.statIconByName[positive] ?? null)
+    : null;
+}
+
+const compareTrackerRowShellClass =
+  "flex items-center gap-3 border border-border bg-card px-3 py-2";
 
 export interface CompareTrackerDescriptor {
   setHash: number;
@@ -101,7 +115,7 @@ export function CompareDialog({
         </DialogHeader>
 
         {anchor ? (
-          <div className="flex shrink-0 items-center gap-3 border border-border bg-card px-3 py-2">
+          <div className={`${compareTrackerRowShellClass} shrink-0`}>
             <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               A
             </span>
@@ -119,7 +133,9 @@ export function CompareDialog({
         ) : null}
 
         {partner ? (
-          <div className="flex items-center justify-between gap-3 border border-border bg-card px-3 py-2">
+          <div
+            className={`${compareTrackerRowShellClass} justify-between`}
+          >
             <div className="flex items-center gap-3">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 B
@@ -161,13 +177,19 @@ export function CompareDialog({
                 className="h-9 w-full min-w-0 rounded-none border border-border bg-card py-0 ps-9 pe-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/80 focus-visible:border-foreground focus-visible:ring-0"
               />
             </div>
-            <div className="max-h-72 min-h-0 overflow-y-auto border border-border bg-card">
+            <div className="max-h-72 min-h-0 overflow-y-auto">
               {filteredCandidates.length === 0 ? (
-                <p className="px-3 py-4 text-sm text-muted-foreground">
+                <p
+                  className={`${compareTrackerRowShellClass} text-sm text-muted-foreground`}
+                >
                   No other trackers in view match.
                 </p>
               ) : (
-                <ul role="listbox" aria-label="Compare candidates">
+                <ul
+                  role="listbox"
+                  aria-label="Compare candidates"
+                  className="flex flex-col gap-2"
+                >
                   {filteredCandidates.map((c) => {
                     const id = ephemeralTrackerId(c);
                     return (
@@ -177,14 +199,21 @@ export function CompareDialog({
                           role="option"
                           aria-selected={false}
                           onClick={() => setPartnerId(id)}
-                          className="flex w-full items-center justify-between gap-3 border-b border-border px-3 py-2 text-left text-sm text-foreground/90 transition-colors last:border-b-0 hover:bg-accent focus-visible:outline-none focus-visible:bg-accent"
+                          className={`${compareTrackerRowShellClass} w-full text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:bg-accent`}
                         >
-                          <span className="truncate">
-                            {c.setName} · {c.archetypeName}
-                          </span>
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {c.tuningName}
-                          </span>
+                          <TrackerIdentBadges
+                            setName={c.setName}
+                            archetypeName={c.archetypeName}
+                            tuning={
+                              <TuningHeaderGlyph
+                                tuningName={c.tuningName}
+                                iconPath={tuningStatIconPathFromLookup(
+                                  c.tuningName,
+                                  lookupPayload,
+                                )}
+                              />
+                            }
+                          />
                         </button>
                       </li>
                     );
