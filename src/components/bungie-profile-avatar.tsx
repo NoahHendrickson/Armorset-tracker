@@ -36,7 +36,7 @@ export function BungieProfileAvatar({
       <span
         aria-hidden
         className={cn(
-          "flex shrink-0 items-center justify-center rounded-full bg-accent font-semibold text-foreground",
+          "flex shrink-0 items-center justify-center rounded-full font-semibold text-muted-foreground",
           s.box,
         )}
       >

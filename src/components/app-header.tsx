@@ -31,11 +31,11 @@ export function AppHeader({
   leadingAccessory,
 }: AppHeaderProps) {
   return (
-    <header className="pointer-events-none fixed left-0 right-0 top-0 z-40 flex flex-col gap-3 px-3 pt-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3 sm:px-4 sm:pt-4">
-      <div className="pointer-events-none flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-background px-4 py-3 sm:h-14 sm:flex-nowrap sm:px-6 sm:py-0">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
         <Link
           href="/dashboard"
-          className="pointer-events-auto flex h-9 items-center gap-2 rounded-none border border-border bg-card px-2.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex h-9 items-center gap-2 text-left transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset */}
           <img
@@ -51,18 +51,16 @@ export function AppHeader({
           </span>
         </Link>
         {leadingAccessory ? (
-          <div className="pointer-events-auto flex shrink-0 items-center">
-            {leadingAccessory}
-          </div>
+          <div className="flex shrink-0 items-center">{leadingAccessory}</div>
         ) : null}
       </div>
 
-      <div className="pointer-events-auto flex flex-wrap items-center gap-2.5 sm:gap-3">
+      <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
         <FeedbackHeaderDialog />
         <RefreshButton variant="header-large" />
         <SyncManifestButton variant="header-large" />
 
-        <div className="flex min-w-0 max-w-[min(100vw-10rem,20rem)] items-center gap-2 rounded-none border border-border bg-card px-2 py-1 sm:max-w-none sm:gap-2.5 sm:px-2.5">
+        <div className="flex min-w-0 max-w-[min(100vw-10rem,20rem)] items-center gap-2 sm:max-w-none sm:gap-2.5">
           <BungieProfileAvatar
             displayName={displayName}
             profilePictureUrl={profilePictureUrl}
