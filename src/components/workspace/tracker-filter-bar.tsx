@@ -34,9 +34,11 @@ import {
 import { ArmorSetMultiSelectPanel } from "@/components/views/armor-set-combobox";
 import type { TrackerFormSelectors } from "@/components/workspace/new-tracker-dialog";
 import {
+  gridFiltersHaveUnblockingSelection,
   type GridFilterClass,
   type GridFiltersJson,
 } from "@/lib/workspace/grid-filters-schema";
+import { ShareFilterLinkButton } from "@/components/workspace/share-filter-link-button";
 
 const FILTER_MENU_CONTENT_CLASS =
   "max-h-[min(60vh,20rem)] min-w-56 overflow-y-auto rounded-none py-2 shadow-xl";
@@ -686,6 +688,12 @@ export function TrackerFilterBar({
         {resultCount === 1 ? resultNoun.singular : resultNoun.plural} for{" "}
         {CLASS_NAMES[value.class] ?? "class"}.
       </p>
+
+      <ShareFilterLinkButton
+        filters={value}
+        disabled={!gridFiltersHaveUnblockingSelection(value)}
+        className="size-9 shrink-0 rounded-none"
+      />
 
       <div className="ml-auto min-w-0">
         {searchExpanded ? (

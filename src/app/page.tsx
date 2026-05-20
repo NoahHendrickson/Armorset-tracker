@@ -8,18 +8,27 @@ import {
   NEW_TRACKER_FAB_SHADOW,
 } from "@/components/workspace/new-tracker-fab-styles";
 import { getSession } from "@/lib/auth/session";
+import {
+  defaultPostAuthReturnPath,
+  sanitizePostAuthReturnPath,
+} from "@/lib/auth/post-auth-return";
 
 interface HomePageProps {
-  searchParams: Promise<{ auth_error?: string }>;
+  searchParams: Promise<{ auth_error?: string; returnTo?: string }>;
 }
 
 export default async function HomePage({ searchParams }: HomePageProps) {
+  const { auth_error, returnTo: returnToRaw } = await searchParams;
+  const safeReturnTo = sanitizePostAuthReturnPath(returnToRaw ?? null);
+
   const session = await getSession();
   if (session) {
-    redirect("/dashboard");
+    redirect(safeReturnTo ?? defaultPostAuthReturnPath());
   }
 
-  const { auth_error } = await searchParams;
+  const loginHref = safeReturnTo
+    ? `/api/auth/bungie/login?returnTo=${encodeURIComponent(safeReturnTo)}`
+    : "/api/auth/bungie/login";
 
   return (
     <main className="flex min-h-[100dvh] flex-1 flex-col items-center justify-center overflow-auto bg-background px-6 py-16 text-foreground">
@@ -57,7 +66,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           ) : null}
 
           <Button asChild className={NEW_TRACKER_FAB_CLASSES} style={NEW_TRACKER_FAB_SHADOW}>
-            <Link href="/api/auth/bungie/login">
+            <Link href={loginHref}>
               Sign in with Bungie
               <SignIn weight="duotone" className="h-5 w-5" aria-hidden />
             </Link>

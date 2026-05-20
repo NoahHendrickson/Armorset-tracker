@@ -10,6 +10,10 @@ import {
   bungieOAuthRedirectUri,
   canonicalBungieLoginIfNeeded,
 } from "@/lib/auth/bungie-redirect-uri";
+import {
+  sanitizePostAuthReturnPath,
+  setPostAuthReturnCookie,
+} from "@/lib/auth/post-auth-return";
 
 export async function GET(req: NextRequest) {
   const canonical = canonicalBungieLoginIfNeeded(req);
@@ -26,5 +30,11 @@ export async function GET(req: NextRequest) {
     state,
     bungieOAuthStateCookieOptions(BUNGIE_OAUTH_STATE_TTL_SECONDS),
   );
+  const returnTo = sanitizePostAuthReturnPath(
+    new URL(req.url).searchParams.get("returnTo"),
+  );
+  if (returnTo) {
+    setPostAuthReturnCookie(res, returnTo);
+  }
   return res;
 }
