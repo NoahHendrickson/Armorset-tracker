@@ -32,6 +32,7 @@ function Render({
       filters={defaultGridFilters()}
       onViewsChange={setViews}
       onApply={() => {}}
+      onClearActive={() => {}}
     />
   );
 }

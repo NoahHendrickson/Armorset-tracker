@@ -6,6 +6,7 @@ import {
   DotsThreeVertical,
   LinkSimple,
   Plus,
+  X,
 } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
 import type { SavedFilterViewRow } from "@/lib/db/types";
@@ -43,12 +44,17 @@ function isOwnedView(view: SavedFilterViewRow): boolean {
 const SAVED_VIEWS_SECTION_LABEL_CLASS =
   "pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground";
 
+/** Matches `INLINE_TRIGGER_FRAME_CLASS` in tracker-filter-bar. */
+const SAVED_VIEWS_TRIGGER_FRAME_CLASS =
+  "relative isolate shrink-0 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background";
+
 interface SavedViewsMenuProps {
   views: SavedFilterViewRow[];
   activeViewId: string | null;
   filters: GridFiltersJson;
   onViewsChange: (views: SavedFilterViewRow[]) => void;
   onApply: (view: SavedFilterViewRow) => void;
+  onClearActive: () => void;
   className?: string;
 }
 
@@ -58,6 +64,7 @@ export function SavedViewsMenu({
   filters,
   onViewsChange,
   onApply,
+  onClearActive,
   className,
 }: SavedViewsMenuProps) {
   const ownedViews = useMemo(
@@ -281,26 +288,53 @@ export function SavedViewsMenu({
   return (
     <>
       <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            aria-label="Saved views"
-            className={cn(
-              "h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs",
-              activeView &&
-                "border-primary/60 bg-primary/10 font-medium text-foreground",
-              className,
-            )}
-          >
-            <span className="max-w-[10rem] truncate">{triggerLabel}</span>
-            <CaretDown
-              weight="duotone"
-              aria-hidden
-              className="!size-3.5 shrink-0 opacity-60"
-            />
-          </Button>
-        </DropdownMenuTrigger>
+        <div className={SAVED_VIEWS_TRIGGER_FRAME_CLASS}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              aria-label="Saved views"
+              className={cn(
+                "group/saved-views-trigger h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs focus-visible:ring-0 focus-visible:ring-offset-0",
+                activeView
+                  ? "border-primary/60 bg-primary/10 font-medium text-foreground hover:border-primary/70 hover:bg-primary/20 hover:text-foreground data-[state=open]:border-primary/60 data-[state=open]:bg-primary/10 data-[state=open]:text-foreground"
+                  : "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+                className,
+              )}
+            >
+              <span className="max-w-[10rem] truncate text-left">
+                {triggerLabel}
+              </span>
+              {activeView ? (
+                <span aria-hidden className="inline-block w-5 shrink-0" />
+              ) : null}
+              <CaretDown
+                weight="duotone"
+                aria-hidden
+                className="!size-3.5 shrink-0 opacity-60 transition group-hover/saved-views-trigger:opacity-90 group-data-[state=open]/saved-views-trigger:rotate-180"
+              />
+            </Button>
+          </DropdownMenuTrigger>
+          {activeView ? (
+            <button
+              type="button"
+              aria-label="Clear saved view"
+              title="Clear saved view"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onClearActive();
+              }}
+              className="group/clear pointer-events-auto absolute inset-y-0 right-8 z-10 flex w-5 items-center justify-center rounded-none border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:text-foreground focus-visible:outline-none"
+            >
+              <X
+                weight="bold"
+                aria-hidden
+                className="!size-3.5 opacity-60 transition group-hover/clear:opacity-90"
+              />
+            </button>
+          ) : null}
+        </div>
         <DropdownMenuContent
           align="start"
           className="min-w-56 max-w-xs rounded-none py-1"

@@ -85,6 +85,16 @@ export function DashboardWorkspace({
     [filters, onFiltersChange],
   );
 
+  const clearActiveSavedView = useCallback(() => {
+    onFiltersChange({
+      ...filters,
+      setHashes: [],
+      archetypeHashes: [],
+      tuningHashes: [],
+      tertiaryStats: [],
+    });
+  }, [filters, onFiltersChange]);
+
   const savedViewsSlot = (
     <SavedViewsMenu
       views={savedViews}
@@ -92,6 +102,7 @@ export function DashboardWorkspace({
       filters={filters}
       onViewsChange={setSavedViews}
       onApply={applySavedView}
+      onClearActive={clearActiveSavedView}
     />
   );
 
