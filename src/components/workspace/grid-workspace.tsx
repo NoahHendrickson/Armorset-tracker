@@ -54,6 +54,7 @@ interface GridWorkspaceProps {
   lookupPayload: GridLookupPayload;
   filters: GridFiltersJson;
   onFiltersChange: (next: GridFiltersJson) => void;
+  savedViewsSlot?: ReactNode;
 }
 
 type TrackerDescriptor = CompareTrackerDescriptor;
@@ -67,6 +68,7 @@ export function GridWorkspace({
   lookupPayload,
   filters,
   onFiltersChange,
+  savedViewsSlot,
 }: GridWorkspaceProps) {
   const { pinnedHashes, togglePin } = usePinnedArmorSets();
 
@@ -228,6 +230,7 @@ export function GridWorkspace({
               resultCount={visibleTrackers.length}
               resultNoun={{ singular: "tracker", plural: "trackers" }}
               showTertiaryStatFilter={false}
+              savedViewsSlot={savedViewsSlot}
             />
           </div>
 

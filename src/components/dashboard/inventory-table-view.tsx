@@ -54,6 +54,7 @@ interface InventoryTableViewProps {
   selectors: TrackerFormSelectors;
   filters: GridFiltersJson;
   onFiltersChange: (next: GridFiltersJson) => void;
+  savedViewsSlot?: ReactNode;
 }
 
 export function InventoryTableView({
@@ -65,6 +66,7 @@ export function InventoryTableView({
   selectors,
   filters,
   onFiltersChange,
+  savedViewsSlot,
 }: InventoryTableViewProps) {
   const { pinnedHashes, togglePin } = usePinnedArmorSets();
 
@@ -172,6 +174,7 @@ export function InventoryTableView({
                               singular: "piece",
                               plural: "pieces",
                             }}
+                            savedViewsSlot={savedViewsSlot}
                           />
                         </TableHead>
                       </TableRow>
