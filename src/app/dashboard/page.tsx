@@ -14,13 +14,31 @@ import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
 import { manifestSelectorsFromLookups } from "@/lib/views/manifest-selectors-from-lookup";
 import { buildGridLookupPayload } from "@/lib/views/grid-lookup-payload.server";
 import { parseGridFilters } from "@/lib/workspace/grid-filters-schema";
+import {
+  decodeGridFiltersFromShare,
+  GRID_FILTERS_SHARE_PARAM,
+} from "@/lib/workspace/grid-filters-share";
 import { bungieIconUrl } from "@/lib/bungie/constants";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+interface DashboardPageProps {
+  searchParams: Promise<{ f?: string }>;
+}
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const { f } = await searchParams;
+  const dashboardPath = f
+    ? `/dashboard?${GRID_FILTERS_SHARE_PARAM}=${encodeURIComponent(f)}`
+    : "/dashboard";
+
   const session = await getSession();
-  if (!session) redirect("/");
+  if (!session) {
+    redirect(`/?returnTo=${encodeURIComponent(dashboardPath)}`);
+  }
+
+  const sharedFilters = f ? decodeGridFiltersFromShare(f) : null;
+  const invalidShareLink = Boolean(f) && sharedFilters === null;
 
   const sb = getServiceRoleClient();
   const { data: userRow } = await sb
@@ -34,7 +52,9 @@ export default async function DashboardPage() {
     userRow.profile_picture_path.trim().length > 0
       ? bungieIconUrl(userRow.profile_picture_path.trim())
       : null;
-  const initialGridFilters = parseGridFilters(userRow?.grid_filters ?? null);
+  const initialGridFilters =
+    sharedFilters ?? parseGridFilters(userRow?.grid_filters ?? null);
+  const appliedFromShare = sharedFilters !== null;
 
   let syncWarning: string | null = null;
   try {
@@ -138,6 +158,8 @@ export default async function DashboardPage() {
       inventory={inventory}
       lookupPayload={lookupPayload}
       initialGridFilters={initialGridFilters}
+      appliedFromShare={appliedFromShare}
+      invalidShareLink={invalidShareLink}
     />
   );
 }

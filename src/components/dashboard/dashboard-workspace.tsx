@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { toast } from "sonner";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import type { GridLookupPayload } from "@/lib/views/grid-lookup-payload";
 import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
@@ -25,6 +26,8 @@ export interface DashboardWorkspaceProps {
   inventory: DerivedArmorPieceJson[];
   lookupPayload: GridLookupPayload;
   initialGridFilters: GridFiltersJson;
+  appliedFromShare?: boolean;
+  invalidShareLink?: boolean;
 }
 
 export function DashboardWorkspace({
@@ -37,11 +40,32 @@ export function DashboardWorkspace({
   inventory,
   lookupPayload,
   initialGridFilters,
+  appliedFromShare = false,
+  invalidShareLink = false,
 }: DashboardWorkspaceProps) {
   const [mode, setMode] = useState<WorkspaceViewMode>("grid");
   const tabs = <WorkspaceViewModeTabs mode={mode} onModeChange={setMode} />;
   const { filters, onFiltersChange } =
     useGridFiltersPersistence(initialGridFilters);
+  const shareHandledRef = useRef(false);
+
+  useEffect(() => {
+    if (shareHandledRef.current) return;
+    if (invalidShareLink) {
+      shareHandledRef.current = true;
+      toast.warning("This share link is invalid or out of date.");
+      return;
+    }
+    if (!appliedFromShare) return;
+    shareHandledRef.current = true;
+    onFiltersChange(initialGridFilters);
+    toast.success("Shared filters applied to your inventory.");
+  }, [
+    appliedFromShare,
+    invalidShareLink,
+    initialGridFilters,
+    onFiltersChange,
+  ]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

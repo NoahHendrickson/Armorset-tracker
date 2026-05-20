@@ -11,6 +11,11 @@ import { bungieOAuthRedirectUri } from "@/lib/auth/bungie-redirect-uri";
 import { requestCookieValue } from "@/lib/auth/request-cookie";
 import { persistTokens } from "@/lib/auth/tokens";
 import { profilePictureRelPathFromMembership } from "@/lib/bungie/profile-picture";
+import {
+  clearPostAuthReturnCookie,
+  defaultPostAuthReturnPath,
+  readPostAuthReturnCookie,
+} from "@/lib/auth/post-auth-return";
 
 function clearOauthStateCookie(res: NextResponse) {
   res.cookies.set(
@@ -159,6 +164,8 @@ export async function GET(req: NextRequest) {
   // without any cross-site/redirect heuristic interference. The page then
   // navigates to /dashboard.
   const jwt = await signSessionJwt(user);
+  const returnPath =
+    readPostAuthReturnCookie(req) ?? defaultPostAuthReturnPath();
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -174,7 +181,7 @@ export async function GET(req: NextRequest) {
   var t=${JSON.stringify(jwt)};
   fetch("/api/auth/install",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({t:t})})
     .then(function(r){
-      if(r.ok){location.replace("/dashboard");return;}
+      if(r.ok){location.replace(${JSON.stringify(returnPath)});return;}
       r.text().then(function(b){location.replace("/?auth_error="+encodeURIComponent("Install failed: "+r.status+" "+b));});
     })
     .catch(function(e){location.replace("/?auth_error="+encodeURIComponent(String(e&&e.message||e)));});
@@ -183,11 +190,13 @@ export async function GET(req: NextRequest) {
 <noscript><p>JavaScript is required to complete sign-in. <a style="color:#9bf" href="/api/auth/bungie/login">Try again</a>.</p></noscript>
 </body>
 </html>`;
-  return new NextResponse(html, {
+  const res = new NextResponse(html, {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
     },
   });
+  clearPostAuthReturnCookie(res);
+  return res;
 }
