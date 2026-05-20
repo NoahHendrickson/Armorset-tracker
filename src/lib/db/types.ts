@@ -133,6 +133,63 @@ export type Database = {
           }
         ];
       };
+      saved_filter_views: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          filters: Json;
+          view_mode: string;
+          share_slug: string | null;
+          source_user_id: string | null;
+          source_display_name: string | null;
+          source_share_slug: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          filters: Json;
+          view_mode: string;
+          share_slug?: string | null;
+          source_user_id?: string | null;
+          source_display_name?: string | null;
+          source_share_slug?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          filters?: Json;
+          view_mode?: string;
+          share_slug?: string | null;
+          source_user_id?: string | null;
+          source_display_name?: string | null;
+          source_share_slug?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "saved_filter_views_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "saved_filter_views_source_user_id_fkey";
+            columns: ["source_user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       inventory_cache: {
         Row: {
           user_id: string;
@@ -301,6 +358,7 @@ export type TablesUpdate<T extends keyof Database["public"]["Tables"]> =
 
 export type UserRow = Tables<"users">;
 export type ViewRow = Tables<"views">;
+export type SavedFilterViewRow = Tables<"saved_filter_views">;
 export type OAuthTokensRow = Tables<"oauth_tokens">;
 export type InventoryCacheRow = Tables<"inventory_cache">;
 export type ManifestVersionRow = Tables<"manifest_versions">;

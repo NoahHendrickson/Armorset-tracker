@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type ButtonHTMLAttributes,
+  type ReactNode,
 } from "react";
 import {
   CaretDown,
@@ -198,6 +199,8 @@ interface TrackerFilterBarProps {
   resultNoun: ResultNoun;
   /** Tracker grid hides tertiary filtering; inventory table keeps it enabled. */
   showTertiaryStatFilter?: boolean;
+  /** Saved filter views menu — rendered after class tabs, before Sets. */
+  savedViewsSlot?: ReactNode;
   className?: string;
 }
 
@@ -216,6 +219,7 @@ export function TrackerFilterBar({
   resultCount,
   resultNoun,
   showTertiaryStatFilter = true,
+  savedViewsSlot,
   className,
 }: TrackerFilterBarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -491,6 +495,8 @@ export function TrackerFilterBar({
       </div>
 
       <div aria-hidden className="h-6 w-px shrink-0 self-center bg-border" />
+
+      {savedViewsSlot}
 
       <Popover open={setsOpen} onOpenChange={setSetsOpen}>
         <div className={cn(INLINE_TRIGGER_FRAME_CLASS, "hidden md:inline-flex")}>

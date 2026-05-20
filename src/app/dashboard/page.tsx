@@ -14,6 +14,7 @@ import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
 import { manifestSelectorsFromLookups } from "@/lib/views/manifest-selectors-from-lookup";
 import { buildGridLookupPayload } from "@/lib/views/grid-lookup-payload.server";
 import { parseGridFilters } from "@/lib/workspace/grid-filters-schema";
+import { listSavedViewsForUser } from "@/lib/saved-views/queries";
 import {
   decodeGridFiltersFromShare,
   GRID_FILTERS_SHARE_PARAM,
@@ -23,11 +24,11 @@ import { bungieIconUrl } from "@/lib/bungie/constants";
 export const dynamic = "force-dynamic";
 
 interface DashboardPageProps {
-  searchParams: Promise<{ f?: string }>;
+  searchParams: Promise<{ f?: string; savedViewImported?: string }>;
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const { f } = await searchParams;
+  const { f, savedViewImported } = await searchParams;
   const dashboardPath = f
     ? `/dashboard?${GRID_FILTERS_SHARE_PARAM}=${encodeURIComponent(f)}`
     : "/dashboard";
@@ -74,10 +75,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     }
   }
 
-  const [cached, lookups, versionCheck] = await Promise.all([
+  const [cached, lookups, versionCheck, savedViews] = await Promise.all([
     getCachedInventoryWithSyncedAt(session.userId),
     getManifestLookups(),
     checkManifestVersion(),
+    listSavedViewsForUser(session.userId),
   ]);
 
   const inventory = cached?.items ?? [];
@@ -158,8 +160,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       inventory={inventory}
       lookupPayload={lookupPayload}
       initialGridFilters={initialGridFilters}
+      initialSavedViews={savedViews}
       appliedFromShare={appliedFromShare}
       invalidShareLink={invalidShareLink}
+      savedViewImportedId={savedViewImported ?? null}
     />
   );
 }
