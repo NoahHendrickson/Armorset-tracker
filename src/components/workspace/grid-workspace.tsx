@@ -161,8 +161,10 @@ export function GridWorkspace({
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const [columnCount, setColumnCount] = useState(1);
+  const showTrackerGrid = unblocked && visibleTrackers.length > 0;
 
   useLayoutEffect(() => {
+    if (!showTrackerGrid) return;
     const el = scrollerRef.current;
     if (!el) return;
     const tick = () => {
@@ -173,7 +175,7 @@ export function GridWorkspace({
     const ro = new ResizeObserver(tick);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [showTrackerGrid]);
 
   const rows = useMemo<TrackerDescriptor[][]>(() => {
     if (visibleTrackers.length === 0 || columnCount < 1) return [];
