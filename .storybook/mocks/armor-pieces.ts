@@ -24,6 +24,7 @@ function basePiece(
     classType: 0,
     setHash: SET.set_hash,
     setName: SET.name,
+    displayName: SET.name,
     archetypeHash: ARCH.archetype_hash,
     archetypeName: ARCH.name,
     primaryStat: "Weapons",

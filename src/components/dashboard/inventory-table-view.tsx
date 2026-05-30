@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { filterInventoryPieces } from "@/lib/filters/filter-inventory";
+import { filterInventoryPieces, inventoryPieceDisplayName } from "@/lib/filters/filter-inventory";
 import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import { usePinnedArmorSets } from "@/lib/views/use-pinned-armor-sets";
 import { TrackerFilterBar } from "@/components/workspace/tracker-filter-bar";
@@ -121,6 +121,7 @@ export function InventoryTableView({
                               singular: "piece",
                               plural: "pieces",
                             }}
+                            showRarityFilter
                             savedViewsSlot={savedViewsSlot}
                           />
                         </TableHead>
@@ -131,7 +132,7 @@ export function InventoryTableView({
                           aria-label="Icon"
                         />
                         <TableHead className="border-b border-border bg-table-header text-table-header-foreground">
-                          Armor set
+                          Name
                         </TableHead>
                         <TableHead className="border-b border-border bg-table-header text-table-header-foreground">
                           Archetype
@@ -177,7 +178,7 @@ export function InventoryTableView({
                                   {/* eslint-disable-next-line @next/next/no-img-element -- Bungie CDN thumbnails; avoid bloating the bundle with next/image remotePatterns. */}
                                   <img
                                     src={bungieIconUrl(piece.iconPath)}
-                                    alt={`${SLOT_LABELS[piece.slot]} — ${piece.setName ?? "armor"}`}
+                                    alt={`${SLOT_LABELS[piece.slot]} — ${inventoryPieceDisplayName(piece) ?? "armor"}`}
                                     className="block h-auto max-h-7 max-w-9 w-auto"
                                     loading="lazy"
                                   />
@@ -191,7 +192,7 @@ export function InventoryTableView({
                               )}
                             </TableCell>
                             <TableCell className="py-1.5 text-foreground/90">
-                              {piece.setName ?? "—"}
+                              {inventoryPieceDisplayName(piece) ?? "—"}
                             </TableCell>
                             <TableCell className="py-1.5 text-foreground/90">
                               {piece.archetypeName ?? "—"}

@@ -109,6 +109,14 @@ export interface DerivedManifestData {
     class_type: number;
     icon_path: string;
   }>;
+  /** Exotic armor pieces (tierType 6), keyed by item hash. No equipable set. */
+  exoticArmor: Array<{
+    item_hash: number;
+    slot: "helmet" | "arms" | "chest" | "legs" | "classItem";
+    class_type: number;
+    name: string;
+    icon_path: string;
+  }>;
   archetypes: Array<{ archetype_hash: number; name: string }>;
   tunings: Array<{ tuning_hash: number; name: string }>;
   plugToArchetype: Array<{ plug_hash: number; archetype_hash: number }>;

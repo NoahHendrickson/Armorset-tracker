@@ -4,7 +4,10 @@ import {
   type ArmorSlot,
 } from "@/lib/bungie/constants";
 import type { ItemComponent, ProfileResponse } from "@/lib/bungie/types";
-import type { ManifestLookups } from "@/lib/manifest/lookups";
+import {
+  resolveArmorCatalogItem,
+  type ManifestLookups,
+} from "@/lib/manifest/lookups";
 import type {
   ArmorStatName,
   DerivedArmorPieceJson,
@@ -22,7 +25,7 @@ interface ItemEntry {
 // manifest's `armor_items` lookup to recognize those as armor.
 function isArmor(item: ItemComponent, lookups: ManifestLookups): boolean {
   if (ARMOR_BUCKET_TO_SLOT[item.bucketHash]) return true;
-  return lookups.armorItemByHash.has(item.itemHash);
+  return resolveArmorCatalogItem(lookups, item.itemHash) != null;
 }
 
 export function collectArmorItems(
@@ -77,18 +80,25 @@ export function deriveArmorPiece(
   const { item, location } = entry;
   if (!item.itemInstanceId) return null;
 
-  const armorItem = lookups.armorItemByHash.get(item.itemHash);
+  const catalog = resolveArmorCatalogItem(lookups, item.itemHash);
+  const isExotic = catalog?.kind === "exotic";
   // Equipment-slot bucketHash works for character inv/equipment; vault items
   // need the manifest fallback since their bucketHash is the vault bucket.
   const slot: ArmorSlot | undefined =
-    ARMOR_BUCKET_TO_SLOT[item.bucketHash] ?? armorItem?.slot;
+    ARMOR_BUCKET_TO_SLOT[item.bucketHash] ?? catalog?.slot;
   if (!slot) return null;
 
-  const setHash = armorItem?.setHash ?? null;
-  const setName = setHash !== null ? lookups.setNameByHash.get(setHash) ?? null : null;
-  const classType = armorItem?.classType ?? null;
+  const setHash = catalog?.kind === "legendary" ? catalog.setHash : null;
+  const setName = catalog?.kind === "legendary" ? catalog.setName : null;
+  const displayName =
+    catalog?.kind === "exotic"
+      ? catalog.name
+      : catalog?.kind === "legendary"
+        ? catalog.setName
+        : null;
+  const classType = catalog?.classType ?? null;
   const iconPath =
-    armorItem?.iconPath && armorItem.iconPath.length > 0 ? armorItem.iconPath : undefined;
+    catalog?.iconPath && catalog.iconPath.length > 0 ? catalog.iconPath : undefined;
 
   const sockets =
     profile.itemComponents?.sockets?.data?.[item.itemInstanceId]?.sockets ?? [];
@@ -176,6 +186,8 @@ export function deriveArmorPiece(
     classType,
     setHash,
     setName,
+    displayName,
+    isExotic,
     archetypeHash,
     archetypeName,
     tuningHash,

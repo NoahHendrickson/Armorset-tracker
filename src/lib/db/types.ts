@@ -340,6 +340,30 @@ export type Database = {
         Update: { stat?: ArmorStatName; icon_path?: string };
         Relationships: [];
       };
+      exotic_armor: {
+        Row: {
+          item_hash: number;
+          slot: "helmet" | "arms" | "chest" | "legs" | "classItem";
+          class_type: number;
+          name: string;
+          icon_path: string;
+        };
+        Insert: {
+          item_hash: number;
+          slot: "helmet" | "arms" | "chest" | "legs" | "classItem";
+          class_type: number;
+          name: string;
+          icon_path?: string;
+        };
+        Update: {
+          item_hash?: number;
+          slot?: "helmet" | "arms" | "chest" | "legs" | "classItem";
+          class_type?: number;
+          name?: string;
+          icon_path?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
@@ -369,6 +393,7 @@ export type TuningRow = Tables<"tunings">;
 export type ArchetypeStatPairRow = Tables<"archetype_stat_pairs">;
 export type ArmorStatPlugRow = Tables<"armor_stat_plugs">;
 export type ArmorStatIconRow = Tables<"armor_stat_icons">;
+export type ExoticArmorRow = Tables<"exotic_armor">;
 
 // The 6 Armor 3.0 stats. Stored as strings everywhere because they're a
 // closed set and play nicely with JSON-encoded inventory items + UI.
@@ -391,6 +416,17 @@ export interface DerivedArmorPieceJson {
   classType: number | null;
   setHash: number | null;
   setName: string | null;
+  /**
+   * Primary table/search label: equipable set name for legendaries, item name
+   * for exotics. Optional on older cached rows — fall back to `setName`.
+   */
+  displayName?: string | null;
+  /**
+   * Exotic armor (manifest tierType 6). Optional so older cached inventory rows
+   * (pre-exotic-support) parse cleanly until the next sync — treat absent as
+   * legendary.
+   */
+  isExotic?: boolean;
   archetypeHash: number | null;
   archetypeName: string | null;
   tuningHash: number | null;

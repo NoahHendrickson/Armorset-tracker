@@ -12,5 +12,6 @@ export const MOCK_GRID_FILTERS_POPULATED: GridFiltersJson = {
   archetypeHashes: [2005],
   tuningHashes: [],
   tertiaryStats: ["Health"],
+  rarity: "legendary",
   search: "",
 };

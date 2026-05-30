@@ -27,6 +27,7 @@ export interface SyncResult {
   counts: {
     armor_sets: number;
     armor_items: number;
+    exotic_armor: number;
     archetypes: number;
     tunings: number;
     plug_to_archetype: number;
@@ -59,6 +60,7 @@ export async function syncManifest({
         { count: iconsCount },
         { count: armorSetsCount },
         { count: armorItemsCount },
+        { count: exoticArmorCount },
         { count: setsMissingLegacyHashes },
         { data: armorItemIconSample },
       ] = await Promise.all([
@@ -67,6 +69,7 @@ export async function syncManifest({
         sb.from("armor_stat_icons").select("*", { count: "exact", head: true }),
         sb.from("armor_sets").select("*", { count: "exact", head: true }),
         sb.from("armor_items").select("*", { count: "exact", head: true }),
+        sb.from("exotic_armor").select("*", { count: "exact", head: true }),
         sb
           .from("armor_sets")
           .select("*", { count: "exact", head: true })
@@ -79,6 +82,8 @@ export async function syncManifest({
         (iconsCount ?? 0) > 0 &&
         (armorSetsCount ?? 0) > 0 &&
         (armorItemsCount ?? 0) > 0 &&
+        /** Re-run derive after schema adds `exotic_armor` — empty until tables are replaced. */
+        (exoticArmorCount ?? 0) > 0 &&
         (setsMissingLegacyHashes ?? 0) === 0 &&
         /** Re-run derive after schema adds `icon_path` — old rows keep "" until tables are replaced. */
         armorItemIconSample != null;
@@ -129,6 +134,7 @@ export async function syncManifest({
     counts: {
       armor_sets: derived.armorSets.length,
       armor_items: derived.armorItems.length,
+      exotic_armor: derived.exoticArmor.length,
       archetypes: derived.archetypes.length,
       tunings: derived.tunings.length,
       plug_to_archetype: derived.plugToArchetype.length,
@@ -143,6 +149,7 @@ export async function syncManifest({
 type DerivedTable =
   | "armor_sets"
   | "armor_items"
+  | "exotic_armor"
   | "archetypes"
   | "tunings"
   | "plug_to_archetype"
@@ -155,6 +162,7 @@ async function currentCounts(sb: ReturnType<typeof getServiceRoleClient>) {
   const [
     armor_sets,
     armor_items,
+    exotic_armor,
     archetypes,
     tunings,
     plug_to_archetype,
@@ -165,6 +173,7 @@ async function currentCounts(sb: ReturnType<typeof getServiceRoleClient>) {
   ] = await Promise.all([
     countTable(sb, "armor_sets"),
     countTable(sb, "armor_items"),
+    countTable(sb, "exotic_armor"),
     countTable(sb, "archetypes"),
     countTable(sb, "tunings"),
     countTable(sb, "plug_to_archetype"),
@@ -176,6 +185,7 @@ async function currentCounts(sb: ReturnType<typeof getServiceRoleClient>) {
   return {
     armor_sets,
     armor_items,
+    exotic_armor,
     archetypes,
     tunings,
     plug_to_archetype,
@@ -199,6 +209,7 @@ async function replaceDerivedTables(derived: ReturnType<typeof deriveManifestDat
 
   // Order matters: dependents go first so we don't violate FKs.
   await sb.from("armor_items").delete().not("item_hash", "is", null);
+  await sb.from("exotic_armor").delete().not("item_hash", "is", null);
   await sb.from("plug_to_archetype").delete().not("plug_hash", "is", null);
   await sb.from("plug_to_tuning").delete().not("plug_hash", "is", null);
   await sb.from("archetype_stat_pairs").delete().not("archetype_hash", "is", null);
@@ -212,6 +223,7 @@ async function replaceDerivedTables(derived: ReturnType<typeof deriveManifestDat
   await chunkInsert(sb, "archetypes", derived.archetypes);
   await chunkInsert(sb, "tunings", derived.tunings);
   await chunkInsert(sb, "armor_items", derived.armorItems);
+  await chunkInsert(sb, "exotic_armor", derived.exoticArmor);
   await chunkInsert(sb, "plug_to_archetype", derived.plugToArchetype);
   await chunkInsert(sb, "plug_to_tuning", derived.plugToTuning);
   await chunkInsert(sb, "archetype_stat_pairs", derived.archetypeStatPairs);

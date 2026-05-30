@@ -323,13 +323,40 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
     class_type: number;
     icon_path: string;
   }> = [];
+  const exoticArmor: Array<{
+    item_hash: number;
+    slot: ArmorSlot;
+    class_type: number;
+    name: string;
+    icon_path: string;
+  }> = [];
 
   for (const item of Object.values(items)) {
     if (item.redacted || item.blacklisted) continue;
     const slot = classifyArmorPiece(item);
     if (!slot) continue;
-    // Legendary (etc.) armor sets only — exotics are one-offs and clutter the set picker.
-    if (item.inventory?.tierType === DESTINY_TIER_EXOTIC) continue;
+    // Exotics never join the set catalog (they're one-offs that clutter the set
+    // picker), but we collect them separately so the inventory pipeline can
+    // recognize vault exotics and tag pieces with rarity + display name/icon.
+    if (item.inventory?.tierType === DESTINY_TIER_EXOTIC) {
+      const exoticCollectible = item.collectibleHash
+        ? collectibles[String(item.collectibleHash)]
+        : undefined;
+      const exoticName =
+        item.displayProperties?.name?.trim() ||
+        exoticCollectible?.displayProperties?.name?.trim();
+      if (!exoticName) continue;
+      exoticArmor.push({
+        item_hash: item.hash,
+        slot,
+        class_type: item.classType ?? 3,
+        name: exoticName,
+        icon_path:
+          pickStatIconPath(item.displayProperties) ||
+          pickStatIconPath(exoticCollectible?.displayProperties),
+      });
+      continue;
+    }
     // Formal armor set bonus (2/4 pieces) from EquipableItemSets + Armor 3.0 sockets.
     const eqSetHash = item.equippingBlock?.equipableItemSetHash;
     if (!eqSetHash) continue;
@@ -422,6 +449,7 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
     tuningCategoryHashes: [...tuningCategoryHashes],
     armorSets,
     armorItems: filteredArmorItems,
+    exoticArmor,
     archetypes: [...archetypes.entries()].map(([archetype_hash, name]) => ({
       archetype_hash,
       name,

@@ -10,12 +10,23 @@ function slotRank(slot: ArmorSlot): number {
   return SLOT_ORDER.indexOf(slot);
 }
 
+/** Primary inventory-table label; legacy rows may only have `setName`. */
+export function inventoryPieceDisplayName(
+  piece: DerivedArmorPieceJson,
+): string | null {
+  return piece.displayName ?? piece.setName ?? null;
+}
+
 export function filterInventoryPieces(
   inventory: DerivedArmorPieceJson[],
   filters: GridFiltersJson,
 ): DerivedArmorPieceJson[] {
   let rows = inventory.filter((p) => p.classType === filters.class);
-  if (filters.setHashes.length > 0) {
+  // Rarity is single-select and always applied (absent `isExotic` = legendary).
+  const wantExotic = filters.rarity === "exotic";
+  rows = rows.filter((p) => Boolean(p.isExotic) === wantExotic);
+  // Exotics have no equipable set — set filter applies to legendary only.
+  if (!wantExotic && filters.setHashes.length > 0) {
     const allowed = new Set(filters.setHashes);
     rows = rows.filter((p) => p.setHash != null && allowed.has(p.setHash));
   }
@@ -41,7 +52,7 @@ export function filterInventoryPieces(
   if (trimmedSearch) {
     rows = rows.filter((p) => {
       const haystack = [
-        p.setName,
+        inventoryPieceDisplayName(p),
         p.archetypeName,
         p.tuningName,
         p.tertiaryStat,
@@ -56,7 +67,9 @@ export function filterInventoryPieces(
   return [...rows].sort((a, b) => {
     const sd = slotRank(a.slot) - slotRank(b.slot);
     if (sd !== 0) return sd;
-    const na = (a.setName ?? "").localeCompare(b.setName ?? "");
+    const na = (inventoryPieceDisplayName(a) ?? "").localeCompare(
+      inventoryPieceDisplayName(b) ?? "",
+    );
     if (na !== 0) return na;
     return a.itemHash - b.itemHash;
   });

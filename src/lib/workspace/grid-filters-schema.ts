@@ -5,6 +5,14 @@ import { ARMOR_STAT_NAMES, type ArmorStatName } from "@/lib/db/types";
 export const GRID_FILTER_CLASS_VALUES = [0, 1, 2] as const;
 export type GridFilterClass = (typeof GRID_FILTER_CLASS_VALUES)[number];
 
+/**
+ * Rarity scope for the inventory table. Single-select, defaults to legendary.
+ * Persisted in `users.grid_filters` and share links but inert in grid tracker
+ * mode — only `InventoryTableView` reads it via `filterInventoryPieces`.
+ */
+export const GRID_FILTER_RARITY_VALUES = ["legendary", "exotic"] as const;
+export type GridFilterRarity = (typeof GRID_FILTER_RARITY_VALUES)[number];
+
 const HASH_LIST_MAX = 256;
 const SEARCH_MAX = 128;
 
@@ -17,6 +25,9 @@ export const gridFiltersSchema = z.object({
   tertiaryStats: z
     .array(z.enum(ARMOR_STAT_NAMES as unknown as [ArmorStatName, ...ArmorStatName[]]))
     .max(ARMOR_STAT_NAMES.length),
+  // `.default` keeps existing stored/shared filters (which predate rarity)
+  // parsing cleanly — they resolve to legendary.
+  rarity: z.enum(GRID_FILTER_RARITY_VALUES).default("legendary"),
   search: z.string().max(SEARCH_MAX),
 });
 
@@ -30,6 +41,7 @@ export function defaultGridFilters(): GridFiltersJson {
     archetypeHashes: [],
     tuningHashes: [],
     tertiaryStats: [],
+    rarity: "legendary",
     search: "",
   };
 }
@@ -56,5 +68,14 @@ export function gridFiltersHaveUnblockingSelection(
     filters.setHashes.length > 0 ||
     filters.archetypeHashes.length > 0 ||
     filters.tuningHashes.length > 0
+  );
+}
+
+/** Inventory table: exotic rarity alone is a meaningful, shareable view. */
+export function inventoryFiltersHaveShareableSelection(
+  filters: GridFiltersJson,
+): boolean {
+  return (
+    gridFiltersHaveUnblockingSelection(filters) || filters.rarity === "exotic"
   );
 }

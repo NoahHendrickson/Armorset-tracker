@@ -20,10 +20,12 @@ type Story = StoryObj<typeof TrackerFilterBar>;
 function Render({
   initial,
   showTertiaryStatFilter = true,
+  showRarityFilter = false,
   width = 960,
 }: {
   initial: GridFiltersJson;
   showTertiaryStatFilter?: boolean;
+  showRarityFilter?: boolean;
   width?: number;
 }) {
   const [value, setValue] = useState<GridFiltersJson>(initial);
@@ -38,6 +40,7 @@ function Render({
         resultCount={42}
         resultNoun={{ singular: "tracker", plural: "trackers" }}
         showTertiaryStatFilter={showTertiaryStatFilter}
+        showRarityFilter={showRarityFilter}
       />
     </div>
   );
@@ -59,4 +62,10 @@ export const TrackerGridNoTertiaryMenu: Story = {
 
 export const NarrowViewport: Story = {
   render: () => <Render initial={MOCK_GRID_FILTERS_POPULATED} width={480} />,
+};
+
+export const InventoryTableWithRarity: Story = {
+  render: () => (
+    <Render initial={MOCK_GRID_FILTERS_POPULATED} showRarityFilter />
+  ),
 };

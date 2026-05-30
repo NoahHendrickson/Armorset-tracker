@@ -19,6 +19,11 @@ export interface ManifestLookups {
     number,
     { setHash: number; slot: ArmorSlot; classType: number; iconPath: string }
   >;
+  /** Exotic armor (manifest tierType 6) keyed by item hash. No equipable set. */
+  exoticArmorByHash: Map<
+    number,
+    { slot: ArmorSlot; classType: number; name: string; iconPath: string }
+  >;
   archetypeStatPair: Map<
     number,
     { primary: ArmorStatName; secondary: ArmorStatName }
@@ -30,6 +35,50 @@ export interface ManifestLookups {
   armorSlotIconPathBySetClassSlot: Map<string, string>;
   /** Weak fallback when no row matches `(set × class)` — first manifest icon seen per slot. */
   slotFallbackIconPathBySlot: Map<ArmorSlot, string>;
+}
+
+export type ArmorCatalogEntry =
+  | {
+      kind: "legendary";
+      setHash: number;
+      slot: ArmorSlot;
+      classType: number;
+      iconPath: string;
+      setName: string | null;
+    }
+  | {
+      kind: "exotic";
+      slot: ArmorSlot;
+      classType: number;
+      iconPath: string;
+      name: string;
+    };
+
+/** Legendary set row or exotic one-off for a manifest item hash, if known. */
+export function resolveArmorCatalogItem(
+  lookups: ManifestLookups,
+  itemHash: number,
+): ArmorCatalogEntry | null {
+  const exotic = lookups.exoticArmorByHash.get(itemHash);
+  if (exotic) {
+    return {
+      kind: "exotic",
+      slot: exotic.slot,
+      classType: exotic.classType,
+      iconPath: exotic.iconPath,
+      name: exotic.name,
+    };
+  }
+  const legendary = lookups.armorItemByHash.get(itemHash);
+  if (!legendary) return null;
+  return {
+    kind: "legendary",
+    setHash: legendary.setHash,
+    slot: legendary.slot,
+    classType: legendary.classType,
+    iconPath: legendary.iconPath,
+    setName: lookups.setNameByHash.get(legendary.setHash) ?? null,
+  };
 }
 
 /** Stable lookup key into {@link ManifestLookups.armorSlotIconPathBySetClassSlot}. */
@@ -132,6 +181,7 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
     versionRes,
     armorSets,
     armorItems,
+    exoticArmor,
     archetypes,
     tunings,
     plugToArchetype,
@@ -163,6 +213,15 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
       icon_path: string | null;
     }>(() =>
       sb.from("armor_items").select("item_hash, set_hash, slot, class_type, icon_path"),
+    ),
+    paginatedSelect<{
+      item_hash: number | string;
+      slot: string;
+      class_type: number;
+      name: string;
+      icon_path: string | null;
+    }>(() =>
+      sb.from("exotic_armor").select("item_hash, slot, class_type, name, icon_path"),
     ),
     paginatedSelect<{ archetype_hash: number | string; name: string }>(
       () => sb.from("archetypes").select("archetype_hash, name"),
@@ -242,6 +301,17 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
           setHash: Number(r.set_hash),
           slot: r.slot as ArmorSlot,
           classType: Number(r.class_type),
+          iconPath: String(r.icon_path ?? "").trim(),
+        },
+      ]),
+    ),
+    exoticArmorByHash: new Map(
+      exoticArmor.map((r) => [
+        Number(r.item_hash),
+        {
+          slot: r.slot as ArmorSlot,
+          classType: Number(r.class_type),
+          name: r.name,
           iconPath: String(r.icon_path ?? "").trim(),
         },
       ]),

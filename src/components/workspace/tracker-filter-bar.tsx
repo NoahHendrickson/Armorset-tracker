@@ -18,13 +18,16 @@ import {
 import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import {
   gridFiltersHaveUnblockingSelection,
+  inventoryFiltersHaveShareableSelection,
   type GridFilterClass,
+  type GridFilterRarity,
   type GridFiltersJson,
 } from "@/lib/workspace/grid-filters-schema";
 import { ShareFilterLinkButton } from "@/components/workspace/share-filter-link-button";
 import { ArmorSetsFilterDimension } from "@/components/workspace/armor-sets-filter-dimension";
 import { HashCheckboxFilterDimension } from "@/components/workspace/hash-checkbox-filter-dimension";
 import { StatCheckboxFilterDimension } from "@/components/workspace/stat-checkbox-filter-dimension";
+import { RarityFilterDimension } from "@/components/workspace/rarity-filter-dimension";
 
 const CLASS_TABS: Array<{ value: GridFilterClass; label: string }> = [
   { value: 0, label: "Titan" },
@@ -46,6 +49,7 @@ interface TrackerFilterBarProps {
   resultCount: number;
   resultNoun: ResultNoun;
   showTertiaryStatFilter?: boolean;
+  showRarityFilter?: boolean;
   savedViewsSlot?: ReactNode;
   className?: string;
 }
@@ -59,6 +63,7 @@ export function TrackerFilterBar({
   resultCount,
   resultNoun,
   showTertiaryStatFilter = true,
+  showRarityFilter = false,
   savedViewsSlot,
   className,
 }: TrackerFilterBarProps) {
@@ -142,6 +147,21 @@ export function TrackerFilterBar({
     }
   }
 
+  function switchRarity(next: GridFilterRarity) {
+    if (next === value.rarity) return;
+    onChange({
+      ...value,
+      rarity: next,
+      // Exotics have no equipable set — clear stale set picks from grid mode.
+      ...(next === "exotic" ? { setHashes: [] } : {}),
+    });
+  }
+
+  const showSetFilter = !showRarityFilter || value.rarity !== "exotic";
+  const shareEnabled = showRarityFilter
+    ? inventoryFiltersHaveShareableSelection(value)
+    : gridFiltersHaveUnblockingSelection(value);
+
   function switchClass(next: GridFilterClass) {
     if (next === value.class) return;
     const allowed = new Set(selectors.setsByClass[next].map((s) => s.hash));
@@ -184,21 +204,32 @@ export function TrackerFilterBar({
 
       {savedViewsSlot}
 
-      <ArmorSetsFilterDimension
-        variant="inline"
-        options={sortedSets}
-        values={setHashesAsStrings}
-        onValuesChange={setSetHashesFromStrings}
-        selectedNames={selectedSetNames}
-        emptyCatalogMessage={armorSetEmptyCopy}
-        pinnedHashes={pinnedHashes}
-        onTogglePin={onTogglePin}
-        classKey={value.class}
-        open={setsOpen}
-        onOpenChange={setSetsOpen}
-        onClear={() => onChange({ ...value, setHashes: [] })}
-        inlineWrapperClass="hidden md:inline-flex"
-      />
+      {showRarityFilter ? (
+        <RarityFilterDimension
+          variant="inline"
+          value={value.rarity}
+          onChange={switchRarity}
+          inlineWrapperClass="hidden md:inline-flex"
+        />
+      ) : null}
+
+      {showSetFilter ? (
+        <ArmorSetsFilterDimension
+          variant="inline"
+          options={sortedSets}
+          values={setHashesAsStrings}
+          onValuesChange={setSetHashesFromStrings}
+          selectedNames={selectedSetNames}
+          emptyCatalogMessage={armorSetEmptyCopy}
+          pinnedHashes={pinnedHashes}
+          onTogglePin={onTogglePin}
+          classKey={value.class}
+          open={setsOpen}
+          onOpenChange={setSetsOpen}
+          onClear={() => onChange({ ...value, setHashes: [] })}
+          inlineWrapperClass="hidden md:inline-flex"
+        />
+      ) : null}
 
       <HashCheckboxFilterDimension
         variant="inline"
@@ -250,21 +281,31 @@ export function TrackerFilterBar({
           align="start"
           className="min-w-48 rounded-none py-1"
         >
-          <ArmorSetsFilterDimension
-            variant="stowed"
-            options={sortedSets}
-            values={setHashesAsStrings}
-            onValuesChange={setSetHashesFromStrings}
-            selectedNames={selectedSetNames}
-            emptyCatalogMessage={armorSetEmptyCopy}
-            pinnedHashes={pinnedHashes}
-            onTogglePin={onTogglePin}
-            classKey={value.class}
-            open={setsOpen}
-            onOpenChange={setSetsOpen}
-            onClear={() => onChange({ ...value, setHashes: [] })}
-            stowedSubTriggerClass="md:hidden"
-          />
+          {showRarityFilter ? (
+            <RarityFilterDimension
+              variant="stowed"
+              value={value.rarity}
+              onChange={switchRarity}
+              stowedSubTriggerClass="md:hidden"
+            />
+          ) : null}
+          {showSetFilter ? (
+            <ArmorSetsFilterDimension
+              variant="stowed"
+              options={sortedSets}
+              values={setHashesAsStrings}
+              onValuesChange={setSetHashesFromStrings}
+              selectedNames={selectedSetNames}
+              emptyCatalogMessage={armorSetEmptyCopy}
+              pinnedHashes={pinnedHashes}
+              onTogglePin={onTogglePin}
+              classKey={value.class}
+              open={setsOpen}
+              onOpenChange={setSetsOpen}
+              onClear={() => onChange({ ...value, setHashes: [] })}
+              stowedSubTriggerClass="md:hidden"
+            />
+          ) : null}
           <HashCheckboxFilterDimension
             variant="stowed"
             label="Archetypes"
@@ -310,7 +351,7 @@ export function TrackerFilterBar({
 
       <ShareFilterLinkButton
         filters={value}
-        disabled={!gridFiltersHaveUnblockingSelection(value)}
+        disabled={!shareEnabled}
         className="size-9 shrink-0 rounded-none"
       />
 
