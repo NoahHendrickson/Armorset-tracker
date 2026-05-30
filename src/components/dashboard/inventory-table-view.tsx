@@ -17,6 +17,7 @@ import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import { usePinnedArmorSets } from "@/lib/views/use-pinned-armor-sets";
 import { TrackerFilterBar } from "@/components/workspace/tracker-filter-bar";
 import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
+import { InventoryItemActions } from "@/components/dashboard/inventory-item-actions";
 
 /** Shared by header + body tables so columns line up (`table-fixed`). */
 const INVENTORY_TABLE_COLGROUP = (
@@ -27,6 +28,7 @@ const INVENTORY_TABLE_COLGROUP = (
     <col />
     <col />
     <col />
+    <col className="w-[15rem]" />
   </colgroup>
 );
 
@@ -107,7 +109,7 @@ export function InventoryTableView({
                     <TableHeader className="[&_tr]:border-b-0">
                       <TableRow className="border-b-0 border-border hover:bg-transparent [&:hover]:bg-transparent">
                         <TableHead
-                          colSpan={6}
+                          colSpan={7}
                           className="h-auto border-b-0 bg-table-header px-3 py-0 text-left align-middle font-medium text-muted-foreground shadow-[inset_0_-1px_0_0_var(--border)] [&:has([role=checkbox])]:pr-0"
                         >
                           <TrackerFilterBar
@@ -146,6 +148,9 @@ export function InventoryTableView({
                         <TableHead className="border-b border-border bg-table-header text-table-header-foreground">
                           Location
                         </TableHead>
+                        <TableHead className="border-b border-border bg-table-header text-table-header-foreground">
+                          Actions
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                   </Table>
@@ -160,7 +165,7 @@ export function InventoryTableView({
                       {filteredRows.length === 0 ? (
                         <TableRow className="border-b-0 border-border hover:bg-transparent shadow-[inset_0_-1px_0_0_var(--border)]">
                           <TableCell
-                            colSpan={6}
+                            colSpan={7}
                             className="py-8 text-center text-sm text-muted-foreground/80"
                           >
                             No armor matches these filters.
@@ -205,6 +210,12 @@ export function InventoryTableView({
                             </TableCell>
                             <TableCell className="py-1.5 text-muted-foreground">
                               {formatLocation(piece)}
+                            </TableCell>
+                            <TableCell className="py-1.5 pe-2 align-middle">
+                              <InventoryItemActions
+                                piece={piece}
+                                targetClass={filters.class}
+                              />
                             </TableCell>
                           </TableRow>
                         ))

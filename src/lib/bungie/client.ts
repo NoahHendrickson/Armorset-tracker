@@ -58,6 +58,101 @@ async function bungieGet<T>(
   return data.Response;
 }
 
+async function bungiePost<T>(
+  path: string,
+  body: Record<string, unknown>,
+  accessToken: string,
+): Promise<T> {
+  const env = serverEnv();
+  const url = path.startsWith("http") ? path : `${BUNGIE_API_BASE}${path}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "X-API-Key": env.BUNGIE_API_KEY,
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (res.status === 503) {
+    throw new BungieApiError("Bungie API maintenance", 503, null, true);
+  }
+  if (!res.ok) {
+    throw new BungieApiError(
+      `Bungie POST ${path} failed: ${res.status} ${res.statusText}`,
+      res.status,
+      null,
+      false,
+    );
+  }
+  let data: BungieResponse<T>;
+  try {
+    data = (await res.json()) as BungieResponse<T>;
+  } catch {
+    throw new BungieApiError(
+      `Bungie POST ${path} returned non-JSON body`,
+      res.status,
+      null,
+      false,
+    );
+  }
+  if (data.ErrorCode !== 1) {
+    throw new BungieApiError(
+      `Bungie API error on ${path}: ${data.ErrorStatus} (${data.ErrorCode}) — ${data.Message}`,
+      res.status,
+      data.ErrorCode,
+      MAINTENANCE_ERROR_CODES.has(data.ErrorCode),
+    );
+  }
+  return data.Response;
+}
+
+export async function transferDestinyItem(
+  accessToken: string,
+  request: {
+    membershipType: number;
+    itemReferenceHash: number;
+    itemId: string;
+    stackSize: number;
+    characterId: string;
+    transferToVault: boolean;
+  },
+): Promise<number> {
+  return bungiePost<number>(
+    "/Destiny2/Actions/Items/TransferItem/",
+    {
+      membershipType: request.membershipType,
+      itemReferenceHash: request.itemReferenceHash,
+      itemId: request.itemId,
+      stackSize: request.stackSize,
+      characterId: request.characterId,
+      transferToVault: request.transferToVault,
+    },
+    accessToken,
+  );
+}
+
+export async function equipDestinyItem(
+  accessToken: string,
+  request: {
+    membershipType: number;
+    itemId: string;
+    characterId: string;
+  },
+): Promise<number> {
+  return bungiePost<number>(
+    "/Destiny2/Actions/Items/EquipItem/",
+    {
+      membershipType: request.membershipType,
+      itemId: request.itemId,
+      characterId: request.characterId,
+    },
+    accessToken,
+  );
+}
+
 export async function getMembershipDataForCurrentUser(
   accessToken: string,
 ): Promise<MembershipData> {

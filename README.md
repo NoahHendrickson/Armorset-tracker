@@ -30,7 +30,7 @@ API.
    - **Redirect URL**: `https://localhost:3000/api/auth/bungie/callback`
      (Bungie requires HTTPS — see step 4. Add your production URL when you
      deploy.)
-   - **Scope**: `Read your Destiny 2 information` (first checkbox only)
+   - **Scope**: enable **Read your Destiny 2 information** and **Move or equip Destiny items** (inventory read + table equip actions)
    - **Origin Header**: leave blank
 3. Copy the **API Key**, **OAuth client_id**, and **OAuth client_secret**.
 

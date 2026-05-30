@@ -12,6 +12,14 @@ export const FILTER_MENU_CONTENT_CLASS =
 export const INLINE_TRIGGER_BASE_CLASS =
   "group/inline-trigger h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs";
 
+/** Brand-green border + light fill — filter triggers and action success flashes. */
+export const INLINE_TRIGGER_ACTIVE_CLASS =
+  "border-primary/60 bg-primary/10 font-medium text-foreground hover:border-primary/70 hover:bg-primary/20 hover:text-foreground";
+
+/** Brighter than filter triggers — full border, stronger fill, saturated label. */
+export const INLINE_TRIGGER_SUCCESS_FLASH_CLASS =
+  "border-primary bg-primary/20 font-semibold text-primary inventory-action-success-flash";
+
 export const INLINE_TRIGGER_FRAME_CLASS =
   "relative isolate shrink-0 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background";
 
@@ -48,7 +56,10 @@ export const InlineFilterTrigger = forwardRef<
         INLINE_TRIGGER_BASE_CLASS,
         "focus-visible:ring-0 focus-visible:ring-offset-0",
         active
-          ? "border-primary/60 bg-primary/10 font-medium text-foreground hover:border-primary/70 hover:bg-primary/20 hover:text-foreground data-[state=open]:border-primary/60 data-[state=open]:bg-primary/10 data-[state=open]:text-foreground"
+          ? cn(
+              INLINE_TRIGGER_ACTIVE_CLASS,
+              "data-[state=open]:border-primary/60 data-[state=open]:bg-primary/10 data-[state=open]:text-foreground",
+            )
           : "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
         className,
       )}

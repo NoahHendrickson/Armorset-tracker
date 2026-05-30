@@ -194,6 +194,32 @@
     }
   }
 
+  /* Inventory table move/equip success — subtle scale + fade-in. */
+  .inventory-action-success-flash {
+    animation: inventory-action-success-flash 0.4s ease-out;
+  }
+
+  @keyframes inventory-action-success-flash {
+    0% {
+      opacity: 0.88;
+      transform: scale(0.96);
+    }
+    70% {
+      opacity: 1;
+      transform: scale(1.02);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .inventory-action-success-flash {
+      animation: none;
+    }
+  }
+
   /* Dot grid lives inside `.workspace-canvas-bounds` (the scaled transform
      subtree). The library `infinite` overlay sits outside scaled content and
      only moves background-position with pan — not zoom — so it swims and
