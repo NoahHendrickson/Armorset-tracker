@@ -9,6 +9,7 @@ import {
   BUNGIE_RECONNECT_PATH,
   BUNGIE_REAUTH_USER_MESSAGE,
 } from "@/lib/auth/bungie-reauth";
+import { useInventoryEquipmentOnlyAlert } from "@/components/dashboard/inventory-equipment-only-alert";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -50,6 +51,7 @@ export function RefreshButton({
   const [isLoading, setIsLoading] = useState(false);
   const [, startTransition] = useTransition();
   const router = useRouter();
+  const equipmentOnlyAlert = useInventoryEquipmentOnlyAlert();
 
   async function refresh() {
     if (isLoading) return;
@@ -93,19 +95,10 @@ export function RefreshButton({
         const detail =
           Array.isArray(body.warnings) && body.warnings[0]
             ? body.warnings[0]
-            : "Bungie only returned equipped armor. Reconnect Bungie so your session can read your full vault and inventories.";
-        toast.error(detail, {
-          ...refreshToastDefaults,
-          duration: 22_000,
-          action: {
-            label: "Reconnect Bungie",
-            actionButtonStyle: { borderRadius: 0 },
-            onClick: () => {
-              window.location.href = BUNGIE_RECONNECT_PATH;
-            },
-          },
-        });
+            : undefined;
+        equipmentOnlyAlert?.showEquipmentOnlyWarning(detail);
       } else {
+        equipmentOnlyAlert?.clearEquipmentOnlyWarning();
         toast.success(
           `Inventory refreshed${typeof body.itemCount === "number" ? ` — ${body.itemCount} pieces` : ""}.`,
           { ...refreshToastDefaults },

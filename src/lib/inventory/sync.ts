@@ -4,6 +4,7 @@ import { PROFILE_COMPONENTS } from "@/lib/bungie/constants";
 import { withBackoff, withUserRateLimit } from "@/lib/bungie/rate-limit";
 import { getServiceRoleClient } from "@/lib/db/server";
 import { BUNGIE_REAUTH_USER_MESSAGE } from "@/lib/auth/bungie-reauth";
+import { INVENTORY_EQUIPMENT_ONLY_WARNING } from "@/lib/inventory/user-messages";
 import {
   forceRefreshAccessToken,
   getValidAccessToken,
@@ -150,11 +151,7 @@ export async function syncUserInventory(
     rawCounts.equippedItems > 0;
 
   if (equipmentOnlyRestricted) {
-    warnings.push(
-      "Bungie returned equipped armor only (vault and character inventories were empty). " +
-        "Reconnect Bungie so your session picks up ReadDestinyInventoryAndVault. " +
-        "If it persists, enable that scope on your app at bungie.net/en/Application and check Bungie.net privacy for inventory visibility.",
-    );
+    warnings.push(INVENTORY_EQUIPMENT_ONLY_WARNING);
   }
 
   const items = deriveAllArmorPieces(profile, lookups);

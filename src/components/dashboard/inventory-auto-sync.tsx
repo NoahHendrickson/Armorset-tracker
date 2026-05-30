@@ -8,6 +8,7 @@ import {
   BUNGIE_RECONNECT_PATH,
   BUNGIE_REAUTH_USER_MESSAGE,
 } from "@/lib/auth/bungie-reauth";
+import { useInventoryEquipmentOnlyAlert } from "@/components/dashboard/inventory-equipment-only-alert";
 
 interface InventoryAutoSyncProps {
   /** When true, POST /api/inventory/sync once on mount (non-forced). */
@@ -21,6 +22,7 @@ interface InventoryAutoSyncProps {
 export function InventoryAutoSync({ enabled }: InventoryAutoSyncProps) {
   const router = useRouter();
   const startedRef = useRef(false);
+  const equipmentOnlyAlert = useInventoryEquipmentOnlyAlert();
 
   useEffect(() => {
     if (!enabled || startedRef.current) return;
@@ -62,16 +64,10 @@ export function InventoryAutoSync({ enabled }: InventoryAutoSyncProps) {
           const detail =
             Array.isArray(body.warnings) && body.warnings[0]
               ? body.warnings[0]
-              : "Bungie only returned equipped armor. Reconnect Bungie so your session can read your full vault and inventories.";
-          toast.error(detail, {
-            duration: 22_000,
-            action: {
-              label: "Reconnect Bungie",
-              onClick: () => {
-                window.location.href = BUNGIE_RECONNECT_PATH;
-              },
-            },
-          });
+              : undefined;
+          equipmentOnlyAlert?.showEquipmentOnlyWarning(detail);
+        } else {
+          equipmentOnlyAlert?.clearEquipmentOnlyWarning();
         }
 
         if (!body.cached) {
@@ -81,7 +77,7 @@ export function InventoryAutoSync({ enabled }: InventoryAutoSyncProps) {
         // Manual refresh remains available from the header.
       }
     })();
-  }, [enabled, router]);
+  }, [enabled, router, equipmentOnlyAlert]);
 
   return null;
 }

@@ -22,6 +22,10 @@ import {
 } from "@/components/dashboard/workspace-view-mode-tabs";
 import { SavedViewsMenu } from "@/components/workspace/saved-views-menu";
 import { InventoryAutoSync } from "@/components/dashboard/inventory-auto-sync";
+import {
+  InventoryEquipmentOnlyBanner,
+  InventoryEquipmentOnlyProvider,
+} from "@/components/dashboard/inventory-equipment-only-alert";
 
 export interface DashboardWorkspaceProps {
   displayName: string;
@@ -145,37 +149,40 @@ export function DashboardWorkspace({
   }, [applySavedView, savedViewImportedId, savedViews]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <InventoryAutoSync enabled={needsInventorySync} />
-      <AppHeader
-        displayName={displayName}
-        profilePictureUrl={profilePictureUrl}
-        leadingAccessory={tabs}
-      />
-      {mode === "table" ? (
-        <InventoryTableView
-          banners={banners}
-          syncWarning={syncWarning}
-          hasInventory={hasInventory}
-          inventory={inventory}
-          selectors={selectors}
-          filters={filters}
-          onFiltersChange={onFiltersChange}
-          savedViewsSlot={savedViewsSlot}
+    <InventoryEquipmentOnlyProvider>
+      <div className="flex h-full min-h-0 flex-col">
+        <InventoryAutoSync enabled={needsInventorySync} />
+        <InventoryEquipmentOnlyBanner />
+        <AppHeader
+          displayName={displayName}
+          profilePictureUrl={profilePictureUrl}
+          leadingAccessory={tabs}
         />
-      ) : (
-        <GridWorkspace
-          banners={banners}
-          syncWarning={syncWarning}
-          hasInventory={hasInventory}
-          selectors={selectors}
-          inventory={inventory}
-          lookupPayload={lookupPayload}
-          filters={filters}
-          onFiltersChange={onFiltersChange}
-          savedViewsSlot={savedViewsSlot}
-        />
-      )}
-    </div>
+        {mode === "table" ? (
+          <InventoryTableView
+            banners={banners}
+            syncWarning={syncWarning}
+            hasInventory={hasInventory}
+            inventory={inventory}
+            selectors={selectors}
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            savedViewsSlot={savedViewsSlot}
+          />
+        ) : (
+          <GridWorkspace
+            banners={banners}
+            syncWarning={syncWarning}
+            hasInventory={hasInventory}
+            selectors={selectors}
+            inventory={inventory}
+            lookupPayload={lookupPayload}
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            savedViewsSlot={savedViewsSlot}
+          />
+        )}
+      </div>
+    </InventoryEquipmentOnlyProvider>
   );
 }
