@@ -32,7 +32,7 @@ export interface DashboardWorkspaceProps {
   profilePictureUrl: string | null;
   banners: ReactNode;
   syncWarning: string | null;
-  needsInventorySync?: boolean;
+  inventorySyncedAt: string | null;
   hasInventory: boolean;
   selectors: TrackerFormSelectors;
   inventory: DerivedArmorPieceJson[];
@@ -49,7 +49,7 @@ export function DashboardWorkspace({
   profilePictureUrl,
   banners,
   syncWarning,
-  needsInventorySync = false,
+  inventorySyncedAt,
   hasInventory,
   selectors,
   inventory,
@@ -151,7 +151,7 @@ export function DashboardWorkspace({
   return (
     <InventoryEquipmentOnlyProvider>
       <div className="flex h-full min-h-0 flex-col">
-        <InventoryAutoSync enabled={needsInventorySync} />
+        <InventoryAutoSync inventorySyncedAt={inventorySyncedAt} />
         <InventoryEquipmentOnlyBanner />
         <AppHeader
           displayName={displayName}

@@ -3,7 +3,6 @@ import { Info, Warning } from "@phosphor-icons/react/dist/ssr";
 import { getSession } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
 import { getCachedInventoryWithSyncedAt } from "@/lib/inventory/sync";
-import { inventoryCacheNeedsSync } from "@/lib/inventory/cache-status";
 import { getManifestLookups } from "@/lib/manifest/lookups";
 import { checkManifestVersion } from "@/lib/manifest/version-check";
 import { SyncManifestButton } from "@/components/dashboard/sync-manifest-button";
@@ -63,7 +62,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const initialGridFilters =
     sharedFilters ?? parseGridFilters(userRow?.grid_filters ?? null);
   const appliedFromShare = sharedFilters !== null;
-  const needsInventorySync = inventoryCacheNeedsSync(cached?.syncedAt);
+  const inventorySyncedAt = cached?.syncedAt ?? null;
 
   const inventory = cached?.items ?? [];
 
@@ -138,7 +137,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       profilePictureUrl={profilePictureUrl}
       banners={banners}
       syncWarning={null}
-      needsInventorySync={needsInventorySync}
+      inventorySyncedAt={inventorySyncedAt}
       hasInventory={cached !== null}
       selectors={selectors}
       inventory={inventory}
