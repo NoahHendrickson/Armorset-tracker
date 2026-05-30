@@ -23,6 +23,7 @@ import {
   type GridFiltersJson,
 } from "@/lib/workspace/grid-filters-schema";
 import { TrackerFilterBar } from "@/components/workspace/tracker-filter-bar";
+import type { SavedViewsBarProps } from "@/components/workspace/saved-views-menu";
 import { TrackerGridContent } from "@/components/workspace/tracker-grid-content";
 import { CompareDialog } from "@/components/workspace/compare-dialog";
 import {
@@ -54,7 +55,7 @@ interface GridWorkspaceProps {
   lookupPayload: GridLookupPayload;
   filters: GridFiltersJson;
   onFiltersChange: (next: GridFiltersJson) => void;
-  savedViewsSlot?: ReactNode;
+  savedViews?: SavedViewsBarProps;
 }
 
 export function GridWorkspace({
@@ -66,7 +67,7 @@ export function GridWorkspace({
   lookupPayload,
   filters,
   onFiltersChange,
-  savedViewsSlot,
+  savedViews,
 }: GridWorkspaceProps) {
   const { pinnedHashes, togglePin } = usePinnedArmorSets();
 
@@ -155,7 +156,7 @@ export function GridWorkspace({
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-4 sm:px-6">
-          <div className="shrink-0 rounded-none border border-border bg-table-header px-3">
+          <div className="min-w-0 w-full shrink-0 overflow-hidden rounded-none border border-border bg-table-header px-3">
             <TrackerFilterBar
               selectors={selectors}
               value={filters}
@@ -165,7 +166,7 @@ export function GridWorkspace({
               resultCount={visibleTrackers.length}
               resultNoun={{ singular: "tracker", plural: "trackers" }}
               showTertiaryStatFilter={false}
-              savedViewsSlot={savedViewsSlot}
+              savedViews={savedViews}
             />
           </div>
 

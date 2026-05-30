@@ -1,20 +1,15 @@
 "use client";
 
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useFilterBarCollapseTier } from "@/components/workspace/use-filter-bar-collapse-tier";
 import {
   MagnifyingGlass,
-  SlidersHorizontal,
   X,
 } from "@phosphor-icons/react/dist/ssr";
 import { CLASS_NAMES } from "@/lib/bungie/constants";
 import type { ArmorStatName } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import {
   gridFiltersHaveUnblockingSelection,
@@ -28,6 +23,17 @@ import { ArmorSetsFilterDimension } from "@/components/workspace/armor-sets-filt
 import { HashCheckboxFilterDimension } from "@/components/workspace/hash-checkbox-filter-dimension";
 import { StatCheckboxFilterDimension } from "@/components/workspace/stat-checkbox-filter-dimension";
 import { RarityFilterDimension } from "@/components/workspace/rarity-filter-dimension";
+import {
+  FILTER_BAR_CONTAINER_CLASS,
+  FILTER_INLINE_ARCHETYPES,
+  FILTER_INLINE_CORE,
+  FILTER_INLINE_TUNINGS_TERTIARY,
+} from "@/components/workspace/filter-bar-primitives";
+import {
+  SavedViewsMenu,
+  type SavedViewsBarProps,
+} from "@/components/workspace/saved-views-menu";
+import { TrackerFilterBarOverflowMenus } from "@/components/workspace/tracker-filter-bar-overflow-menus";
 
 const CLASS_TABS: Array<{ value: GridFilterClass; label: string }> = [
   { value: 0, label: "Titan" },
@@ -50,7 +56,7 @@ interface TrackerFilterBarProps {
   resultNoun: ResultNoun;
   showTertiaryStatFilter?: boolean;
   showRarityFilter?: boolean;
-  savedViewsSlot?: ReactNode;
+  savedViews?: SavedViewsBarProps;
   className?: string;
 }
 
@@ -64,13 +70,16 @@ export function TrackerFilterBar({
   resultNoun,
   showTertiaryStatFilter = true,
   showRarityFilter = false,
-  savedViewsSlot,
+  savedViews,
   className,
 }: TrackerFilterBarProps) {
+  const barRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchUiOpen, setSearchUiOpen] = useState(false);
   const [setsOpen, setSetsOpen] = useState(false);
   const searchExpanded = searchUiOpen || value.search.trim().length > 0;
+  const collapseTier = useFilterBarCollapseTier(barRef);
+  const savedViewsInline = collapseTier !== "filters-menu";
 
   const sortedSets = useMemo(
     () => selectors.setsByClass[value.class],
@@ -152,15 +161,9 @@ export function TrackerFilterBar({
     onChange({
       ...value,
       rarity: next,
-      // Exotics have no equipable set — clear stale set picks from grid mode.
       ...(next === "exotic" ? { setHashes: [] } : {}),
     });
   }
-
-  const showSetFilter = !showRarityFilter || value.rarity !== "exotic";
-  const shareEnabled = showRarityFilter
-    ? inventoryFiltersHaveShareableSelection(value)
-    : gridFiltersHaveUnblockingSelection(value);
 
   function switchClass(next: GridFilterClass) {
     if (next === value.class) return;
@@ -172,13 +175,44 @@ export function TrackerFilterBar({
     });
   }
 
-  const barMinH = "min-h-[52px]";
+  const showSetFilter = !showRarityFilter || value.rarity !== "exotic";
+  const shareEnabled = showRarityFilter
+    ? inventoryFiltersHaveShareableSelection(value)
+    : gridFiltersHaveUnblockingSelection(value);
+
+  const overflowProps = {
+    collapseTier,
+    value,
+    onChange,
+    showTertiaryStatFilter,
+    showRarityFilter,
+    showSetFilter,
+    sortedSets,
+    sortedArchetypes,
+    sortedTunings,
+    setHashesAsStrings,
+    selectedSetNames,
+    armorSetEmptyCopy,
+    pinnedHashes,
+    onTogglePin,
+    setsOpen,
+    onSetsOpenChange: setSetsOpen,
+    onSetHashesFromStrings: setSetHashesFromStrings,
+    onToggleArchetype: toggleArchetype,
+    onToggleTuning: toggleTuning,
+    onToggleStat: toggleStat,
+    onSwitchRarity: switchRarity,
+    savedViews:
+      collapseTier === "filters-menu" ? savedViews : undefined,
+  };
 
   return (
     <div
+      ref={barRef}
       className={cn(
-        "flex min-w-0 flex-wrap items-center gap-2 sm:gap-3",
-        barMinH,
+        FILTER_BAR_CONTAINER_CLASS,
+        "flex w-full min-w-0 max-w-full flex-nowrap items-center gap-2 overflow-hidden sm:gap-3",
+        "min-h-[52px]",
         className,
       )}
     >
@@ -202,14 +236,19 @@ export function TrackerFilterBar({
 
       <div aria-hidden className="h-6 w-px shrink-0 self-center bg-border" />
 
-      {savedViewsSlot}
+      {savedViews && savedViewsInline ? (
+        <SavedViewsMenu
+          {...savedViews}
+          inlineWrapperClass={FILTER_INLINE_CORE}
+        />
+      ) : null}
 
       {showRarityFilter ? (
         <RarityFilterDimension
           variant="inline"
           value={value.rarity}
           onChange={switchRarity}
-          inlineWrapperClass="hidden md:inline-flex"
+          inlineWrapperClass={FILTER_INLINE_CORE}
         />
       ) : null}
 
@@ -227,7 +266,7 @@ export function TrackerFilterBar({
           open={setsOpen}
           onOpenChange={setSetsOpen}
           onClear={() => onChange({ ...value, setHashes: [] })}
-          inlineWrapperClass="hidden md:inline-flex"
+          inlineWrapperClass={FILTER_INLINE_CORE}
         />
       ) : null}
 
@@ -239,7 +278,7 @@ export function TrackerFilterBar({
         onToggle={toggleArchetype}
         onClear={() => onChange({ ...value, archetypeHashes: [] })}
         emptyMessage="No archetypes — sync the manifest first."
-        inlineWrapperClass="hidden md:inline-flex"
+        inlineWrapperClass={FILTER_INLINE_ARCHETYPES}
         menuContentClass="min-w-64"
       />
 
@@ -251,7 +290,7 @@ export function TrackerFilterBar({
         onToggle={toggleTuning}
         onClear={() => onChange({ ...value, tuningHashes: [] })}
         emptyMessage="No tunings — sync the manifest first."
-        inlineWrapperClass="hidden lg:inline-flex"
+        inlineWrapperClass={FILTER_INLINE_TUNINGS_TERTIARY}
         menuContentClass="min-w-56"
       />
 
@@ -261,87 +300,14 @@ export function TrackerFilterBar({
           selectedStats={value.tertiaryStats}
           onToggle={toggleStat}
           onClear={() => onChange({ ...value, tertiaryStats: [] })}
-          inlineWrapperClass="hidden lg:inline-flex"
+          inlineWrapperClass={FILTER_INLINE_TUNINGS_TERTIARY}
         />
       ) : null}
 
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            aria-label="More filters"
-            className="relative h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs lg:hidden"
-          >
-            <SlidersHorizontal weight="duotone" aria-hidden className="size-4" />
-            <span className="hidden sm:inline">Filters</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          className="min-w-48 rounded-none py-1"
-        >
-          {showRarityFilter ? (
-            <RarityFilterDimension
-              variant="stowed"
-              value={value.rarity}
-              onChange={switchRarity}
-              stowedSubTriggerClass="md:hidden"
-            />
-          ) : null}
-          {showSetFilter ? (
-            <ArmorSetsFilterDimension
-              variant="stowed"
-              options={sortedSets}
-              values={setHashesAsStrings}
-              onValuesChange={setSetHashesFromStrings}
-              selectedNames={selectedSetNames}
-              emptyCatalogMessage={armorSetEmptyCopy}
-              pinnedHashes={pinnedHashes}
-              onTogglePin={onTogglePin}
-              classKey={value.class}
-              open={setsOpen}
-              onOpenChange={setSetsOpen}
-              onClear={() => onChange({ ...value, setHashes: [] })}
-              stowedSubTriggerClass="md:hidden"
-            />
-          ) : null}
-          <HashCheckboxFilterDimension
-            variant="stowed"
-            label="Archetypes"
-            options={sortedArchetypes}
-            selectedHashes={value.archetypeHashes}
-            onToggle={toggleArchetype}
-            onClear={() => onChange({ ...value, archetypeHashes: [] })}
-            emptyMessage="No archetypes — sync the manifest first."
-            stowedSubTriggerClass="md:hidden"
-            menuContentClass="min-w-64"
-          />
-          {showTertiaryStatFilter ? (
-            <StatCheckboxFilterDimension
-              variant="stowed"
-              selectedStats={value.tertiaryStats}
-              onToggle={toggleStat}
-              onClear={() => onChange({ ...value, tertiaryStats: [] })}
-              stowedSubTriggerClass="lg:hidden"
-            />
-          ) : null}
-          <HashCheckboxFilterDimension
-            variant="stowed"
-            label="Tuning stats"
-            options={sortedTunings}
-            selectedHashes={value.tuningHashes}
-            onToggle={toggleTuning}
-            onClear={() => onChange({ ...value, tuningHashes: [] })}
-            emptyMessage="No tunings — sync the manifest first."
-            stowedSubTriggerClass="lg:hidden"
-            menuContentClass="min-w-56"
-          />
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <TrackerFilterBarOverflowMenus {...overflowProps} />
 
       <p
-        className="min-w-0 flex-1 text-xs leading-snug text-muted-foreground/80"
+        className="min-w-0 flex-1 truncate text-xs leading-snug text-muted-foreground/80"
         aria-live="polite"
       >
         Showing {resultCount}{" "}

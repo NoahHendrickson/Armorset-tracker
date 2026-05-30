@@ -20,7 +20,6 @@ import {
   WorkspaceViewModeTabs,
   type WorkspaceViewMode,
 } from "@/components/dashboard/workspace-view-mode-tabs";
-import { SavedViewsMenu } from "@/components/workspace/saved-views-menu";
 import { InventoryAutoSync } from "@/components/dashboard/inventory-auto-sync";
 import {
   InventoryEquipmentOnlyBanner,
@@ -102,16 +101,14 @@ export function DashboardWorkspace({
     });
   }, [filters, onFiltersChange]);
 
-  const savedViewsSlot = (
-    <SavedViewsMenu
-      views={savedViews}
-      activeViewId={activeSavedViewId}
-      filters={filters}
-      onViewsChange={setSavedViews}
-      onApply={applySavedView}
-      onClearActive={clearActiveSavedView}
-    />
-  );
+  const savedViewsMenuProps = {
+    views: savedViews,
+    activeViewId: activeSavedViewId,
+    filters,
+    onViewsChange: setSavedViews,
+    onApply: applySavedView,
+    onClearActive: clearActiveSavedView,
+  };
 
   useEffect(() => {
     if (shareHandledRef.current) return;
@@ -167,7 +164,7 @@ export function DashboardWorkspace({
             selectors={selectors}
             filters={filters}
             onFiltersChange={onFiltersChange}
-            savedViewsSlot={savedViewsSlot}
+            savedViews={savedViewsMenuProps}
           />
         ) : (
           <GridWorkspace
@@ -179,7 +176,7 @@ export function DashboardWorkspace({
             lookupPayload={lookupPayload}
             filters={filters}
             onFiltersChange={onFiltersChange}
-            savedViewsSlot={savedViewsSlot}
+            savedViews={savedViewsMenuProps}
           />
         )}
       </div>

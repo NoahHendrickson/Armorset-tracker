@@ -47,25 +47,51 @@ function Render({
 }
 
 export const EmptyFilters: Story = {
-  render: () => <Render initial={MOCK_GRID_FILTERS_EMPTY} />,
+  render: () => <Render initial={MOCK_GRID_FILTERS_EMPTY} width={1200} />,
 };
 
 export const PopulatedFilters: Story = {
-  render: () => <Render initial={MOCK_GRID_FILTERS_POPULATED} />,
+  render: () => <Render initial={MOCK_GRID_FILTERS_POPULATED} width={1200} />,
 };
 
 export const TrackerGridNoTertiaryMenu: Story = {
   render: () => (
-    <Render initial={MOCK_GRID_FILTERS_POPULATED} showTertiaryStatFilter={false} />
+    <Render
+      initial={MOCK_GRID_FILTERS_POPULATED}
+      showTertiaryStatFilter={false}
+      width={1200}
+    />
   ),
 };
 
-export const NarrowViewport: Story = {
-  render: () => <Render initial={MOCK_GRID_FILTERS_POPULATED} width={480} />,
+/** ≥72rem — all filters inline. */
+export const WideAllInline: Story = {
+  render: () => <Render initial={MOCK_GRID_FILTERS_POPULATED} width={1200} />,
+};
+
+/** 64–72rem — tunings/tertiary in More; sets & archetypes stay inline. */
+export const MidMoreOverflow: Story = {
+  render: () => (
+    <Render initial={MOCK_GRID_FILTERS_POPULATED} width={1080} showRarityFilter />
+  ),
+};
+
+/** 56–64rem — archetypes join More; sets/rarity stay inline. */
+export const MidMoreWithArchetypes: Story = {
+  render: () => (
+    <Render initial={MOCK_GRID_FILTERS_POPULATED} width={960} showRarityFilter />
+  ),
+};
+
+/** <56rem — everything in Filters menu. */
+export const NarrowFullFilters: Story = {
+  render: () => (
+    <Render initial={MOCK_GRID_FILTERS_POPULATED} width={480} showRarityFilter />
+  ),
 };
 
 export const InventoryTableWithRarity: Story = {
   render: () => (
-    <Render initial={MOCK_GRID_FILTERS_POPULATED} showRarityFilter />
+    <Render initial={MOCK_GRID_FILTERS_POPULATED} showRarityFilter width={1200} />
   ),
 };

@@ -16,6 +16,7 @@ import { filterInventoryPieces, inventoryPieceDisplayName } from "@/lib/filters/
 import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import { usePinnedArmorSets } from "@/lib/views/use-pinned-armor-sets";
 import { TrackerFilterBar } from "@/components/workspace/tracker-filter-bar";
+import type { SavedViewsBarProps } from "@/components/workspace/saved-views-menu";
 import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
 import { InventoryItemActions } from "@/components/dashboard/inventory-item-actions";
 
@@ -48,7 +49,7 @@ interface InventoryTableViewProps {
   selectors: TrackerFormSelectors;
   filters: GridFiltersJson;
   onFiltersChange: (next: GridFiltersJson) => void;
-  savedViewsSlot?: ReactNode;
+  savedViews?: SavedViewsBarProps;
 }
 
 export function InventoryTableView({
@@ -60,7 +61,7 @@ export function InventoryTableView({
   selectors,
   filters,
   onFiltersChange,
-  savedViewsSlot,
+  savedViews,
 }: InventoryTableViewProps) {
   const { pinnedHashes, togglePin } = usePinnedArmorSets();
 
@@ -110,7 +111,7 @@ export function InventoryTableView({
                       <TableRow className="border-b-0 border-border hover:bg-transparent [&:hover]:bg-transparent">
                         <TableHead
                           colSpan={7}
-                          className="h-auto border-b-0 bg-table-header px-3 py-0 text-left align-middle font-medium text-muted-foreground shadow-[inset_0_-1px_0_0_var(--border)] [&:has([role=checkbox])]:pr-0"
+                          className="h-auto w-full max-w-0 border-b-0 bg-table-header px-3 py-0 text-left align-middle font-medium text-muted-foreground shadow-[inset_0_-1px_0_0_var(--border)] [&:has([role=checkbox])]:pr-0"
                         >
                           <TrackerFilterBar
                             selectors={selectors}
@@ -124,7 +125,7 @@ export function InventoryTableView({
                               plural: "pieces",
                             }}
                             showRarityFilter
-                            savedViewsSlot={savedViewsSlot}
+                            savedViews={savedViews}
                           />
                         </TableHead>
                       </TableRow>

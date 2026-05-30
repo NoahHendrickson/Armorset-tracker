@@ -16,6 +16,8 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -23,12 +25,16 @@ import {
   ShareViewDialog,
 } from "@/components/workspace/saved-view-dialogs";
 import { SavedViewRow } from "@/components/workspace/saved-view-row";
-import { INLINE_TRIGGER_FRAME_CLASS } from "@/components/workspace/filter-bar-primitives";
+import {
+  FILTER_MENU_CONTENT_CLASS,
+  FilterDimensionSubTrigger,
+  INLINE_TRIGGER_FRAME_CLASS,
+} from "@/components/workspace/filter-bar-primitives";
 
 const SAVED_VIEWS_SECTION_LABEL_CLASS =
   "pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground";
 
-interface SavedViewsMenuProps {
+export interface SavedViewsMenuProps {
   views: SavedFilterViewRow[];
   activeViewId: string | null;
   filters: GridFiltersJson;
@@ -36,7 +42,17 @@ interface SavedViewsMenuProps {
   onApply: (view: SavedFilterViewRow) => void;
   onClearActive: () => void;
   className?: string;
+  variant?: "inline" | "stowed";
+  /** Inline only — wrapper visibility (e.g. container-query hide). */
+  inlineWrapperClass?: string;
+  /** Stowed only — sub-trigger visibility inside the aggregate Filters menu. */
+  stowedSubTriggerClass?: string;
 }
+
+export type SavedViewsBarProps = Omit<
+  SavedViewsMenuProps,
+  "variant" | "inlineWrapperClass" | "stowedSubTriggerClass"
+>;
 
 export function SavedViewsMenu({
   views,
@@ -46,6 +62,9 @@ export function SavedViewsMenu({
   onApply,
   onClearActive,
   className,
+  variant = "inline",
+  inlineWrapperClass = "",
+  stowedSubTriggerClass = "",
 }: SavedViewsMenuProps) {
   const api = useSavedViewsApi(views, onViewsChange);
 
@@ -107,10 +126,134 @@ export function SavedViewsMenu({
 
   const triggerLabel = activeView?.name ?? "Views";
 
+  const menuBody = (
+    <>
+      <DropdownMenuLabel className={SAVED_VIEWS_SECTION_LABEL_CLASS}>
+        Saved by you
+      </DropdownMenuLabel>
+      {ownedViews.length === 0 ? (
+        <div className="px-3 py-2.5 text-sm text-muted-foreground/80">
+          No saved views yet.
+        </div>
+      ) : null}
+      {ownedViews.map((view) => (
+        <SavedViewRow
+          key={view.id}
+          view={view}
+          active={view.id === activeViewId}
+          owned
+          onApply={() => onApply(view)}
+          onRename={() => openRenameDialog(view)}
+          onShare={() => void openShareDialog(view)}
+          onRevokeShare={
+            view.share_slug ? () => void api.revokeShareLink(view) : undefined
+          }
+          onDelete={() => void api.deleteView(view)}
+        />
+      ))}
+
+      <DropdownMenuSeparator />
+
+      <DropdownMenuLabel className={SAVED_VIEWS_SECTION_LABEL_CLASS}>
+        Shared with you
+      </DropdownMenuLabel>
+      {sharedViews.length === 0 ? (
+        <div className="px-3 py-2.5 text-sm text-muted-foreground/80">
+          No shared views yet.
+        </div>
+      ) : null}
+      {sharedViews.map((view) => (
+        <SavedViewRow
+          key={view.id}
+          view={view}
+          active={view.id === activeViewId}
+          owned={false}
+          onApply={() => onApply(view)}
+          onDelete={() => void api.deleteView(view)}
+        />
+      ))}
+
+      <DropdownMenuSeparator />
+
+      <DropdownMenuItem
+        className="rounded-none"
+        onSelect={(e) => {
+          e.preventDefault();
+          setSaveOpen(true);
+        }}
+      >
+        <Plus weight="duotone" className="size-4" aria-hidden />
+        Save current filters as view…
+      </DropdownMenuItem>
+    </>
+  );
+
+  const dialogs = (
+    <>
+      <SavedViewNameDialog
+        key="save"
+        open={saveOpen}
+        onOpenChange={setSaveOpen}
+        title="Save view"
+        description="Saves your current set, archetype, tuning, and tertiary filters. Class and search are not included."
+        submitLabel="Save"
+        busyLabel="Saving…"
+        onSubmit={(name) => api.createView(name, filters)}
+      />
+
+      <SavedViewNameDialog
+        key={renameTarget?.id ?? "rename"}
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        title="Rename view"
+        initialName={renameTarget?.name ?? ""}
+        submitLabel="Rename"
+        busyLabel="Saving…"
+        onSubmit={(name) =>
+          renameTarget ? api.renameView(renameTarget, name) : Promise.resolve(false)
+        }
+      />
+
+      <ShareViewDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        target={shareTarget}
+        shareUrl={shareUrl}
+        shareBusy={shareBusy}
+        onRevoke={revokeShare}
+      />
+    </>
+  );
+
+  if (variant === "stowed") {
+    return (
+      <>
+        <DropdownMenuSub>
+          <FilterDimensionSubTrigger
+            label={triggerLabel}
+            selectionCount={activeView ? 1 : 0}
+            className={stowedSubTriggerClass}
+          />
+          <DropdownMenuSubContent
+            className={cn(
+              "min-w-56 max-w-xs rounded-none py-1",
+              FILTER_MENU_CONTENT_CLASS,
+              stowedSubTriggerClass,
+            )}
+            collisionPadding={16}
+          >
+            {menuBody}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        {dialogs}
+      </>
+    );
+  }
+
   return (
     <>
       <DropdownMenu modal={false}>
-        <div className={INLINE_TRIGGER_FRAME_CLASS}>
+        <div className={cn(INLINE_TRIGGER_FRAME_CLASS, inlineWrapperClass)}>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
@@ -162,100 +305,10 @@ export function SavedViewsMenu({
           className="min-w-56 max-w-xs rounded-none py-1"
           collisionPadding={16}
         >
-          <DropdownMenuLabel className={SAVED_VIEWS_SECTION_LABEL_CLASS}>
-            Saved by you
-          </DropdownMenuLabel>
-          {ownedViews.length === 0 ? (
-            <div className="px-3 py-2.5 text-sm text-muted-foreground/80">
-              No saved views yet.
-            </div>
-          ) : null}
-          {ownedViews.map((view) => (
-            <SavedViewRow
-              key={view.id}
-              view={view}
-              active={view.id === activeViewId}
-              owned
-              onApply={() => onApply(view)}
-              onRename={() => openRenameDialog(view)}
-              onShare={() => void openShareDialog(view)}
-              onRevokeShare={
-                view.share_slug
-                  ? () => void api.revokeShareLink(view)
-                  : undefined
-              }
-              onDelete={() => void api.deleteView(view)}
-            />
-          ))}
-
-          <DropdownMenuSeparator />
-
-          <DropdownMenuLabel className={SAVED_VIEWS_SECTION_LABEL_CLASS}>
-            Shared with you
-          </DropdownMenuLabel>
-          {sharedViews.length === 0 ? (
-            <div className="px-3 py-2.5 text-sm text-muted-foreground/80">
-              No shared views yet.
-            </div>
-          ) : null}
-          {sharedViews.map((view) => (
-            <SavedViewRow
-              key={view.id}
-              view={view}
-              active={view.id === activeViewId}
-              owned={false}
-              onApply={() => onApply(view)}
-              onDelete={() => void api.deleteView(view)}
-            />
-          ))}
-
-          <DropdownMenuSeparator />
-
-          <DropdownMenuItem
-            className="rounded-none"
-            onSelect={(e) => {
-              e.preventDefault();
-              setSaveOpen(true);
-            }}
-          >
-            <Plus weight="duotone" className="size-4" aria-hidden />
-            Save current filters as view…
-          </DropdownMenuItem>
+          {menuBody}
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <SavedViewNameDialog
-        key="save"
-        open={saveOpen}
-        onOpenChange={setSaveOpen}
-        title="Save view"
-        description="Saves your current set, archetype, tuning, and tertiary filters. Class and search are not included."
-        submitLabel="Save"
-        busyLabel="Saving…"
-        onSubmit={(name) => api.createView(name, filters)}
-      />
-
-      <SavedViewNameDialog
-        key={renameTarget?.id ?? "rename"}
-        open={renameOpen}
-        onOpenChange={setRenameOpen}
-        title="Rename view"
-        initialName={renameTarget?.name ?? ""}
-        submitLabel="Rename"
-        busyLabel="Saving…"
-        onSubmit={(name) =>
-          renameTarget ? api.renameView(renameTarget, name) : Promise.resolve(false)
-        }
-      />
-
-      <ShareViewDialog
-        open={shareOpen}
-        onOpenChange={setShareOpen}
-        target={shareTarget}
-        shareUrl={shareUrl}
-        shareBusy={shareBusy}
-        onRevoke={revokeShare}
-      />
+      {dialogs}
     </>
   );
 }
