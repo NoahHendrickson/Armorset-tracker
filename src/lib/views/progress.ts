@@ -54,6 +54,46 @@ export function tertiaryStatsForArchetype(
   return orderTertiaryStatsForDisplay(raw);
 }
 
+/** Identity key for the `(set × archetype × tuning)` triple a tracker matches. */
+export function inventoryTripleKey(
+  setHash: number,
+  archetypeHash: number,
+  tuningHash: number,
+): string {
+  return `${setHash}:${archetypeHash}:${tuningHash}`;
+}
+
+/**
+ * Bucket inventory by `(set, archetype, tuning)` so each tracker tile resolves
+ * its candidate pieces with a single map lookup instead of re-scanning the
+ * whole inventory. Pieces missing any of the three hashes can never match a
+ * tracker — matching requires strict equality on all three — so they're
+ * dropped here rather than carried into every bucket.
+ */
+export function indexInventoryByTriple(
+  inventory: DerivedArmorPieceJson[],
+): Map<string, DerivedArmorPieceJson[]> {
+  const out = new Map<string, DerivedArmorPieceJson[]>();
+  for (const piece of inventory) {
+    if (
+      piece.setHash == null ||
+      piece.archetypeHash == null ||
+      piece.tuningHash == null
+    ) {
+      continue;
+    }
+    const key = inventoryTripleKey(
+      piece.setHash,
+      piece.archetypeHash,
+      piece.tuningHash,
+    );
+    const bucket = out.get(key);
+    if (bucket) bucket.push(piece);
+    else out.set(key, [piece]);
+  }
+  return out;
+}
+
 export function computeViewProgress(
   view: ViewRow,
   inventory: DerivedArmorPieceJson[],
