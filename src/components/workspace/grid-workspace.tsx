@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useDeferredValue,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -11,6 +12,10 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { enumerateVisibleTrackers } from "@/lib/filters/enumerate-trackers";
+import {
+  indexInventoryByTriple,
+  inventoryTripleKey,
+} from "@/lib/views/progress";
 import type { GridLookupPayload } from "@/lib/views/grid-lookup-payload";
 import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import {
@@ -34,6 +39,9 @@ import {
   TRACKER_WIDTH,
 } from "@/lib/workspace/workspace-constants";
 import { usePinnedArmorSets } from "@/lib/views/use-pinned-armor-sets";
+
+/** Stable empty bucket so tiles with no matching pieces keep referential identity. */
+const EMPTY_PIECES: DerivedArmorPieceJson[] = [];
 
 const ROW_GAP_PX = 16;
 /** Virtual row height for scaled tiles + vertical gap. */
@@ -82,11 +90,32 @@ export function GridWorkspace({
     return out;
   }, [inventory]);
 
-  const inventoryForClass = inventoryByClass[filters.class] ?? [];
+  const inventoryForClass = useMemo(
+    () => inventoryByClass[filters.class] ?? EMPTY_PIECES,
+    [inventoryByClass, filters.class],
+  );
 
+  // Typing in the search box must stay responsive. Defer the search term so the
+  // full cross-product enumeration runs on a lower-priority render instead of
+  // blocking every keystroke; other filter dimensions still update eagerly.
+  const deferredSearch = useDeferredValue(filters.search);
+  const filtersForEnumeration = useMemo(
+    () =>
+      deferredSearch === filters.search
+        ? filters
+        : { ...filters, search: deferredSearch },
+    [filters, deferredSearch],
+  );
   const visibleTrackers = useMemo(
-    () => enumerateVisibleTrackers(filters, selectors),
-    [filters, selectors],
+    () => enumerateVisibleTrackers(filtersForEnumeration, selectors),
+    [filtersForEnumeration, selectors],
+  );
+
+  // Bucket the class inventory once so each tile resolves its matching pieces
+  // with a single lookup instead of re-scanning the whole inventory.
+  const inventoryIndex = useMemo(
+    () => indexInventoryByTriple(inventoryForClass),
+    [inventoryForClass],
   );
   const unblocked = gridFiltersHaveUnblockingSelection(filters);
 
@@ -222,7 +251,15 @@ export function GridWorkspace({
                           <GridTile
                             key={ephemeralTrackerId(d)}
                             descriptor={d}
-                            inventory={inventoryForClass}
+                            inventory={
+                              inventoryIndex.get(
+                                inventoryTripleKey(
+                                  d.setHash,
+                                  d.archetypeHash,
+                                  d.tuningHash,
+                                ),
+                              ) ?? EMPTY_PIECES
+                            }
                             lookupPayload={lookupPayload}
                             hasInventory={hasInventory}
                             onCompareClick={() => setCompareAnchor(d)}

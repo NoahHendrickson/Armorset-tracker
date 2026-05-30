@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useDeferredValue, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { SLOT_LABELS, bungieIconUrl } from "@/lib/bungie/constants";
 import {
@@ -32,6 +33,9 @@ const INVENTORY_TABLE_COLGROUP = (
     <col className="w-[15rem]" />
   </colgroup>
 );
+
+/** Approximate single-row height; the virtualizer remeasures real rows on mount. */
+const ESTIMATED_ROW_HEIGHT_PX = 41;
 
 function formatLocation(piece: DerivedArmorPieceJson): string {
   const loc = piece.location;
@@ -65,10 +69,35 @@ export function InventoryTableView({
 }: InventoryTableViewProps) {
   const { pinnedHashes, togglePin } = usePinnedArmorSets();
 
-  const filteredRows = useMemo(
-    () => filterInventoryPieces(inventory, filters),
-    [inventory, filters],
+  // Keep typing responsive: defer the search term so the filter + sort pass
+  // runs on a lower-priority render instead of blocking every keystroke.
+  const deferredSearch = useDeferredValue(filters.search);
+  const filtersForFiltering = useMemo(
+    () =>
+      deferredSearch === filters.search
+        ? filters
+        : { ...filters, search: deferredSearch },
+    [filters, deferredSearch],
   );
+  const filteredRows = useMemo(
+    () => filterInventoryPieces(inventory, filtersForFiltering),
+    [inventory, filtersForFiltering],
+  );
+
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filteredRows.length,
+    getScrollElement: () => scrollerRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT_PX,
+    overscan: 10,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom =
+    virtualRows.length > 0
+      ? totalSize - virtualRows[virtualRows.length - 1].end
+      : 0;
 
   const hasTopMessage = Boolean(banners) || Boolean(syncWarning);
 
@@ -156,7 +185,10 @@ export function InventoryTableView({
                     </TableHeader>
                   </Table>
                 </div>
-                <div className="menu-scrollbar max-h-[calc(100dvh-13rem)] min-h-0 min-w-0 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable]">
+                <div
+                  ref={scrollerRef}
+                  className="menu-scrollbar max-h-[calc(100dvh-13rem)] min-h-0 min-w-0 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable]"
+                >
                   <Table
                     className="w-full table-fixed border-separate border-spacing-0"
                     containerClassName="overflow-visible"
@@ -173,53 +205,70 @@ export function InventoryTableView({
                           </TableCell>
                         </TableRow>
                       ) : (
-                        filteredRows.map((piece) => (
-                          <TableRow
-                            key={piece.itemInstanceId}
-                            className="border-b-0 shadow-[inset_0_-1px_0_0_var(--border)] hover:bg-accent/60"
-                          >
-                            <TableCell className="w-px whitespace-nowrap py-1 pe-2 align-middle">
-                              {piece.iconPath ? (
-                                <span className="inline-flex rounded-none border border-border bg-accent leading-none">
-                                  {/* eslint-disable-next-line @next/next/no-img-element -- Bungie CDN thumbnails; avoid bloating the bundle with next/image remotePatterns. */}
-                                  <img
-                                    src={bungieIconUrl(piece.iconPath)}
-                                    alt={`${SLOT_LABELS[piece.slot]} — ${inventoryPieceDisplayName(piece) ?? "armor"}`}
-                                    className="block h-auto max-h-7 max-w-9 w-auto"
-                                    loading="lazy"
+                        <>
+                          {paddingTop > 0 ? (
+                            <tr aria-hidden>
+                              <td colSpan={7} style={{ height: paddingTop }} />
+                            </tr>
+                          ) : null}
+                          {virtualRows.map((vRow) => {
+                            const piece = filteredRows[vRow.index];
+                            return (
+                              <TableRow
+                                key={piece.itemInstanceId}
+                                data-index={vRow.index}
+                                ref={rowVirtualizer.measureElement}
+                                className="border-b-0 shadow-[inset_0_-1px_0_0_var(--border)] hover:bg-accent/60"
+                              >
+                                <TableCell className="w-px whitespace-nowrap py-1 pe-2 align-middle">
+                                  {piece.iconPath ? (
+                                    <span className="inline-flex rounded-none border border-border bg-accent leading-none">
+                                      {/* eslint-disable-next-line @next/next/no-img-element -- Bungie CDN thumbnails; avoid bloating the bundle with next/image remotePatterns. */}
+                                      <img
+                                        src={bungieIconUrl(piece.iconPath)}
+                                        alt={`${SLOT_LABELS[piece.slot]} — ${inventoryPieceDisplayName(piece) ?? "armor"}`}
+                                        className="block h-auto max-h-7 max-w-9 w-auto"
+                                        loading="lazy"
+                                      />
+                                    </span>
+                                  ) : (
+                                    <div
+                                      role="img"
+                                      aria-label={`${SLOT_LABELS[piece.slot]} — no artwork`}
+                                      className="inline-block size-7 rounded-none border border-border bg-accent/60"
+                                    />
+                                  )}
+                                </TableCell>
+                                <TableCell className="py-1.5 text-foreground/90">
+                                  {inventoryPieceDisplayName(piece) ?? "—"}
+                                </TableCell>
+                                <TableCell className="py-1.5 text-foreground/90">
+                                  {piece.archetypeName ?? "—"}
+                                </TableCell>
+                                <TableCell className="py-1.5 text-foreground/80">
+                                  {piece.tertiaryStat ?? "—"}
+                                </TableCell>
+                                <TableCell className="py-1.5 text-foreground/90">
+                                  {piece.tuningName ?? "—"}
+                                </TableCell>
+                                <TableCell className="py-1.5 text-muted-foreground">
+                                  {formatLocation(piece)}
+                                </TableCell>
+                                <TableCell className="py-1.5 pe-2 align-middle">
+                                  <InventoryItemActions
+                                    piece={piece}
+                                    targetClass={filters.class}
                                   />
-                                </span>
-                              ) : (
-                                <div
-                                  role="img"
-                                  aria-label={`${SLOT_LABELS[piece.slot]} — no artwork`}
-                                  className="inline-block size-7 rounded-none border border-border bg-accent/60"
-                                />
-                              )}
-                            </TableCell>
-                            <TableCell className="py-1.5 text-foreground/90">
-                              {inventoryPieceDisplayName(piece) ?? "—"}
-                            </TableCell>
-                            <TableCell className="py-1.5 text-foreground/90">
-                              {piece.archetypeName ?? "—"}
-                            </TableCell>
-                            <TableCell className="py-1.5 text-foreground/80">
-                              {piece.tertiaryStat ?? "—"}
-                            </TableCell>
-                            <TableCell className="py-1.5 text-foreground/90">
-                              {piece.tuningName ?? "—"}
-                            </TableCell>
-                            <TableCell className="py-1.5 text-muted-foreground">
-                              {formatLocation(piece)}
-                            </TableCell>
-                            <TableCell className="py-1.5 pe-2 align-middle">
-                              <InventoryItemActions
-                                piece={piece}
-                                targetClass={filters.class}
-                              />
-                            </TableCell>
-                          </TableRow>
-                        ))
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                          {paddingBottom > 0 ? (
+                            <tr aria-hidden>
+                              <td colSpan={7} style={{ height: paddingBottom }} />
+                            </tr>
+                          ) : null}
+                        </>
                       )}
                     </TableBody>
                   </Table>
