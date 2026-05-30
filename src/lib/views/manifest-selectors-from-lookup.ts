@@ -1,12 +1,10 @@
 import "server-only";
 import type { ManifestLookups } from "@/lib/manifest/lookups";
-import type { TrackerOptionItem } from "@/lib/views/tracker-option";
-export function manifestSelectorsFromLookups(lookups: ManifestLookups): {
-  setsByClass: { 0: TrackerOptionItem[]; 1: TrackerOptionItem[]; 2: TrackerOptionItem[] };
-  archetypes: TrackerOptionItem[];
-  tunings: TrackerOptionItem[];
-  manifestEmpty: boolean;
-} {
+import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
+
+export function manifestSelectorsFromLookups(
+  lookups: ManifestLookups,
+): TrackerFormSelectors {
   const setsForClass: Record<0 | 1 | 2, Set<number>> = {
     0: new Set(),
     1: new Set(),

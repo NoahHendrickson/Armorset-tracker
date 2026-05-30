@@ -19,7 +19,10 @@ import { tuningPositiveArmorStat } from "@/lib/views/tuning-positive-stat";
 import {
   buildEphemeralTrackerPayload,
   ephemeralTrackerId,
+  type TrackerDescriptor,
 } from "@/lib/workspace/build-tracker-payload-core";
+
+export type { TrackerDescriptor };
 
 function tuningStatIconPathFromLookup(
   tuningName: string,
@@ -34,22 +37,12 @@ function tuningStatIconPathFromLookup(
 const compareTrackerRowShellClass =
   "flex items-center gap-3 border border-border bg-card px-3 py-2";
 
-export interface CompareTrackerDescriptor {
-  setHash: number;
-  archetypeHash: number;
-  tuningHash: number;
-  classType: number;
-  setName: string;
-  archetypeName: string;
-  tuningName: string;
-}
-
 interface CompareDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  anchor: CompareTrackerDescriptor | null;
+  anchor: TrackerDescriptor | null;
   /** Tiles available as partner choices — same class as the anchor by construction. */
-  candidatePool: CompareTrackerDescriptor[];
+  candidatePool: TrackerDescriptor[];
   lookupPayload: GridLookupPayload;
   inventory: DerivedArmorPieceJson[];
   hasInventory: boolean;
@@ -73,7 +66,7 @@ export function CompareDialog({
   const [query, setQuery] = useState("");
 
   const filteredCandidates = useMemo(() => {
-    if (!anchor) return [] as CompareTrackerDescriptor[];
+    if (!anchor) return [] as TrackerDescriptor[];
     const trimmed = query.trim().toLowerCase();
     const aId = ephemeralTrackerId(anchor);
     let rows = candidatePool.filter((c) => ephemeralTrackerId(c) !== aId);

@@ -12,7 +12,7 @@ import {
   parseSavedFilterViewPayload,
   savedViewPayloadMatchesFilters,
 } from "@/lib/saved-views/schema";
-import type { TrackerFormSelectors } from "@/components/workspace/new-tracker-dialog";
+import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import { AppHeader } from "@/components/app-header";
 import { GridWorkspace } from "@/components/workspace/grid-workspace";
 import { InventoryTableView } from "@/components/dashboard/inventory-table-view";
@@ -21,12 +21,14 @@ import {
   type WorkspaceViewMode,
 } from "@/components/dashboard/workspace-view-mode-tabs";
 import { SavedViewsMenu } from "@/components/workspace/saved-views-menu";
+import { InventoryAutoSync } from "@/components/dashboard/inventory-auto-sync";
 
 export interface DashboardWorkspaceProps {
   displayName: string;
   profilePictureUrl: string | null;
   banners: ReactNode;
   syncWarning: string | null;
+  needsInventorySync?: boolean;
   hasInventory: boolean;
   selectors: TrackerFormSelectors;
   inventory: DerivedArmorPieceJson[];
@@ -43,6 +45,7 @@ export function DashboardWorkspace({
   profilePictureUrl,
   banners,
   syncWarning,
+  needsInventorySync = false,
   hasInventory,
   selectors,
   inventory,
@@ -143,6 +146,7 @@ export function DashboardWorkspace({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <InventoryAutoSync enabled={needsInventorySync} />
       <AppHeader
         displayName={displayName}
         profilePictureUrl={profilePictureUrl}

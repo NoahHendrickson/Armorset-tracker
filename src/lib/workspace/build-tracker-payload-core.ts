@@ -38,12 +38,21 @@ function cellsToSerializable(
   return out;
 }
 
-interface EphemeralDescriptor {
+/** Grid/compare tile identity (hashes + display names). */
+export interface TrackerDescriptor {
   setHash: number;
   archetypeHash: number;
   tuningHash: number;
   classType: number;
+  setName: string;
+  archetypeName: string;
+  tuningName: string;
 }
+
+type EphemeralDescriptor = Pick<
+  TrackerDescriptor,
+  "setHash" | "archetypeHash" | "tuningHash" | "classType"
+>;
 
 /**
  * Pure tracker payload assembly. Reads only from {@link GridLookupPayload} so

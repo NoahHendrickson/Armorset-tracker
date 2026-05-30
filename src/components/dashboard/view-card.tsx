@@ -29,7 +29,7 @@ export function ViewCard({
 
   return (
     <Link
-      href={`/views/${view.id}`}
+      href="/dashboard"
       className="group block focus:outline-none"
       aria-label={`Open view ${view.name}`}
     >

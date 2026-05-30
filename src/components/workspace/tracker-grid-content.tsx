@@ -62,7 +62,7 @@ const TRACKER_HEADER_CONTENT_DIVIDER =
 
 /**
  * Inline tracker tile (no Rnd / merge chrome). Same inner layout as the
- * canvas `TrackerPanel`'s solo branch — header + ViewGrid; Compare sits top-right in the header when enabled.
+ * Grid tile shell — header + ViewGrid; Compare sits top-right in the header when enabled.
  */
 export function TrackerGridContent({
   payload,

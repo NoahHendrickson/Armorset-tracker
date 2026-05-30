@@ -100,19 +100,21 @@ the main `tsconfig.json`) and is unrelated to the production build.
   equipped items (typically a missing `ReadDestinyInventoryAndVault` OAuth scope). The warning
   is surfaced through `RefreshButton` as a sticky toast.
 
-### Workspace / canvas (`src/components/workspace/`, `src/lib/workspace/`, `src/lib/views/`)
-- The dashboard is a single pannable/zoomable canvas (`react-zoom-pan-pinch`) with draggable,
-  resizable tracker panels (`react-rnd`). Each tracker is one `views` row.
-- Per-tracker geometry lives in `views.layout` (zod-validated by `workspaceLayoutSchema`).
-  Per-user pan/zoom lives in `users.workspace_camera`.
-- **Merge model**: two trackers can be merged. `layout.mergedWith` is the partner's `views.id`
-  and **must be symmetric** — if A.mergedWith=B then B.mergedWith=A. Merge target detection
-  reads each tracker's *actual* width (varies by tertiary-stat columns), not a hardcoded width;
-  see `pickMergeDropTarget()` and `mergeOverlapRatio()` in `src/lib/views/canvas-merge.ts`.
-  `TrackerPanel` exposes a `layoutLiveRef` so `onDragStop` reads the live position rather than
-  stale React state.
-- Persistence for camera + layouts goes through `PATCH /api/me/workspace` and the per-view
-  `PATCH /api/views/[id]` route. Debounce mutations on the client.
+### Workspace / dashboard (`src/components/workspace/`, `src/lib/workspace/`, `src/lib/filters/`)
+- The dashboard is a **grid or table** view (`GridWorkspace`, `InventoryTableView`) driven by
+  ephemeral `(set × archetype × tuning)` tiles — no per-tile `views` DB rows in grid mode.
+- Filter state lives in `users.grid_filters` (`GridFiltersJson` in `grid-filters-schema.ts`).
+  Saved named presets use `saved_filter_views` with a shared **filter preset** shape in
+  `lib/filters/filter-preset.ts` (hash/stat dimensions only; class and search stay local).
+- Canonical filter logic: `lib/filters/enumerate-trackers.ts` (grid cross-product),
+  `filter-inventory.ts` (table rows), `filterPresetsEqual` for active saved-view detection.
+- Share links: `?f=` encodes full grid filters (`grid-filters-share.ts`); saved views use
+  `/saved-views/[slug]` after `POST /api/saved-views/[id]/share`.
+- Compare uses `MergedCompareGrid` + `merge-compare.ts` (ephemeral descriptors from
+  `build-tracker-payload-core.ts`).
+- Filter persistence debounces through `useGridFiltersPersistence` → `PATCH /api/me/workspace`.
+- Legacy `views` table + `/api/views` remain for migration/debug; `/views/[id]` redirects to
+  `/dashboard`.
 
 ### Database (`src/lib/db/`)
 - `types.ts` is the single source of truth for table shapes — keep it in sync with migrations

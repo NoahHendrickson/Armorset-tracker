@@ -7,7 +7,7 @@
 | Service | Command | Notes |
 |---------|---------|-------|
 | Next.js dev server | `npm run dev:http` | Plain HTTP on port 3000. Use `npm run dev` for HTTPS (required for Bungie OAuth). |
-| Lint | `npm run lint` | ESLint 9 flat config. Pre-existing warnings/errors in `spike/` and `tracker-panel.tsx` are known. |
+| Lint | `npm run lint` | ESLint 9 flat config. Pre-existing warnings/errors in `spike/` are known. |
 | Build | `npm run build` | Runs TypeScript check + Next.js production build. |
 
 ### Environment variables

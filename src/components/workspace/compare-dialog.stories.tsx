@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { useState } from "react";
 import {
   CompareDialog,
-  type CompareTrackerDescriptor,
+  type TrackerDescriptor,
 } from "./compare-dialog";
 import { Button } from "@/components/ui/button";
 import { MOCK_GRID_LOOKUP_PAYLOAD } from "../../../.storybook/mocks/grid-lookup";
@@ -21,8 +21,8 @@ export default meta;
 
 type Story = StoryObj<typeof CompareDialog>;
 
-function buildPool(): CompareTrackerDescriptor[] {
-  const pool: CompareTrackerDescriptor[] = [];
+function buildPool(): TrackerDescriptor[] {
+  const pool: TrackerDescriptor[] = [];
   for (const s of MOCK_ARMOR_SETS) {
     for (const a of MOCK_ARCHETYPES) {
       for (const t of MOCK_TUNINGS) {

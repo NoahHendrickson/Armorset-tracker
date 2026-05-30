@@ -1,5 +1,5 @@
 import type { TrackerOptionItem } from "@/lib/views/tracker-option";
-import type { TrackerFormSelectors } from "@/components/workspace/new-tracker-dialog";
+import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import {
   MOCK_ARCHETYPES,
   MOCK_ARMOR_SETS,

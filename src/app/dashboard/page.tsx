@@ -2,11 +2,8 @@ import { redirect } from "next/navigation";
 import { Info, Warning } from "@phosphor-icons/react/dist/ssr";
 import { getSession } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
-import {
-  getCachedInventoryWithSyncedAt,
-  syncUserInventory,
-  InventoryNotReady,
-} from "@/lib/inventory/sync";
+import { getCachedInventoryWithSyncedAt } from "@/lib/inventory/sync";
+import { inventoryCacheNeedsSync } from "@/lib/inventory/cache-status";
 import { getManifestLookups } from "@/lib/manifest/lookups";
 import { checkManifestVersion } from "@/lib/manifest/version-check";
 import { SyncManifestButton } from "@/components/dashboard/sync-manifest-button";
@@ -42,11 +39,21 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const invalidShareLink = Boolean(f) && sharedFilters === null;
 
   const sb = getServiceRoleClient();
-  const { data: userRow } = await sb
-    .from("users")
-    .select("display_name, profile_picture_path, grid_filters")
-    .eq("id", session.userId)
-    .maybeSingle();
+
+  const [userRowRes, cached, lookups, versionCheck, savedViews] =
+    await Promise.all([
+      sb
+        .from("users")
+        .select("display_name, profile_picture_path, grid_filters")
+        .eq("id", session.userId)
+        .maybeSingle(),
+      getCachedInventoryWithSyncedAt(session.userId),
+      getManifestLookups(),
+      checkManifestVersion(),
+      listSavedViewsForUser(session.userId),
+    ]);
+
+  const userRow = userRowRes.data;
   const displayName = userRow?.display_name ?? session.displayName;
   const profilePictureUrl =
     userRow?.profile_picture_path &&
@@ -56,31 +63,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const initialGridFilters =
     sharedFilters ?? parseGridFilters(userRow?.grid_filters ?? null);
   const appliedFromShare = sharedFilters !== null;
-
-  let syncWarning: string | null = null;
-  try {
-    const inv = await syncUserInventory(session, { force: false });
-    if (inv.equipmentOnlyRestricted) {
-      syncWarning =
-        inv.warnings[0] ??
-        "Bungie only returned equipped armor. Reconnect Bungie to restore full vault access.";
-    }
-  } catch (err) {
-    if (err instanceof InventoryNotReady) {
-      syncWarning = err.message;
-    } else if (err instanceof Error) {
-      syncWarning = err.message;
-    } else {
-      syncWarning = "Could not load inventory.";
-    }
-  }
-
-  const [cached, lookups, versionCheck, savedViews] = await Promise.all([
-    getCachedInventoryWithSyncedAt(session.userId),
-    getManifestLookups(),
-    checkManifestVersion(),
-    listSavedViewsForUser(session.userId),
-  ]);
+  const needsInventorySync = inventoryCacheNeedsSync(cached?.syncedAt);
 
   const inventory = cached?.items ?? [];
 
@@ -154,7 +137,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       displayName={displayName}
       profilePictureUrl={profilePictureUrl}
       banners={banners}
-      syncWarning={syncWarning}
+      syncWarning={null}
+      needsInventorySync={needsInventorySync}
       hasInventory={cached !== null}
       selectors={selectors}
       inventory={inventory}

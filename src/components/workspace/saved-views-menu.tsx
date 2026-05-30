@@ -1,31 +1,15 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import {
-  CaretDown,
-  DotsThreeVertical,
-  LinkSimple,
-  Plus,
-  X,
-} from "@phosphor-icons/react/dist/ssr";
-import { toast } from "sonner";
+import { CaretDown, Plus, X } from "@phosphor-icons/react/dist/ssr";
 import type { SavedFilterViewRow } from "@/lib/db/types";
 import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
 import {
-  buildSavedFilterViewShareUrl,
-  payloadFromGridFilters,
-  parseSavedFilterViewPayload,
-} from "@/lib/saved-views/schema";
+  isOwnedSavedView,
+  useSavedViewsApi,
+} from "@/lib/saved-views/use-saved-views-api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,19 +18,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+import {
+  SavedViewNameDialog,
+  ShareViewDialog,
+} from "@/components/workspace/saved-view-dialogs";
+import { SavedViewRow } from "@/components/workspace/saved-view-row";
+import { INLINE_TRIGGER_FRAME_CLASS } from "@/components/workspace/filter-bar-primitives";
 
-function isOwnedView(view: SavedFilterViewRow): boolean {
-  return view.source_user_id === null;
-}
-
-/** Same styling as the "Pinned sets" section label in armor-set-combobox. */
 const SAVED_VIEWS_SECTION_LABEL_CLASS =
   "pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground";
-
-/** Matches `INLINE_TRIGGER_FRAME_CLASS` in tracker-filter-bar. */
-const SAVED_VIEWS_TRIGGER_FRAME_CLASS =
-  "relative isolate shrink-0 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background";
 
 interface SavedViewsMenuProps {
   views: SavedFilterViewRow[];
@@ -67,12 +47,14 @@ export function SavedViewsMenu({
   onClearActive,
   className,
 }: SavedViewsMenuProps) {
+  const api = useSavedViewsApi(views, onViewsChange);
+
   const ownedViews = useMemo(
-    () => views.filter((v) => isOwnedView(v)),
+    () => views.filter((v) => isOwnedSavedView(v)),
     [views],
   );
   const sharedViews = useMemo(
-    () => views.filter((v) => !isOwnedView(v)),
+    () => views.filter((v) => !isOwnedSavedView(v)),
     [views],
   );
 
@@ -82,16 +64,10 @@ export function SavedViewsMenu({
   );
 
   const [saveOpen, setSaveOpen] = useState(false);
-  const [saveName, setSaveName] = useState("");
-  const [saveBusy, setSaveBusy] = useState(false);
-
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<SavedFilterViewRow | null>(
     null,
   );
-  const [renameName, setRenameName] = useState("");
-  const [renameBusy, setRenameBusy] = useState(false);
-
   const [shareOpen, setShareOpen] = useState(false);
   const [shareTarget, setShareTarget] = useState<SavedFilterViewRow | null>(
     null,
@@ -99,196 +75,42 @@ export function SavedViewsMenu({
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
 
-  const openSaveDialog = useCallback(() => {
-    setSaveName("");
-    setSaveOpen(true);
-  }, []);
-
   const openRenameDialog = useCallback((view: SavedFilterViewRow) => {
     setRenameTarget(view);
-    setRenameName(view.name);
     setRenameOpen(true);
   }, []);
 
-  const openShareDialog = useCallback(async (view: SavedFilterViewRow) => {
-    setShareTarget(view);
-    setShareUrl(null);
-    setShareOpen(true);
-    setShareBusy(true);
-    try {
-      const res = await fetch(`/api/saved-views/${view.id}/share`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(body?.error ?? `Share failed (${res.status})`);
-      }
-      const body = (await res.json()) as { slug: string; url: string };
-      setShareUrl(body.url);
-      onViewsChange(
-        views.map((v) =>
-          v.id === view.id ? { ...v, share_slug: body.slug } : v,
-        ),
-      );
-    } catch (err) {
-      setShareOpen(false);
-      toast.error(
-        err instanceof Error ? err.message : "Could not create share link.",
-      );
-    } finally {
-      setShareBusy(false);
-    }
-  }, [onViewsChange, views]);
-
-  const handleSave = useCallback(async () => {
-    const trimmed = saveName.trim();
-    if (!trimmed || saveBusy) return;
-    setSaveBusy(true);
-    try {
-      const res = await fetch("/api/saved-views", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: trimmed,
-          filters: payloadFromGridFilters(filters),
-        }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(body?.error ?? `Save failed (${res.status})`);
-      }
-      const body = (await res.json()) as { view: SavedFilterViewRow };
-      onViewsChange(
-        [...views, body.view].sort((a, b) => a.name.localeCompare(b.name)),
-      );
-      setSaveOpen(false);
-      toast.success("View saved.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save view.");
-    } finally {
-      setSaveBusy(false);
-    }
-  }, [filters, onViewsChange, saveBusy, saveName, views]);
-
-  const handleRename = useCallback(async () => {
-    if (!renameTarget) return;
-    const trimmed = renameName.trim();
-    if (!trimmed || renameBusy) return;
-    setRenameBusy(true);
-    try {
-      const res = await fetch(`/api/saved-views/${renameTarget.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(body?.error ?? `Rename failed (${res.status})`);
-      }
-      const body = (await res.json()) as { view: SavedFilterViewRow };
-      onViewsChange(
-        views
-          .map((v) => (v.id === body.view.id ? body.view : v))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      );
-      setRenameOpen(false);
-      toast.success("View renamed.");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Could not rename view.",
-      );
-    } finally {
-      setRenameBusy(false);
-    }
-  }, [onViewsChange, renameBusy, renameName, renameTarget, views]);
-
-  const handleDelete = useCallback(
+  const openShareDialog = useCallback(
     async (view: SavedFilterViewRow) => {
-      try {
-        const res = await fetch(`/api/saved-views/${view.id}`, {
-          method: "DELETE",
-        });
-        if (!res.ok) {
-          const body = (await res.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(body?.error ?? `Delete failed (${res.status})`);
-        }
-        onViewsChange(views.filter((v) => v.id !== view.id));
-        toast.success(
-          isOwnedView(view) ? "View deleted." : "Removed from your list.",
-        );
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Could not delete view.",
-        );
-      }
-    },
-    [onViewsChange, views],
-  );
-
-  const revokeShareForView = useCallback(
-    async (view: SavedFilterViewRow, closeDialog = false) => {
+      setShareTarget(view);
+      setShareUrl(null);
+      setShareOpen(true);
       setShareBusy(true);
-      try {
-        const res = await fetch(`/api/saved-views/${view.id}/share`, {
-          method: "DELETE",
-        });
-        if (!res.ok) {
-          const body = (await res.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(body?.error ?? `Revoke failed (${res.status})`);
-        }
-        onViewsChange(
-          views.map((v) => (v.id === view.id ? { ...v, share_slug: null } : v)),
-        );
-        if (closeDialog) {
-          setShareOpen(false);
-          setShareUrl(null);
-        }
-        toast.success("Share link revoked.");
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Could not revoke share link.",
-        );
-      } finally {
-        setShareBusy(false);
-      }
+      const url = await api.ensureShareLink(view);
+      setShareUrl(url);
+      setShareBusy(false);
+      if (!url) setShareOpen(false);
     },
-    [onViewsChange, views],
+    [api],
   );
 
-  async function copyShareUrl() {
-    const url =
-      shareUrl ??
-      (shareTarget?.share_slug
-        ? buildSavedFilterViewShareUrl(
-            window.location.origin,
-            shareTarget.share_slug,
-          )
-        : null);
-    if (!url) return;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copied.");
-    } catch {
-      toast.error("Could not copy link.");
+  const revokeShare = useCallback(async () => {
+    if (!shareTarget) return;
+    setShareBusy(true);
+    const ok = await api.revokeShareLink(shareTarget);
+    setShareBusy(false);
+    if (ok) {
+      setShareOpen(false);
+      setShareUrl(null);
     }
-  }
+  }, [api, shareTarget]);
 
   const triggerLabel = activeView?.name ?? "Views";
 
   return (
     <>
       <DropdownMenu modal={false}>
-        <div className={SAVED_VIEWS_TRIGGER_FRAME_CLASS}>
+        <div className={INLINE_TRIGGER_FRAME_CLASS}>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
@@ -353,16 +175,16 @@ export function SavedViewsMenu({
               key={view.id}
               view={view}
               active={view.id === activeViewId}
-              onApply={() => onApply(view)}
               owned
+              onApply={() => onApply(view)}
               onRename={() => openRenameDialog(view)}
               onShare={() => void openShareDialog(view)}
               onRevokeShare={
                 view.share_slug
-                  ? () => void revokeShareForView(view)
+                  ? () => void api.revokeShareLink(view)
                   : undefined
               }
-              onDelete={() => void handleDelete(view)}
+              onDelete={() => void api.deleteView(view)}
             />
           ))}
 
@@ -381,9 +203,9 @@ export function SavedViewsMenu({
               key={view.id}
               view={view}
               active={view.id === activeViewId}
-              onApply={() => onApply(view)}
               owned={false}
-              onDelete={() => void handleDelete(view)}
+              onApply={() => onApply(view)}
+              onDelete={() => void api.deleteView(view)}
             />
           ))}
 
@@ -393,7 +215,7 @@ export function SavedViewsMenu({
             className="rounded-none"
             onSelect={(e) => {
               e.preventDefault();
-              openSaveDialog();
+              setSaveOpen(true);
             }}
           >
             <Plus weight="duotone" className="size-4" aria-hidden />
@@ -402,262 +224,38 @@ export function SavedViewsMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
-        <DialogContent className="rounded-none sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Save view</DialogTitle>
-            <DialogDescription>
-              Saves your current set, archetype, tuning, and tertiary filters.
-              Class and search are not included.
-            </DialogDescription>
-          </DialogHeader>
-          <Input
-            value={saveName}
-            onChange={(e) => setSaveName(e.target.value)}
-            placeholder="View name"
-            maxLength={80}
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void handleSave();
-            }}
-          />
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-none"
-              onClick={() => setSaveOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              className="rounded-none"
-              disabled={!saveName.trim() || saveBusy}
-              onClick={() => void handleSave()}
-            >
-              {saveBusy ? "Saving…" : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SavedViewNameDialog
+        key="save"
+        open={saveOpen}
+        onOpenChange={setSaveOpen}
+        title="Save view"
+        description="Saves your current set, archetype, tuning, and tertiary filters. Class and search are not included."
+        submitLabel="Save"
+        busyLabel="Saving…"
+        onSubmit={(name) => api.createView(name, filters)}
+      />
 
-      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
-        <DialogContent className="rounded-none sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rename view</DialogTitle>
-          </DialogHeader>
-          <Input
-            value={renameName}
-            onChange={(e) => setRenameName(e.target.value)}
-            placeholder="View name"
-            maxLength={80}
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void handleRename();
-            }}
-          />
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-none"
-              onClick={() => setRenameOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              className="rounded-none"
-              disabled={!renameName.trim() || renameBusy}
-              onClick={() => void handleRename()}
-            >
-              {renameBusy ? "Saving…" : "Rename"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SavedViewNameDialog
+        key={renameTarget?.id ?? "rename"}
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        title="Rename view"
+        initialName={renameTarget?.name ?? ""}
+        submitLabel="Rename"
+        busyLabel="Saving…"
+        onSubmit={(name) =>
+          renameTarget ? api.renameView(renameTarget, name) : Promise.resolve(false)
+        }
+      />
 
-      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
-        <DialogContent className="rounded-none sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Share view</DialogTitle>
-            <DialogDescription>
-              Anyone with this link can add a snapshot to their dashboard after
-              signing in.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-2">
-            <Input
-              readOnly
-              value={
-                shareUrl ??
-                (shareBusy
-                  ? "Generating link…"
-                  : shareTarget?.share_slug
-                    ? buildSavedFilterViewShareUrl(
-                        typeof window !== "undefined"
-                          ? window.location.origin
-                          : "",
-                        shareTarget.share_slug,
-                      )
-                    : "")
-              }
-              className="font-mono text-xs"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="shrink-0 rounded-none"
-              aria-label="Copy share link"
-              disabled={shareBusy || !shareUrl}
-              onClick={() => void copyShareUrl()}
-            >
-              <LinkSimple weight="duotone" className="size-4" aria-hidden />
-            </Button>
-          </div>
-          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
-            <Button
-              type="button"
-              variant="destructive"
-              className="rounded-none"
-              disabled={shareBusy}
-              onClick={() => {
-                if (shareTarget) void revokeShareForView(shareTarget, true);
-              }}
-            >
-              Revoke link
-            </Button>
-            <Button
-              type="button"
-              className="rounded-none"
-              disabled={shareBusy || !shareUrl}
-              onClick={() => void copyShareUrl()}
-            >
-              Copy link
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ShareViewDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        target={shareTarget}
+        shareUrl={shareUrl}
+        shareBusy={shareBusy}
+        onRevoke={revokeShare}
+      />
     </>
   );
 }
-
-function SavedViewRow({
-  view,
-  active,
-  owned,
-  onApply,
-  onRename,
-  onShare,
-  onRevokeShare,
-  onDelete,
-}: {
-  view: SavedFilterViewRow;
-  active: boolean;
-  owned: boolean;
-  onApply: () => void;
-  onRename?: () => void;
-  onShare?: () => void;
-  onRevokeShare?: () => void;
-  onDelete: () => void;
-}) {
-  const payload = parseSavedFilterViewPayload(view.filters);
-
-  return (
-    <div className="group/row flex min-w-0 items-center gap-0.5 px-1">
-      <DropdownMenuItem
-        className={cn(
-          "min-w-0 flex-1 cursor-pointer rounded-none",
-          active && "bg-accent font-medium",
-        )}
-        onSelect={(e) => {
-          e.preventDefault();
-          if (!payload) {
-            toast.error("This view has invalid saved data.");
-            return;
-          }
-          onApply();
-        }}
-      >
-        <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate">{view.name}</span>
-          {!owned ? (
-            <span className="truncate text-muted-foreground">
-              from {view.source_display_name ?? "someone"}
-            </span>
-          ) : null}
-        </span>
-      </DropdownMenuItem>
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={`Actions for ${view.name}`}
-            className="size-7 shrink-0 rounded-none opacity-70 group-hover/row:opacity-100"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <DotsThreeVertical
-              weight="bold"
-              className="size-3.5"
-              aria-hidden
-            />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="min-w-40 rounded-none py-1"
-          collisionPadding={16}
-        >
-          {owned ? (
-            <>
-              <DropdownMenuItem
-                className="rounded-none"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  onRename?.();
-                }}
-              >
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="rounded-none"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  onShare?.();
-                }}
-              >
-                Get share link
-              </DropdownMenuItem>
-              {view.share_slug ? (
-                <DropdownMenuItem
-                  className="rounded-none"
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    onRevokeShare?.();
-                  }}
-                >
-                  Revoke share link
-                </DropdownMenuItem>
-              ) : null}
-              <DropdownMenuSeparator />
-            </>
-          ) : null}
-          <DropdownMenuItem
-            className="rounded-none text-destructive focus:text-destructive"
-            onSelect={(e) => {
-              e.preventDefault();
-              onDelete();
-            }}
-          >
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-}
-

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -9,11 +10,13 @@ import {
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
-import type { TrackerFormSelectors } from "@/components/workspace/new-tracker-dialog";
+import { enumerateVisibleTrackers } from "@/lib/filters/enumerate-trackers";
 import type { GridLookupPayload } from "@/lib/views/grid-lookup-payload";
+import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import {
   buildEphemeralTrackerPayload,
   ephemeralTrackerId,
+  type TrackerDescriptor,
 } from "@/lib/workspace/build-tracker-payload-core";
 import {
   gridFiltersHaveUnblockingSelection,
@@ -21,10 +24,7 @@ import {
 } from "@/lib/workspace/grid-filters-schema";
 import { TrackerFilterBar } from "@/components/workspace/tracker-filter-bar";
 import { TrackerGridContent } from "@/components/workspace/tracker-grid-content";
-import {
-  CompareDialog,
-  type CompareTrackerDescriptor,
-} from "@/components/workspace/compare-dialog";
+import { CompareDialog } from "@/components/workspace/compare-dialog";
 import {
   TRACKER_GRID_TILE_DISPLAY_HEIGHT_PX,
   TRACKER_GRID_TILE_DISPLAY_WIDTH_PX,
@@ -57,8 +57,6 @@ interface GridWorkspaceProps {
   savedViewsSlot?: ReactNode;
 }
 
-type TrackerDescriptor = CompareTrackerDescriptor;
-
 export function GridWorkspace({
   banners,
   syncWarning,
@@ -85,97 +83,32 @@ export function GridWorkspace({
 
   const inventoryForClass = inventoryByClass[filters.class] ?? [];
 
-  // ---- Visible trackers (enumerate filtered cross-product) ----
+  const visibleTrackers = useMemo(
+    () => enumerateVisibleTrackers(filters, selectors),
+    [filters, selectors],
+  );
   const unblocked = gridFiltersHaveUnblockingSelection(filters);
 
-  const visibleTrackers = useMemo<TrackerDescriptor[]>(() => {
-    if (!unblocked) return [];
-
-    const setOptions = selectors.setsByClass[filters.class];
-    const setIds =
-      filters.setHashes.length > 0
-        ? new Set(filters.setHashes)
-        : null;
-    const archetypeIds =
-      filters.archetypeHashes.length > 0
-        ? new Set(filters.archetypeHashes)
-        : null;
-    const tuningIds =
-      filters.tuningHashes.length > 0
-        ? new Set(filters.tuningHashes)
-        : null;
-    const searchTerm = filters.search.trim().toLowerCase();
-
-    const sets = setOptions.filter((s) => (setIds ? setIds.has(s.hash) : true));
-    const archetypes = selectors.archetypes.filter((a) =>
-      archetypeIds ? archetypeIds.has(a.hash) : true,
-    );
-    const tunings = selectors.tunings.filter((t) =>
-      tuningIds ? tuningIds.has(t.hash) : true,
-    );
-
-    const out: TrackerDescriptor[] = [];
-    for (const set of sets) {
-      for (const arch of archetypes) {
-        for (const tun of tunings) {
-          if (searchTerm) {
-            const haystack =
-              `${set.name} ${arch.name} ${tun.name}`.toLowerCase();
-            if (!haystack.includes(searchTerm)) continue;
-          }
-          out.push({
-            setHash: set.hash,
-            archetypeHash: arch.hash,
-            tuningHash: tun.hash,
-            classType: filters.class,
-            setName: set.name,
-            archetypeName: arch.name,
-            tuningName: tun.name,
-          });
-        }
-      }
-    }
-
-    out.sort((a, b) => {
-      const s = a.setName.localeCompare(b.setName);
-      if (s !== 0) return s;
-      const ar = a.archetypeName.localeCompare(b.archetypeName);
-      if (ar !== 0) return ar;
-      const tu = a.tuningName.localeCompare(b.tuningName);
-      if (tu !== 0) return tu;
-      return a.setHash - b.setHash;
-    });
-
-    return out;
-  }, [
-    unblocked,
-    filters.class,
-    filters.setHashes,
-    filters.archetypeHashes,
-    filters.tuningHashes,
-    filters.search,
-    selectors.setsByClass,
-    selectors.archetypes,
-    selectors.tunings,
-  ]);
-
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const [scrollerEl, setScrollerEl] = useState<HTMLDivElement | null>(null);
   const [columnCount, setColumnCount] = useState(1);
-  const showTrackerGrid = unblocked && visibleTrackers.length > 0;
+
+  const scrollerRefCallback = useCallback((node: HTMLDivElement | null) => {
+    scrollerRef.current = node;
+    setScrollerEl(node);
+  }, []);
 
   useLayoutEffect(() => {
-    if (!showTrackerGrid) return;
-    const el = scrollerRef.current;
-    if (!el) return;
+    if (!scrollerEl) return;
     const tick = () => {
-      const next = trackerGridColumnCountForWidth(el.clientWidth);
+      const next = trackerGridColumnCountForWidth(scrollerEl.clientWidth);
       setColumnCount((prev) => (prev === next ? prev : next));
     };
     tick();
     const ro = new ResizeObserver(tick);
-    ro.observe(el);
+    ro.observe(scrollerEl);
     return () => ro.disconnect();
-  }, [showTrackerGrid]);
+  }, [scrollerEl]);
 
   const rows = useMemo<TrackerDescriptor[][]>(() => {
     if (visibleTrackers.length === 0 || columnCount < 1) return [];
@@ -256,7 +189,7 @@ export function GridWorkspace({
             </div>
           ) : (
             <div
-              ref={scrollerRef}
+              ref={scrollerRefCallback}
               className="menu-scrollbar relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
             >
               <div
