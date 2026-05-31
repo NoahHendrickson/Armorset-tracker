@@ -79,7 +79,6 @@ export function TrackerFilterBar({
   const [setsOpen, setSetsOpen] = useState(false);
   const searchExpanded = searchUiOpen || value.search.trim().length > 0;
   const collapseTier = useFilterBarCollapseTier(barRef);
-  const savedViewsInline = collapseTier !== "filters-menu";
 
   const sortedSets = useMemo(
     () => selectors.setsByClass[value.class],
@@ -202,8 +201,9 @@ export function TrackerFilterBar({
     onToggleTuning: toggleTuning,
     onToggleStat: toggleStat,
     onSwitchRarity: switchRarity,
-    savedViews:
-      collapseTier === "filters-menu" ? savedViews : undefined,
+    // Saved views lives permanently in the right-hand action cluster, so it is
+    // never stowed into the left "Filters" overflow menu.
+    savedViews: undefined,
   };
 
   return (
@@ -235,13 +235,6 @@ export function TrackerFilterBar({
       </div>
 
       <div aria-hidden className="h-6 w-px shrink-0 self-center bg-border" />
-
-      {savedViews && savedViewsInline ? (
-        <SavedViewsMenu
-          {...savedViews}
-          inlineWrapperClass={FILTER_INLINE_CORE}
-        />
-      ) : null}
 
       {showRarityFilter ? (
         <RarityFilterDimension
@@ -314,6 +307,21 @@ export function TrackerFilterBar({
         {resultCount === 1 ? resultNoun.singular : resultNoun.plural} for{" "}
         {CLASS_NAMES[value.class] ?? "class"}.
       </p>
+
+      {savedViews ? (
+        <>
+          {collapseTier === "filters-menu" ? null : (
+            <div
+              aria-hidden
+              className="h-6 w-px shrink-0 self-center bg-border"
+            />
+          )}
+          <SavedViewsMenu
+            {...savedViews}
+            compact={collapseTier === "filters-menu"}
+          />
+        </>
+      ) : null}
 
       <ShareFilterLinkButton
         filters={value}

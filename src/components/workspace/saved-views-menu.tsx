@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { CaretDown, Plus, X } from "@phosphor-icons/react/dist/ssr";
+import { BookmarkSimple, CaretDown, Plus, X } from "@phosphor-icons/react/dist/ssr";
 import type { SavedFilterViewRow } from "@/lib/db/types";
 import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
 import {
@@ -43,6 +43,8 @@ export interface SavedViewsMenuProps {
   onClearActive: () => void;
   className?: string;
   variant?: "inline" | "stowed";
+  /** Inline only — icon-only trigger for narrow bars (mirrors search collapse). */
+  compact?: boolean;
   /** Inline only — wrapper visibility (e.g. container-query hide). */
   inlineWrapperClass?: string;
   /** Stowed only — sub-trigger visibility inside the aggregate Filters menu. */
@@ -63,6 +65,7 @@ export function SavedViewsMenu({
   onClearActive,
   className,
   variant = "inline",
+  compact = false,
   inlineWrapperClass = "",
   stowedSubTriggerClass = "",
 }: SavedViewsMenuProps) {
@@ -258,29 +261,41 @@ export function SavedViewsMenu({
             <Button
               type="button"
               variant="outline"
-              aria-label="Saved views"
+              aria-label={activeView ? `Saved views — ${activeView.name}` : "Saved views"}
+              title={compact && activeView ? activeView.name : undefined}
               className={cn(
-                "group/saved-views-trigger h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs focus-visible:ring-0 focus-visible:ring-offset-0",
+                "group/saved-views-trigger h-9 shrink-0 gap-1.5 rounded-none text-xs focus-visible:ring-0 focus-visible:ring-offset-0",
+                compact ? "size-9 px-0" : "px-3",
                 activeView
                   ? "border-primary/60 bg-primary/10 font-medium text-foreground hover:border-primary/70 hover:bg-primary/20 hover:text-foreground data-[state=open]:border-primary/60 data-[state=open]:bg-primary/10 data-[state=open]:text-foreground"
                   : "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
                 className,
               )}
             >
-              <span className="max-w-[10rem] truncate text-left">
-                {triggerLabel}
-              </span>
-              {activeView ? (
-                <span aria-hidden className="inline-block w-5 shrink-0" />
-              ) : null}
-              <CaretDown
-                weight="duotone"
-                aria-hidden
-                className="!size-3.5 shrink-0 opacity-60 transition group-hover/saved-views-trigger:opacity-90 group-data-[state=open]/saved-views-trigger:rotate-180"
-              />
+              {compact ? (
+                <BookmarkSimple
+                  weight={activeView ? "fill" : "regular"}
+                  aria-hidden
+                  className="!size-4 shrink-0"
+                />
+              ) : (
+                <>
+                  <span className="max-w-[10rem] truncate text-left">
+                    {triggerLabel}
+                  </span>
+                  {activeView ? (
+                    <span aria-hidden className="inline-block w-5 shrink-0" />
+                  ) : null}
+                  <CaretDown
+                    weight="duotone"
+                    aria-hidden
+                    className="!size-3.5 shrink-0 opacity-60 transition group-hover/saved-views-trigger:opacity-90 group-data-[state=open]/saved-views-trigger:rotate-180"
+                  />
+                </>
+              )}
             </Button>
           </DropdownMenuTrigger>
-          {activeView ? (
+          {!compact && activeView ? (
             <button
               type="button"
               aria-label="Clear saved view"
