@@ -1,9 +1,9 @@
-import {
-  SLOT_LABELS,
-  SLOT_ORDER,
-  type ArmorSlot,
-} from "@/lib/bungie/constants";
+import { SLOT_ORDER, type ArmorSlot } from "@/lib/bungie/constants";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
+import {
+  inventoryPieceMatchesSetSearch,
+  tokenizeInventorySearchQuery,
+} from "@/lib/filters/inventory-set-search";
 import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
 
 function slotRank(slot: ArmorSlot): number {
@@ -48,21 +48,11 @@ export function filterInventoryPieces(
       (p) => p.tertiaryStat != null && allowed.has(p.tertiaryStat),
     );
   }
-  const trimmedSearch = filters.search.trim().toLowerCase();
-  if (trimmedSearch) {
-    rows = rows.filter((p) => {
-      const haystack = [
-        inventoryPieceDisplayName(p),
-        p.archetypeName,
-        p.tuningName,
-        p.tertiaryStat,
-        SLOT_LABELS[p.slot],
-      ]
-        .filter((v): v is string => Boolean(v))
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(trimmedSearch);
-    });
+  const searchTokens = tokenizeInventorySearchQuery(filters.search);
+  if (searchTokens.length > 0) {
+    rows = rows.filter((p) =>
+      inventoryPieceMatchesSetSearch(p, searchTokens),
+    );
   }
   return [...rows].sort((a, b) => {
     const sd = slotRank(a.slot) - slotRank(b.slot);

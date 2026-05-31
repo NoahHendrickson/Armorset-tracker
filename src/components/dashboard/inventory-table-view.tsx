@@ -222,6 +222,8 @@ export function InventoryTableView({
                             plural: "pieces",
                           }}
                           showRarityFilter
+                          searchPlacement="start"
+                          searchDefaultExpanded
                           savedViews={savedViews}
                         />
                       </TableHead>
