@@ -26,12 +26,16 @@ function Render({
   initial,
   showTertiaryStatFilter = true,
   showRarityFilter = false,
+  searchPlacement,
+  searchDefaultExpanded,
   withSavedViews = true,
   width = 960,
 }: {
   initial: GridFiltersJson;
   showTertiaryStatFilter?: boolean;
   showRarityFilter?: boolean;
+  searchPlacement?: "start" | "end";
+  searchDefaultExpanded?: boolean;
   withSavedViews?: boolean;
   width?: number;
 }) {
@@ -62,6 +66,8 @@ function Render({
         resultNoun={{ singular: "tracker", plural: "trackers" }}
         showTertiaryStatFilter={showTertiaryStatFilter}
         showRarityFilter={showRarityFilter}
+        searchPlacement={searchPlacement}
+        searchDefaultExpanded={searchDefaultExpanded}
         savedViews={savedViews}
       />
     </div>
@@ -115,5 +121,18 @@ export const NarrowFullFilters: Story = {
 export const InventoryTableWithRarity: Story = {
   render: () => (
     <Render initial={MOCK_GRID_FILTERS_POPULATED} showRarityFilter width={1200} />
+  ),
+};
+
+/** Table view: primary set search leftmost and expanded by default. */
+export const InventoryTableSearchPrimary: Story = {
+  render: () => (
+    <Render
+      initial={MOCK_GRID_FILTERS_EMPTY}
+      showRarityFilter
+      searchPlacement="start"
+      searchDefaultExpanded
+      width={1200}
+    />
   ),
 };

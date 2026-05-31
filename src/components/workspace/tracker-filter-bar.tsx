@@ -57,6 +57,9 @@ interface TrackerFilterBarProps {
   resultNoun: ResultNoun;
   showTertiaryStatFilter?: boolean;
   showRarityFilter?: boolean;
+  /** Table view: search is the primary control — leftmost and always visible. */
+  searchPlacement?: "start" | "end";
+  searchDefaultExpanded?: boolean;
   savedViews?: SavedViewsBarProps;
   className?: string;
 }
@@ -71,14 +74,23 @@ export function TrackerFilterBar({
   resultNoun,
   showTertiaryStatFilter = true,
   showRarityFilter = false,
+  searchPlacement = "end",
+  searchDefaultExpanded = false,
   savedViews,
   className,
 }: TrackerFilterBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [searchUiOpen, setSearchUiOpen] = useState(false);
+  const [searchUiOpen, setSearchUiOpen] = useState(searchDefaultExpanded);
   const [setsOpen, setSetsOpen] = useState(false);
-  const searchExpanded = searchUiOpen || value.search.trim().length > 0;
+  const searchExpanded =
+    searchDefaultExpanded ||
+    searchUiOpen ||
+    value.search.trim().length > 0;
+  const searchPlaceholder =
+    searchPlacement === "start"
+      ? "Search sets (e.g. ferro smoke)"
+      : "Search armor";
   const collapseTier = useFilterBarCollapseTier(barRef);
 
   const sortedSets = useMemo(
@@ -186,6 +198,75 @@ export function TrackerFilterBar({
     ? inventoryFiltersHaveShareableSelection(value)
     : gridFiltersHaveUnblockingSelection(value);
 
+  const searchField = searchExpanded ? (
+    <div
+      role="search"
+      className={cn(
+        "relative -my-2 min-h-[60px] min-w-0",
+        searchPlacement === "start"
+          ? "w-44 shrink-0 sm:w-52 lg:w-60"
+          : "lg:max-w-xs",
+      )}
+    >
+      <MagnifyingGlass
+        weight="regular"
+        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+        aria-hidden
+      />
+      <input
+        ref={searchInputRef}
+        type="search"
+        value={value.search}
+        onChange={(e) => onChange({ ...value, search: e.target.value })}
+        placeholder={searchPlaceholder}
+        aria-label="Search armor sets"
+        onBlur={() => {
+          if (!searchDefaultExpanded && !value.search.trim()) {
+            setSearchUiOpen(false);
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== "Escape") return;
+          if (value.search.trim()) {
+            onChange({ ...value, search: "" });
+          } else if (!searchDefaultExpanded) {
+            setSearchUiOpen(false);
+            e.currentTarget.blur();
+          }
+        }}
+        className="h-[60px] w-full min-w-0 border-0 border-b border-white bg-transparent py-0 ps-9 pe-9 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground/80 focus-visible:border-b focus-visible:border-white focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-search-cancel-button]:hidden"
+      />
+      {value.search ? (
+        <button
+          type="button"
+          aria-label="Clear search"
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={() => onChange({ ...value, search: "" })}
+          className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-none text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <X weight="bold" className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      ) : null}
+    </div>
+  ) : (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-label="Search armor sets"
+      aria-expanded={searchExpanded}
+      className="size-9 shrink-0 self-center rounded-none border-0 shadow-none hover:bg-accent/50"
+      onClick={() => {
+        setSearchUiOpen(true);
+        queueMicrotask(() =>
+          searchInputRef.current?.focus({ preventScroll: true }),
+        );
+      }}
+    >
+      <MagnifyingGlass weight="regular" aria-hidden className="size-4" />
+    </Button>
+  );
+
   const overflowProps = {
     collapseTier,
     value,
@@ -223,6 +304,10 @@ export function TrackerFilterBar({
         className,
       )}
     >
+      {searchPlacement === "start" ? (
+        <div className="shrink-0">{searchField}</div>
+      ) : null}
+
       <div className={cn(chromeToolbarShellClass, "min-w-0")} role="group" aria-label="Class">
         {CLASS_TABS.map((tab, index) => (
           <button
@@ -329,69 +414,9 @@ export function TrackerFilterBar({
         className="size-9 shrink-0 rounded-none"
       />
 
-      <div className="ml-auto min-w-0">
-        {searchExpanded ? (
-          <div
-            role="search"
-            className="relative -my-2 min-h-[60px] min-w-0 lg:max-w-xs"
-          >
-            <MagnifyingGlass
-              weight="regular"
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden
-            />
-            <input
-              ref={searchInputRef}
-              type="search"
-              value={value.search}
-              onChange={(e) => onChange({ ...value, search: e.target.value })}
-              placeholder="Search armor"
-              aria-label="Search armor"
-              onBlur={() => {
-                if (!value.search.trim()) setSearchUiOpen(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key !== "Escape") return;
-                if (value.search.trim()) {
-                  onChange({ ...value, search: "" });
-                } else {
-                  setSearchUiOpen(false);
-                  e.currentTarget.blur();
-                }
-              }}
-              className="h-[60px] w-full min-w-0 border-0 border-b border-white bg-transparent py-0 ps-9 pe-9 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground/80 focus-visible:border-b focus-visible:border-white focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-search-cancel-button]:hidden"
-            />
-            {value.search ? (
-              <button
-                type="button"
-                aria-label="Clear search"
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => onChange({ ...value, search: "" })}
-                className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-none text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <X weight="bold" className="h-3.5 w-3.5" aria-hidden />
-              </button>
-            ) : null}
-          </div>
-        ) : (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Search armor"
-            aria-expanded={searchExpanded}
-            className="size-9 shrink-0 self-center rounded-none border-0 shadow-none hover:bg-accent/50"
-            onClick={() => {
-              setSearchUiOpen(true);
-              queueMicrotask(() =>
-                searchInputRef.current?.focus({ preventScroll: true }),
-              );
-            }}
-          >
-            <MagnifyingGlass weight="regular" aria-hidden className="size-4" />
-          </Button>
-        )}
-      </div>
+      {searchPlacement === "end" ? (
+        <div className="ml-auto min-w-0 shrink-0">{searchField}</div>
+      ) : null}
     </div>
   );
 }
