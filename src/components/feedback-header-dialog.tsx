@@ -14,11 +14,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type FeedbackCategory = "bug" | "wishlist";
@@ -28,9 +23,6 @@ type FeedbackCategory = "bug" | "wishlist";
  */
 export function FeedbackHeaderDialog() {
   const [open, setOpen] = React.useState(false);
-  const [tooltipOpen, setTooltipOpen] = React.useState(false);
-  /** After closing the dialog, ignore tooltip opens until the trigger loses pointer (avoids instant re-show). */
-  const suppressTooltipUntilLeaveRef = React.useRef(false);
   const [category, setCategory] = React.useState<FeedbackCategory | null>(null);
   const [message, setMessage] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -40,11 +32,7 @@ export function FeedbackHeaderDialog() {
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
-    setTooltipOpen(false);
-    if (next) {
-      suppressTooltipUntilLeaveRef.current = false;
-    } else {
-      suppressTooltipUntilLeaveRef.current = true;
+    if (!next) {
       setMessage("");
       setCategory(null);
       setSending(false);
@@ -84,29 +72,12 @@ export function FeedbackHeaderDialog() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <Tooltip
-        open={tooltipOpen}
-        onOpenChange={(nextTip) => {
-          if (nextTip && suppressTooltipUntilLeaveRef.current) return;
-          setTooltipOpen(nextTip);
-        }}
-      >
-        <TooltipTrigger asChild>
-          <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Send feedback"
-              onPointerLeave={() => {
-                suppressTooltipUntilLeaveRef.current = false;
-              }}
-            >
-              <ChatCircleDots weight="duotone" />
-            </Button>
-          </DialogTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Feedback</TooltipContent>
-      </Tooltip>
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <ChatCircleDots weight="duotone" />
+          Feedback
+        </Button>
+      </DialogTrigger>
       <DialogContent className="rounded-none sm:rounded-none">
         <DialogHeader className="pb-4">
           <DialogTitle>Feedback</DialogTitle>

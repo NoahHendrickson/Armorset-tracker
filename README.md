@@ -74,10 +74,14 @@ required because Bungie's OAuth refuses non-HTTPS redirect URLs.
 If you ever need plain HTTP for some reason, `npm run dev:http` is also
 wired up, but Bungie sign-in won't work against it.
 
-### 5. First-run manifest sync
+### 5. Manifest data
 
-After signing in once (so a session cookie exists), trigger the manifest
-sync:
+On first visit to `/dashboard` after sign-in, the app automatically downloads
+and derives the Bungie manifest (sets, archetypes, tunings). This usually
+takes under a minute and needs no user action.
+
+For headless or dev setup without opening the dashboard, you can still trigger
+sync manually:
 
 ```bash
 curl -kX POST https://localhost:3000/api/admin/manifest/sync \
@@ -86,12 +90,12 @@ curl -kX POST https://localhost:3000/api/admin/manifest/sync \
 
 (`-k` lets curl accept the dev cert.)
 
-This populates `armor_sets`, `armor_items`, `archetypes`, `tunings`, and
-the plug → archetype/tuning lookups. Without it, the dropdowns on the
-**New view** page are empty.
+Or run `npx tsx scripts/sync-manifest.ts` from the repo root (requires env
+vars and Supabase access).
 
-A weekly cron is wired up in [`vercel.json`](vercel.json) to re-sync after
-Tuesday Bungie maintenance.
+A weekly Vercel cron re-syncs after Tuesday Bungie maintenance. Set
+`CRON_SECRET` in Vercel project env; the cron invokes
+`GET /api/admin/manifest/sync` with `Authorization: Bearer $CRON_SECRET`.
 
 ## Phase 0 spike
 

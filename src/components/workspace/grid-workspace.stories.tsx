@@ -7,11 +7,28 @@ import {
   MOCK_GRID_FILTERS_EMPTY,
   MOCK_GRID_FILTERS_POPULATED,
 } from "../../../.storybook/mocks/grid-filters";
+import {
+  MOCK_WORKSPACE_HEALTH_LOADED,
+  MOCK_WORKSPACE_HEALTH_NO_MANIFEST,
+} from "../../../.storybook/mocks/workspace-health";
+import { WorkspaceSyncProvider } from "@/components/dashboard/workspace-sync-status";
 
 const meta: Meta<typeof GridWorkspace> = {
   title: "Workspace/GridWorkspace",
   component: GridWorkspace,
   parameters: { layout: "fullscreen" },
+  decorators: [
+    (Story, ctx) => (
+      <WorkspaceSyncProvider
+        health={
+          (ctx.parameters.workspaceHealth as typeof MOCK_WORKSPACE_HEALTH_LOADED) ??
+          MOCK_WORKSPACE_HEALTH_LOADED
+        }
+      >
+        <Story />
+      </WorkspaceSyncProvider>
+    ),
+  ],
 };
 export default meta;
 
@@ -55,8 +72,15 @@ function PopulatedStory() {
 
 export const EmptyState: Story = {
   render: EmptyStory,
+  parameters: { workspaceHealth: MOCK_WORKSPACE_HEALTH_LOADED },
 };
 
 export const PopulatedFilters: Story = {
   render: PopulatedStory,
+  parameters: { workspaceHealth: MOCK_WORKSPACE_HEALTH_LOADED },
+};
+
+export const ManifestNotReady: Story = {
+  render: EmptyStory,
+  parameters: { workspaceHealth: MOCK_WORKSPACE_HEALTH_NO_MANIFEST },
 };

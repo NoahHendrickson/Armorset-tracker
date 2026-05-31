@@ -3,6 +3,16 @@ import { BUNGIE_AUTH_URL, BUNGIE_TOKEN_URL } from "./constants";
 import { serverEnv } from "@/lib/env";
 import type { OAuthTokenResponse } from "./types";
 
+export class BungieOAuthError extends Error {
+  constructor(
+    readonly status: number,
+    readonly body: string,
+  ) {
+    super(`Bungie OAuth request failed: ${status} — ${body}`);
+    this.name = "BungieOAuthError";
+  }
+}
+
 export function buildAuthorizeUrl(state: string, redirectUri: string): string {
   const env = serverEnv();
   const url = new URL(BUNGIE_AUTH_URL);
@@ -39,9 +49,8 @@ export async function exchangeAuthorizationCode(
   });
 
   if (!res.ok) {
-    throw new Error(
-      `Bungie token exchange failed: ${res.status} ${res.statusText} — ${await res.text()}`,
-    );
+    const body = await res.text();
+    throw new BungieOAuthError(res.status, body);
   }
   return (await res.json()) as OAuthTokenResponse;
 }
@@ -68,9 +77,8 @@ export async function refreshTokens(refreshToken: string): Promise<OAuthTokenRes
   });
 
   if (!res.ok) {
-    throw new Error(
-      `Bungie token refresh failed: ${res.status} ${res.statusText} — ${await res.text()}`,
-    );
+    const body = await res.text();
+    throw new BungieOAuthError(res.status, body);
   }
   return (await res.json()) as OAuthTokenResponse;
 }

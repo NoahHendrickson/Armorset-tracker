@@ -1,11 +1,12 @@
-import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
 import { getCachedInventoryWithSyncedAt } from "@/lib/inventory/sync";
 import { getManifestLookups } from "@/lib/manifest/lookups";
+import { checkManifestVersion } from "@/lib/manifest/version-check";
 import { ManifestStatusBanner } from "@/components/dashboard/manifest-status-banner";
 import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
+import { buildWorkspaceDataHealth } from "@/lib/workspace/workspace-data-health.shared";
 import { manifestSelectorsFromLookups } from "@/lib/views/manifest-selectors-from-lookup";
 import { buildGridLookupPayload } from "@/lib/views/grid-lookup-payload.server";
 import { parseGridFilters } from "@/lib/workspace/grid-filters-schema";
@@ -38,7 +39,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const sb = getServiceRoleClient();
 
-  const [userRowRes, cached, lookups, savedViews] = await Promise.all([
+  const [userRowRes, cached, lookups, savedViews, versionCheck] = await Promise.all([
     sb
       .from("users")
       .select("display_name, profile_picture_path, grid_filters")
@@ -47,6 +48,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     getCachedInventoryWithSyncedAt(session.userId),
     getManifestLookups(),
     listSavedViewsForUser(session.userId),
+    checkManifestVersion(),
   ]);
 
   const userRow = userRowRes.data;
@@ -62,15 +64,28 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const inventorySyncedAt = cached?.syncedAt ?? null;
 
   const inventory = cached?.items ?? [];
+  const hasInventoryCache = cached !== null;
+  const dataHealth = buildWorkspaceDataHealth({
+    manifestVersion: lookups.version,
+    schemaOutdated: versionCheck.schemaOutdated,
+    manifestNeedsSync:
+      lookups.version === null ||
+      versionCheck.schemaOutdated ||
+      versionCheck.needsResync,
+    inventorySyncedAt,
+    inventoryPieceCount: inventory.length,
+    hasInventoryCache,
+  });
 
   const selectors = manifestSelectorsFromLookups(lookups);
   const lookupPayload = buildGridLookupPayload(lookups);
 
-  const banners = (
-    <Suspense fallback={null}>
-      <ManifestStatusBanner manifestVersion={lookups.version} />
-    </Suspense>
-  );
+  const banners = dataHealth.manifestNeedsSync ? (
+    <ManifestStatusBanner
+      manifestVersion={lookups.version}
+      versionCheck={versionCheck}
+    />
+  ) : null;
 
   return (
     <DashboardWorkspace
@@ -78,8 +93,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       profilePictureUrl={profilePictureUrl}
       banners={banners}
       syncWarning={null}
-      inventorySyncedAt={inventorySyncedAt}
-      hasInventory={cached !== null}
+      dataHealth={dataHealth}
+      hasInventory={hasInventoryCache}
       selectors={selectors}
       inventory={inventory}
       lookupPayload={lookupPayload}

@@ -1,12 +1,24 @@
 import "server-only";
 import { getServiceRoleClient } from "@/lib/db/server";
-import { decryptToken, encryptToken } from "./crypto";
-import { refreshTokens } from "@/lib/bungie/oauth";
+import {
+  isFatalOAuthRefreshFailure,
+  isTransientOAuthRefreshFailure,
+} from "@/lib/bungie/bungie-auth-errors";
+import { BungieOAuthError, refreshTokens } from "@/lib/bungie/oauth";
 import type { OAuthTokenResponse } from "@/lib/bungie/types";
+import { decryptToken, encryptToken } from "./crypto";
 
 const ACCESS_SKEW_MS = 60_000;
 const LEASE_SECONDS = 45;
-const WAIT_BUDGET_MS = 4000;
+const WAIT_BUDGET_MS = 8_000;
+
+/** Refresh failed due to network or Bungie 5xx — caller should retry, not reauth. */
+export class TokenRefreshTransientError extends Error {
+  constructor(message: string, readonly cause?: unknown) {
+    super(message);
+    this.name = "TokenRefreshTransientError";
+  }
+}
 
 interface DecodedTokens {
   accessToken: string;
@@ -15,8 +27,14 @@ interface DecodedTokens {
   refreshExpiresAt: Date;
 }
 
+const refreshInFlight = new Map<string, Promise<string | null>>();
+
 function sleep(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
+}
+
+function accessTokenStillValid(tokens: DecodedTokens, force: boolean): boolean {
+  return !force && tokens.expiresAt.getTime() > Date.now() + ACCESS_SKEW_MS;
 }
 
 async function tryAcquireRefreshLease(userId: string): Promise<boolean> {
@@ -53,8 +71,27 @@ async function tryRefreshWithBungie(
 ): Promise<OAuthTokenResponse | null> {
   try {
     return await refreshTokens(refreshToken);
-  } catch {
-    return null;
+  } catch (err) {
+    if (err instanceof BungieOAuthError) {
+      if (isFatalOAuthRefreshFailure(err.status, err.body)) {
+        console.error(
+          "[auth] Bungie refresh token rejected (reauth required):",
+          err.body.slice(0, 500),
+        );
+        return null;
+      }
+      if (isTransientOAuthRefreshFailure(err.status)) {
+        console.error("[auth] Bungie refresh transient failure:", err.message);
+        throw new TokenRefreshTransientError(err.message, err);
+      }
+      console.error("[auth] Bungie refresh failed:", err.message);
+      return null;
+    }
+    console.error("[auth] Bungie refresh network error:", err);
+    throw new TokenRefreshTransientError(
+      err instanceof Error ? err.message : "Token refresh failed",
+      err,
+    );
   }
 }
 
@@ -68,7 +105,7 @@ async function ensureRefreshedAccessToken(
     const t = await loadTokens(userId);
     if (!t) return null;
     if (t.refreshExpiresAt.getTime() <= Date.now()) return null;
-    if (!force && t.expiresAt.getTime() > Date.now() + ACCESS_SKEW_MS) {
+    if (accessTokenStillValid(t, force)) {
       return t.accessToken;
     }
 
@@ -78,7 +115,7 @@ async function ensureRefreshedAccessToken(
         const t2 = await loadTokens(userId);
         if (!t2) return null;
         if (t2.refreshExpiresAt.getTime() <= Date.now()) return null;
-        if (!force && t2.expiresAt.getTime() > Date.now() + ACCESS_SKEW_MS) {
+        if (accessTokenStillValid(t2, force)) {
           return t2.accessToken;
         }
 
@@ -96,7 +133,7 @@ async function ensureRefreshedAccessToken(
     const tAfter = await loadTokens(userId);
     if (!tAfter) return null;
     if (tAfter.refreshExpiresAt.getTime() <= Date.now()) return null;
-    if (!force && tAfter.expiresAt.getTime() > Date.now() + ACCESS_SKEW_MS) {
+    if (accessTokenStillValid(tAfter, force)) {
       return tAfter.accessToken;
     }
   }
@@ -104,10 +141,25 @@ async function ensureRefreshedAccessToken(
   const final = await loadTokens(userId);
   if (!final) return null;
   if (final.refreshExpiresAt.getTime() <= Date.now()) return null;
-  if (!force && final.expiresAt.getTime() > Date.now() + ACCESS_SKEW_MS) {
+  if (accessTokenStillValid(final, force)) {
     return final.accessToken;
   }
   return null;
+}
+
+function runDedupedRefresh(
+  userId: string,
+  force: boolean,
+): Promise<string | null> {
+  const key = `${userId}:${force ? "force" : "soft"}`;
+  const existing = refreshInFlight.get(key);
+  if (existing) return existing;
+
+  const promise = ensureRefreshedAccessToken(userId, force).finally(() => {
+    refreshInFlight.delete(key);
+  });
+  refreshInFlight.set(key, promise);
+  return promise;
 }
 
 export async function persistTokens(
@@ -117,17 +169,44 @@ export async function persistTokens(
   const sb = getServiceRoleClient();
   const now = Date.now();
   const expiresAt = new Date(now + tokens.expires_in * 1000);
-  const refreshExpiresAt = new Date(now + tokens.refresh_expires_in * 1000);
 
-  const { error } = await sb.from("oauth_tokens").upsert({
-    user_id: userId,
-    access_token_encrypted: bufferToHex(encryptToken(tokens.access_token)),
-    refresh_token_encrypted: bufferToHex(encryptToken(tokens.refresh_token)),
-    expires_at: expiresAt.toISOString(),
-    refresh_expires_at: refreshExpiresAt.toISOString(),
-    refresh_lease_until: null,
-    updated_at: new Date().toISOString(),
-  });
+  const updatedAt = new Date().toISOString();
+  const accessEncrypted = bufferToHex(encryptToken(tokens.access_token));
+
+  if (tokens.refresh_token) {
+    const refreshExpiresAt =
+      tokens.refresh_expires_in != null
+        ? new Date(now + tokens.refresh_expires_in * 1000).toISOString()
+        : (
+            await loadTokens(userId)
+          )?.refreshExpiresAt.toISOString();
+
+    if (!refreshExpiresAt) {
+      throw new Error("persistTokens: refresh_expires_in required with refresh_token");
+    }
+
+    const { error } = await sb.from("oauth_tokens").upsert({
+      user_id: userId,
+      access_token_encrypted: accessEncrypted,
+      refresh_token_encrypted: bufferToHex(encryptToken(tokens.refresh_token)),
+      expires_at: expiresAt.toISOString(),
+      refresh_expires_at: refreshExpiresAt,
+      refresh_lease_until: null,
+      updated_at: updatedAt,
+    });
+    if (error) throw new Error(`persistTokens failed: ${error.message}`);
+    return;
+  }
+
+  const { error } = await sb
+    .from("oauth_tokens")
+    .update({
+      access_token_encrypted: accessEncrypted,
+      expires_at: expiresAt.toISOString(),
+      refresh_lease_until: null,
+      updated_at: updatedAt,
+    })
+    .eq("user_id", userId);
   if (error) throw new Error(`persistTokens failed: ${error.message}`);
 }
 
@@ -167,7 +246,7 @@ export async function getValidAccessToken(
   if (tokens.refreshExpiresAt.getTime() <= now) {
     return null;
   }
-  return ensureRefreshedAccessToken(userId, false);
+  return runDedupedRefresh(userId, false);
 }
 
 /**
@@ -184,7 +263,7 @@ export async function forceRefreshAccessToken(
   const tokens = await loadTokens(userId);
   if (!tokens) return null;
   if (tokens.refreshExpiresAt.getTime() <= Date.now()) return null;
-  return ensureRefreshedAccessToken(userId, true);
+  return runDedupedRefresh(userId, true);
 }
 
 function bufferToHex(buf: Buffer): string {

@@ -6,8 +6,7 @@ import {
   transferDestinyItem,
 } from "@/lib/bungie/client";
 import { withBackoff, withUserRateLimit } from "@/lib/bungie/rate-limit";
-import { getValidAccessToken } from "@/lib/auth/tokens";
-import { BUNGIE_REAUTH_USER_MESSAGE } from "@/lib/auth/bungie-reauth";
+import { withBungieAccessTokenRetry } from "@/lib/auth/bungie-api-retry";
 import type { Session } from "@/lib/auth/session";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import type { GridFilterClass } from "@/lib/workspace/grid-filters-schema";
@@ -19,11 +18,8 @@ import {
   resolveCharacterIdForClass,
   wrongClassForTarget,
 } from "@/lib/inventory/equip-plan";
-import {
-  getCachedInventory,
-  syncUserInventory,
-  InventoryNotReady,
-} from "@/lib/inventory/sync";
+import { getCachedInventory, syncUserInventory } from "@/lib/inventory/sync";
+import { InventoryNotReady } from "@/lib/inventory/inventory-not-ready";
 
 const PROFILE_CHARACTERS_COMPONENT = 200;
 
@@ -101,19 +97,20 @@ export interface ArmorItemActionResult {
 
 async function resolveTargetCharacterId(
   session: Session,
-  accessToken: string,
   classType: GridFilterClass,
 ): Promise<string> {
-  const profile = await withUserRateLimit(session.userId, () =>
-    withBackoff(
-      () =>
-        getProfile(
-          session.bungieMembershipType,
-          session.bungieMembershipId,
-          [PROFILE_CHARACTERS_COMPONENT],
-          accessToken,
-        ),
-      { retries: 2, baseMs: 400 },
+  const profile = await withBungieAccessTokenRetry(session.userId, (accessToken) =>
+    withUserRateLimit(session.userId, () =>
+      withBackoff(
+        () =>
+          getProfile(
+            session.bungieMembershipType,
+            session.bungieMembershipId,
+            [PROFILE_CHARACTERS_COMPONENT],
+            accessToken,
+          ),
+        { retries: 2, baseMs: 400 },
+      ),
     ),
   );
 
@@ -184,14 +181,12 @@ async function executeArmorAction(
 ): Promise<ArmorItemActionResult> {
   const piece = await validatePiece(session, input);
 
-  const accessToken = await getValidAccessToken(session.userId);
-  if (!accessToken) {
-    throw new InventoryNotReady(BUNGIE_REAUTH_USER_MESSAGE, 401);
-  }
+  const accessToken = await withBungieAccessTokenRetry(session.userId, async (token) =>
+    token,
+  );
 
   const targetCharacterId = await resolveTargetCharacterId(
     session,
-    accessToken,
     input.classType,
   );
 

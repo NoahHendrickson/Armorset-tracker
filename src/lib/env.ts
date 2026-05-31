@@ -5,7 +5,7 @@ import { z } from "zod";
  * Zod 4's `z.preprocess` + inner `.optional()` rejects plain `undefined` input in
  * some builds; use transform so unset GitHub feedback vars don't block boot.
  */
-const optionalGithubFeedbackString = z
+const optionalTrimmedString = z
   .string()
   .optional()
   .transform((s) => {
@@ -14,6 +14,8 @@ const optionalGithubFeedbackString = z
     return t === "" ? undefined : t;
   })
   .refine((v) => v === undefined || v.length >= 1);
+
+const optionalGithubFeedbackString = optionalTrimmedString;
 
 const supabaseProjectUrl = z
   .string()
@@ -59,6 +61,8 @@ const serverSchema = z.object({
   GITHUB_FEEDBACK_OWNER: optionalGithubFeedbackString,
   GITHUB_FEEDBACK_REPO: optionalGithubFeedbackString,
   GITHUB_FEEDBACK_TOKEN: optionalGithubFeedbackString,
+  /** Vercel cron bearer auth for GET /api/admin/manifest/sync */
+  CRON_SECRET: optionalTrimmedString,
 });
 
 const clientSchema = z.object({
@@ -83,6 +87,7 @@ const ENV_TRIM_KEYS = [
   "GITHUB_FEEDBACK_OWNER",
   "GITHUB_FEEDBACK_REPO",
   "GITHUB_FEEDBACK_TOKEN",
+  "CRON_SECRET",
 ] as const;
 
 function envWithTrimmedSecrets(): NodeJS.ProcessEnv {

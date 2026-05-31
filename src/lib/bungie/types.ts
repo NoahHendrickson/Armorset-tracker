@@ -31,9 +31,10 @@ export interface MembershipData {
 
 export interface OAuthTokenResponse {
   access_token: string;
-  refresh_token: string;
+  /** Omitted on some refresh responses — keep the stored refresh token when absent. */
+  refresh_token?: string;
   expires_in: number;
-  refresh_expires_in: number;
+  refresh_expires_in?: number;
   membership_id: string;
   token_type: string;
 }

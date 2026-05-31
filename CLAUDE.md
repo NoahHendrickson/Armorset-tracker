@@ -23,8 +23,9 @@ npm run lint             # eslint (eslint-config-next + core-web-vitals + typesc
 npm run db:push          # apply pending Supabase migrations
 npm run db:push:dry-run  # preview pending migrations without applying
 
-# After signing in once locally, populate manifest-derived tables:
+# After signing in once locally, optional headless manifest populate:
 curl -kX POST https://localhost:3000/api/admin/manifest/sync -b cookies.txt
+# Or: npx tsx scripts/sync-manifest.ts
 ```
 
 There is no test suite. The `spike/` directory is a one-off Phase-0 Node script (excluded from
@@ -81,8 +82,10 @@ the main `tsconfig.json`) and is unrelated to the production build.
 
 ### Manifest pipeline (`src/lib/manifest/`)
 - `sync.ts` is a full replace: it deletes all 9 derived tables (FK-ordered) and re-inserts in
-  chunks. Triggered manually via `POST /api/admin/manifest/sync` and weekly via the
-  `vercel.json` cron (`0 18 * * 2` — Tuesday after Bungie maintenance).
+  chunks. Triggered automatically when a signed-in user opens `/dashboard` (`WorkspaceAutoSync`),
+  via authenticated `POST /api/admin/manifest/sync` (session cookie), and weekly via the
+  `vercel.json` cron (`0 18 * * 2` — Tuesday after Bungie maintenance; `GET` with
+  `Authorization: Bearer $CRON_SECRET`).
 - `derive.ts` walks `DestinyInventoryItemDefinition` + related tables to produce the small lookup
   tables (`armor_sets`, `armor_items`, `archetypes`, `tunings`, `plug_to_archetype`,
   `plug_to_tuning`, `archetype_stat_pairs`, `armor_stat_plugs`, `armor_stat_icons`).
@@ -164,5 +167,7 @@ answering or making UI changes. Storybook must be running for the endpoint at
 ## Production deploy
 
 Deployed on Vercel. The `vercel.json` cron re-runs `/api/admin/manifest/sync` every Tuesday at
-18:00 UTC. `NEXT_PUBLIC_APP_URL` must match the Bungie app's registered redirect URI exactly
+18:00 UTC via `GET` with `Authorization: Bearer $CRON_SECRET` (set in Vercel env). Signed-in
+users also trigger sync automatically on dashboard load when manifest data is missing or stale.
+`NEXT_PUBLIC_APP_URL` must match the Bungie app's registered redirect URI exactly
 (including scheme), or OAuth fails with a state mismatch.

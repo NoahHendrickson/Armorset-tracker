@@ -91,7 +91,7 @@ export const WideAllInline: Story = {
   render: () => <Render initial={MOCK_GRID_FILTERS_POPULATED} width={1200} />,
 };
 
-/** 64–72rem — tunings/tertiary in More; sets & archetypes stay inline. */
+/** 64–72rem — tertiary/tunings in More; sets & archetypes stay inline. */
 export const MidMoreOverflow: Story = {
   render: () => (
     <Render initial={MOCK_GRID_FILTERS_POPULATED} width={1080} showRarityFilter />

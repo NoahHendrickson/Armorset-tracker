@@ -145,7 +145,7 @@ export const EmptyCatalog: Story = {
           onValueChange={setValue}
           sharpCorners
           aria-label="Armor set"
-          emptyCatalogMessage="No sets available — sync the manifest first."
+          emptyCatalogMessage="No sets available yet."
         />
       </div>
     );

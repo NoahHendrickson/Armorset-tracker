@@ -77,8 +77,8 @@ export function ViewGrid({
   if (tertiaryStats.length === 0) {
     return (
       <div className="rounded-md border border-border bg-accent/40 p-4 text-sm text-muted-foreground">
-        No tertiary stats available for this archetype yet. Sync the manifest
-        to populate archetype stat pairs.
+        No tertiary stats available for this archetype yet. Stat data is still
+        loading.
       </div>
     );
   }

@@ -20,7 +20,9 @@ import {
   WorkspaceViewModeTabs,
   type WorkspaceViewMode,
 } from "@/components/dashboard/workspace-view-mode-tabs";
-import { InventoryAutoSync } from "@/components/dashboard/inventory-auto-sync";
+import { WorkspaceAutoSync } from "@/components/dashboard/workspace-auto-sync";
+import { WorkspaceSyncProvider } from "@/components/dashboard/workspace-sync-status";
+import type { WorkspaceDataHealth } from "@/lib/workspace/workspace-data-health.shared";
 import {
   InventoryEquipmentOnlyBanner,
   InventoryEquipmentOnlyProvider,
@@ -31,7 +33,7 @@ export interface DashboardWorkspaceProps {
   profilePictureUrl: string | null;
   banners: ReactNode;
   syncWarning: string | null;
-  inventorySyncedAt: string | null;
+  dataHealth: WorkspaceDataHealth;
   hasInventory: boolean;
   selectors: TrackerFormSelectors;
   inventory: DerivedArmorPieceJson[];
@@ -48,7 +50,7 @@ export function DashboardWorkspace({
   profilePictureUrl,
   banners,
   syncWarning,
-  inventorySyncedAt,
+  dataHealth,
   hasInventory,
   selectors,
   inventory,
@@ -59,7 +61,7 @@ export function DashboardWorkspace({
   invalidShareLink = false,
   savedViewImportedId = null,
 }: DashboardWorkspaceProps) {
-  const [mode, setMode] = useState<WorkspaceViewMode>("grid");
+  const [mode, setMode] = useState<WorkspaceViewMode>("table");
   const [savedViews, setSavedViews] =
     useState<SavedFilterViewRow[]>(initialSavedViews);
   const tabs = <WorkspaceViewModeTabs mode={mode} onModeChange={setMode} />;
@@ -147,9 +149,10 @@ export function DashboardWorkspace({
 
   return (
     <InventoryEquipmentOnlyProvider>
-      <div className="flex h-full min-h-0 flex-col">
-        <InventoryAutoSync inventorySyncedAt={inventorySyncedAt} />
-        <InventoryEquipmentOnlyBanner />
+      <WorkspaceSyncProvider health={dataHealth}>
+        <div className="flex h-full min-h-0 flex-col">
+          <WorkspaceAutoSync health={dataHealth} />
+          <InventoryEquipmentOnlyBanner />
         <AppHeader
           displayName={displayName}
           profilePictureUrl={profilePictureUrl}
@@ -179,7 +182,8 @@ export function DashboardWorkspace({
             savedViews={savedViewsMenuProps}
           />
         )}
-      </div>
+        </div>
+      </WorkspaceSyncProvider>
     </InventoryEquipmentOnlyProvider>
   );
 }

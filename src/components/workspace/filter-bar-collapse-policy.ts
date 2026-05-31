@@ -25,8 +25,8 @@ export const MORE_MENU_DIMENSIONS: Record<
   readonly MoreMenuDimension[]
 > = {
   "full-inline": [],
-  "more-tunings": ["tunings", "tertiary"],
-  "more-all": ["archetypes", "tunings", "tertiary"],
+  "more-tunings": ["tertiary", "tunings"],
+  "more-all": ["archetypes", "tertiary", "tunings"],
   "filters-menu": [],
 };
 
@@ -73,7 +73,6 @@ export function countFullFiltersSelections(
   value: GridFiltersJson,
   options: {
     showTertiaryStatFilter: boolean;
-    showRarityFilter: boolean;
     savedViews?: SavedViewsBarProps;
   },
 ): number {
@@ -84,7 +83,6 @@ export function countFullFiltersSelections(
   if (options.showTertiaryStatFilter) {
     count += value.tertiaryStats.length;
   }
-  if (options.showRarityFilter && value.rarity !== "legendary") count += 1;
   if (options.savedViews?.activeViewId) count += 1;
   return count;
 }

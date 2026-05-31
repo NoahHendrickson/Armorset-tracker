@@ -31,6 +31,12 @@ import { TrackerFilterBar } from "@/components/workspace/tracker-filter-bar";
 import type { SavedViewsBarProps } from "@/components/workspace/saved-views-menu";
 import { TrackerGridContent } from "@/components/workspace/tracker-grid-content";
 import { CompareDialog } from "@/components/workspace/compare-dialog";
+import { WorkspaceSyncGatePanel } from "@/components/dashboard/workspace-sync-gate-panel";
+import { useWorkspaceSync } from "@/components/dashboard/workspace-sync-status";
+import {
+  inventoryTableEmptyState,
+  isWorkspaceSyncGateState,
+} from "@/lib/workspace/workspace-data-health.shared";
 import {
   TRACKER_GRID_TILE_DISPLAY_HEIGHT_PX,
   TRACKER_GRID_TILE_DISPLAY_WIDTH_PX,
@@ -78,6 +84,35 @@ export function GridWorkspace({
   savedViews,
 }: GridWorkspaceProps) {
   const { pinnedHashes, togglePin } = usePinnedArmorSets();
+  const {
+    health,
+    phase,
+    manifestError,
+    inventoryError,
+    reauthMessage,
+    retrySync,
+  } = useWorkspaceSync();
+
+  const syncGateState = useMemo(() => {
+    const state = inventoryTableEmptyState({
+      health,
+      phase,
+      manifestError,
+      inventoryError,
+      reauthMessage,
+      filteredCount: 0,
+      classType: filters.class,
+      filtersExcludeAll: false,
+    });
+    return isWorkspaceSyncGateState(state) ? state : null;
+  }, [
+    filters.class,
+    health,
+    inventoryError,
+    manifestError,
+    phase,
+    reauthMessage,
+  ]);
 
   // Class-bucketed inventory; cheap to re-compute when `inventory` changes.
   const inventoryByClass = useMemo(() => {
@@ -185,6 +220,13 @@ export function GridWorkspace({
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-4 sm:px-6">
+          {syncGateState ? (
+            <WorkspaceSyncGatePanel
+              state={syncGateState}
+              onRetry={retrySync}
+            />
+          ) : (
+            <>
           <div className="min-w-0 w-full shrink-0 overflow-hidden rounded-none border border-border bg-table-header px-3">
             <TrackerFilterBar
               selectors={selectors}
@@ -271,6 +313,8 @@ export function GridWorkspace({
                 })}
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
       </div>

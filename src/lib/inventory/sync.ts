@@ -3,12 +3,9 @@ import { BungieApiError, getProfile } from "@/lib/bungie/client";
 import { PROFILE_COMPONENTS } from "@/lib/bungie/constants";
 import { withBackoff, withUserRateLimit } from "@/lib/bungie/rate-limit";
 import { getServiceRoleClient } from "@/lib/db/server";
-import { BUNGIE_REAUTH_USER_MESSAGE } from "@/lib/auth/bungie-reauth";
+import { withBungieAccessTokenRetry } from "@/lib/auth/bungie-api-retry";
 import { INVENTORY_EQUIPMENT_ONLY_WARNING } from "@/lib/inventory/user-messages";
-import {
-  forceRefreshAccessToken,
-  getValidAccessToken,
-} from "@/lib/auth/tokens";
+import { InventoryNotReady } from "@/lib/inventory/inventory-not-ready";
 import { getManifestLookups } from "@/lib/manifest/lookups";
 import type { Session } from "@/lib/auth/session";
 import type { DerivedArmorPieceJson, InventoryCacheRow, Json } from "@/lib/db/types";
@@ -53,12 +50,7 @@ export interface InventorySyncOptions {
   force?: boolean;
 }
 
-export class InventoryNotReady extends Error {
-  constructor(reason: string, readonly status: number = 503) {
-    super(reason);
-    this.name = "InventoryNotReady";
-  }
-}
+export { InventoryNotReady } from "@/lib/inventory/inventory-not-ready";
 
 export async function syncUserInventory(
   session: Session,
@@ -88,15 +80,12 @@ export async function syncUserInventory(
     }
   }
 
-  const accessToken = await getValidAccessToken(session.userId);
-  if (!accessToken) {
-    throw new InventoryNotReady(BUNGIE_REAUTH_USER_MESSAGE, 401);
-  }
-
   const lookups = await getManifestLookups();
   const warnings: string[] = [];
   if (!lookups.version) {
-    warnings.push("Manifest has not been synced yet — run /api/admin/manifest/sync first.");
+    warnings.push(
+      "Manifest is still loading — inventory may be incomplete until it finishes.",
+    );
   }
 
   const fetchProfile = (token: string) =>
@@ -115,33 +104,12 @@ export async function syncUserInventory(
 
   let profile;
   try {
-    profile = await fetchProfile(accessToken);
+    profile = await withBungieAccessTokenRetry(session.userId, fetchProfile);
   } catch (err) {
     if (err instanceof BungieApiError && err.maintenance) {
       throw new InventoryNotReady("Bungie API is in maintenance.", 503);
     }
-    // Bungie sometimes revokes a token before our cached `expires_at` says it
-    // should be expired (server restarts on their side, user re-auth elsewhere,
-    // etc.). Force-refresh once and retry before giving up.
-    if (err instanceof BungieApiError && err.status === 401) {
-      const refreshed = await forceRefreshAccessToken(session.userId);
-      if (!refreshed) {
-        throw new InventoryNotReady(BUNGIE_REAUTH_USER_MESSAGE, 401);
-      }
-      try {
-        profile = await fetchProfile(refreshed);
-      } catch (retryErr) {
-        if (
-          retryErr instanceof BungieApiError &&
-          retryErr.status === 401
-        ) {
-          throw new InventoryNotReady(BUNGIE_REAUTH_USER_MESSAGE, 401);
-        }
-        throw retryErr;
-      }
-    } else {
-      throw err;
-    }
+    throw err;
   }
 
   const rawCounts = rawInventoryItemCounts(profile);

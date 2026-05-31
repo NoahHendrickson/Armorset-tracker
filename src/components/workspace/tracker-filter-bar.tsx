@@ -10,6 +10,7 @@ import { CLASS_NAMES } from "@/lib/bungie/constants";
 import type { ArmorStatName } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { chromeToolbarShellClass } from "@/components/ui/chrome-square-icon-button";
 import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import {
   gridFiltersHaveUnblockingSelection,
@@ -107,8 +108,14 @@ export function TrackerFilterBar({
   }, [sortedSets, value.setHashes]);
 
   const armorSetEmptyCopy = selectors.manifestEmpty
-    ? "Sync the manifest first."
+    ? "Loading armor sets…"
     : "No sets for this class.";
+  const archetypeEmptyCopy = selectors.manifestEmpty
+    ? "Loading archetypes…"
+    : "No archetypes for this class.";
+  const tuningEmptyCopy = selectors.manifestEmpty
+    ? "Loading tunings…"
+    : "No tunings for this class.";
 
   function setSetHashesFromStrings(next: string[]) {
     onChange({
@@ -184,7 +191,6 @@ export function TrackerFilterBar({
     value,
     onChange,
     showTertiaryStatFilter,
-    showRarityFilter,
     showSetFilter,
     sortedSets,
     sortedArchetypes,
@@ -192,6 +198,8 @@ export function TrackerFilterBar({
     setHashesAsStrings,
     selectedSetNames,
     armorSetEmptyCopy,
+    archetypeEmptyCopy,
+    tuningEmptyCopy,
     pinnedHashes,
     onTogglePin,
     setsOpen,
@@ -200,8 +208,7 @@ export function TrackerFilterBar({
     onToggleArchetype: toggleArchetype,
     onToggleTuning: toggleTuning,
     onToggleStat: toggleStat,
-    onSwitchRarity: switchRarity,
-    // Saved views lives permanently in the right-hand action cluster, so it is
+    // Saved views and rarity live in the right-hand action cluster, so they are
     // never stowed into the left "Filters" overflow menu.
     savedViews: undefined,
   };
@@ -211,20 +218,20 @@ export function TrackerFilterBar({
       ref={barRef}
       className={cn(
         FILTER_BAR_CONTAINER_CLASS,
-        "flex w-full min-w-0 max-w-full flex-nowrap items-center gap-2 overflow-hidden sm:gap-3",
-        "min-h-[52px]",
+        "flex w-full min-w-0 max-w-full flex-nowrap items-center gap-2 overflow-hidden py-2 sm:gap-3",
+        "min-h-[60px]",
         className,
       )}
     >
-      <div className="flex min-w-0 shrink-0 overflow-hidden rounded-none bg-card">
-        {CLASS_TABS.map((tab) => (
+      <div className={cn(chromeToolbarShellClass, "min-w-0")} role="group" aria-label="Class">
+        {CLASS_TABS.map((tab, index) => (
           <button
             key={tab.value}
             type="button"
             className={cn(
-              "flex h-9 shrink-0 items-center border border-transparent px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-              value.class === tab.value &&
-                "border-border bg-accent text-foreground",
+              "flex h-9 shrink-0 items-center px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+              index > 0 && "border-l border-border",
+              value.class === tab.value && "bg-accent text-foreground",
             )}
             onClick={() => switchClass(tab.value)}
             aria-pressed={value.class === tab.value}
@@ -233,17 +240,6 @@ export function TrackerFilterBar({
           </button>
         ))}
       </div>
-
-      <div aria-hidden className="h-6 w-px shrink-0 self-center bg-border" />
-
-      {showRarityFilter ? (
-        <RarityFilterDimension
-          variant="inline"
-          value={value.rarity}
-          onChange={switchRarity}
-          inlineWrapperClass={FILTER_INLINE_CORE}
-        />
-      ) : null}
 
       {showSetFilter ? (
         <ArmorSetsFilterDimension
@@ -270,21 +266,9 @@ export function TrackerFilterBar({
         selectedHashes={value.archetypeHashes}
         onToggle={toggleArchetype}
         onClear={() => onChange({ ...value, archetypeHashes: [] })}
-        emptyMessage="No archetypes — sync the manifest first."
+        emptyMessage={archetypeEmptyCopy}
         inlineWrapperClass={FILTER_INLINE_ARCHETYPES}
         menuContentClass="min-w-64"
-      />
-
-      <HashCheckboxFilterDimension
-        variant="inline"
-        label="Tunings"
-        options={sortedTunings}
-        selectedHashes={value.tuningHashes}
-        onToggle={toggleTuning}
-        onClear={() => onChange({ ...value, tuningHashes: [] })}
-        emptyMessage="No tunings — sync the manifest first."
-        inlineWrapperClass={FILTER_INLINE_TUNINGS_TERTIARY}
-        menuContentClass="min-w-56"
       />
 
       {showTertiaryStatFilter ? (
@@ -297,6 +281,18 @@ export function TrackerFilterBar({
         />
       ) : null}
 
+      <HashCheckboxFilterDimension
+        variant="inline"
+        label="Tunings"
+        options={sortedTunings}
+        selectedHashes={value.tuningHashes}
+        onToggle={toggleTuning}
+        onClear={() => onChange({ ...value, tuningHashes: [] })}
+        emptyMessage={tuningEmptyCopy}
+        inlineWrapperClass={FILTER_INLINE_TUNINGS_TERTIARY}
+        menuContentClass="min-w-56"
+      />
+
       <TrackerFilterBarOverflowMenus {...overflowProps} />
 
       <p
@@ -308,19 +304,23 @@ export function TrackerFilterBar({
         {CLASS_NAMES[value.class] ?? "class"}.
       </p>
 
+      {(showRarityFilter || savedViews) && collapseTier !== "filters-menu" ? (
+        <div aria-hidden className="h-6 w-px shrink-0 self-center bg-border" />
+      ) : null}
+
+      {showRarityFilter ? (
+        <RarityFilterDimension
+          variant="inline"
+          value={value.rarity}
+          onChange={switchRarity}
+        />
+      ) : null}
+
       {savedViews ? (
-        <>
-          {collapseTier === "filters-menu" ? null : (
-            <div
-              aria-hidden
-              className="h-6 w-px shrink-0 self-center bg-border"
-            />
-          )}
-          <SavedViewsMenu
-            {...savedViews}
-            compact={collapseTier === "filters-menu"}
-          />
-        </>
+        <SavedViewsMenu
+          {...savedViews}
+          compact={collapseTier === "filters-menu"}
+        />
       ) : null}
 
       <ShareFilterLinkButton
@@ -333,7 +333,7 @@ export function TrackerFilterBar({
         {searchExpanded ? (
           <div
             role="search"
-            className="relative min-h-[52px] min-w-0 lg:max-w-xs"
+            className="relative -my-2 min-h-[60px] min-w-0 lg:max-w-xs"
           >
             <MagnifyingGlass
               weight="regular"
@@ -359,7 +359,7 @@ export function TrackerFilterBar({
                   e.currentTarget.blur();
                 }
               }}
-              className="h-[52px] w-full min-w-0 border-0 border-b border-white bg-transparent py-0 ps-9 pe-9 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground/80 focus-visible:border-b focus-visible:border-white focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-search-cancel-button]:hidden"
+              className="h-[60px] w-full min-w-0 border-0 border-b border-white bg-transparent py-0 ps-9 pe-9 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground/80 focus-visible:border-b focus-visible:border-white focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-search-cancel-button]:hidden"
             />
             {value.search ? (
               <button

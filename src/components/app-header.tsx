@@ -5,7 +5,6 @@ import Link from "next/link";
 import { SignOut } from "@phosphor-icons/react/dist/ssr";
 import { FeedbackHeaderDialog } from "@/components/feedback-header-dialog";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
-import { SyncManifestButton } from "@/components/dashboard/sync-manifest-button";
 import { BungieProfileAvatar } from "@/components/bungie-profile-avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,7 +57,6 @@ export function AppHeader({
       <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
         <FeedbackHeaderDialog />
         <RefreshButton variant="header-large" />
-        <SyncManifestButton variant="header-large" />
 
         <div className="flex min-w-0 max-w-[min(100vw-10rem,20rem)] items-center gap-2 sm:max-w-none sm:gap-2.5">
           <BungieProfileAvatar

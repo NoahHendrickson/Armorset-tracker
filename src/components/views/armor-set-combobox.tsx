@@ -48,7 +48,7 @@ export function ArmorSetCombobox({
   onValueChange,
   disabled,
   placeholder,
-  emptyCatalogMessage = "No sets available — sync the manifest first.",
+  emptyCatalogMessage = "No sets available yet.",
   sharpCorners = false,
   invalid = false,
   portalContainer,

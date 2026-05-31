@@ -6,7 +6,7 @@ import {
 } from "@/lib/auth/bungie-reauth";
 import { BungieApiError } from "@/lib/bungie/client";
 import { ItemActionError } from "@/lib/inventory/item-actions";
-import { InventoryNotReady } from "@/lib/inventory/sync";
+import { InventoryNotReady } from "@/lib/inventory/inventory-not-ready";
 
 export function inventoryMutationErrorResponse(
   err: unknown,

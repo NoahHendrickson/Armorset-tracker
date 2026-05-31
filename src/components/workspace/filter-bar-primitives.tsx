@@ -18,8 +18,8 @@ export const FILTER_BAR_CONTAINER_CLASS = "@container/filter-bar";
  * in filter-bar-collapse-policy.ts.
  *
  * - ≥72rem: all filters inline
- * - 64–72rem: tunings + tertiary → "More" menu; sets/rarity/archetypes stay inline
- * - 56–64rem: archetypes join "More"; sets/rarity stay inline
+ * - 64–72rem: tertiary + tunings → "More" menu; sets/archetypes stay inline
+ * - 56–64rem: archetypes join "More"; sets stay inline
  * - <56rem: everything → "Filters" menu
  */
 
@@ -38,10 +38,10 @@ export const FILTER_INLINE_ARCHETYPES = "hidden @[64rem]/filter-bar:inline-flex"
 export const FILTER_STOWED_IN_FILTERS_ARCHETYPES =
   "@[56rem]/filter-bar:hidden";
 
-/** Tier 3 — views, rarity, armor sets inline. */
+/** Tier 3 — armor sets inline. */
 export const FILTER_INLINE_CORE = "hidden @[56rem]/filter-bar:inline-flex";
 
-/** Tier 3 — views, rarity, armor sets in full "Filters". */
+/** Tier 3 — armor sets in full "Filters". */
 export const FILTER_STOWED_IN_FILTERS_CORE = "@[56rem]/filter-bar:hidden";
 
 /** "More" overflow trigger — visible between 56rem and 72rem. */
@@ -53,6 +53,10 @@ export const FILTER_FULL_MENU_BUTTON = "inline-flex @[56rem]/filter-bar:hidden";
 
 export const INLINE_TRIGGER_BASE_CLASS =
   "group/inline-trigger h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs";
+
+/** Idle dropdown triggers — lighter than the table-header bar they sit on. */
+export const INLINE_TRIGGER_IDLE_CLASS =
+  "bg-background text-foreground hover:bg-background/90 dark:bg-accent dark:text-accent-foreground dark:hover:bg-accent/90";
 
 /** Brand-green border + light fill — filter triggers and action success flashes. */
 export const INLINE_TRIGGER_ACTIVE_CLASS =
@@ -102,7 +106,10 @@ export const InlineFilterTrigger = forwardRef<
               INLINE_TRIGGER_ACTIVE_CLASS,
               "data-[state=open]:border-primary/60 data-[state=open]:bg-primary/10 data-[state=open]:text-foreground",
             )
-          : "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+          : cn(
+              INLINE_TRIGGER_IDLE_CLASS,
+              "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+            ),
         className,
       )}
       {...props}

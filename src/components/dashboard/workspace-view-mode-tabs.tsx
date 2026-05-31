@@ -27,29 +27,29 @@ export function WorkspaceViewModeTabs({
       <button
         type="button"
         role="tab"
-        aria-selected={mode === "grid"}
-        className={cn(
-          segmentBtn,
-          mode === "grid" && "bg-accent text-foreground",
-        )}
-        onClick={() => onModeChange("grid")}
-      >
-        <SquaresFour className="h-4 w-4" weight="duotone" aria-hidden />
-        Tracker
-      </button>
-      <button
-        type="button"
-        role="tab"
         aria-selected={mode === "table"}
         className={cn(
           segmentBtn,
-          "border-l border-border",
           mode === "table" && "bg-accent text-foreground",
         )}
         onClick={() => onModeChange("table")}
       >
         <Table className="h-4 w-4" weight="duotone" aria-hidden />
         Table
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "grid"}
+        className={cn(
+          segmentBtn,
+          "border-l border-border",
+          mode === "grid" && "bg-accent text-foreground",
+        )}
+        onClick={() => onModeChange("grid")}
+      >
+        <SquaresFour className="h-4 w-4" weight="duotone" aria-hidden />
+        Tracker
       </button>
     </div>
   );

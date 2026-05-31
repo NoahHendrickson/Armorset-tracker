@@ -3,7 +3,7 @@ import "server-only";
 import { getDestinyManifest } from "@/lib/bungie/client";
 import { getServiceRoleClient } from "@/lib/db/server";
 
-interface CheckResult {
+export interface ManifestVersionCheckResult {
   cachedVersion: string | null;
   liveVersion: string | null;
   needsResync: boolean;
@@ -14,7 +14,7 @@ interface CheckResult {
 }
 
 let lastCheckAt = 0;
-let lastResult: CheckResult = {
+let lastResult: ManifestVersionCheckResult = {
   cachedVersion: null,
   liveVersion: null,
   needsResync: false,
@@ -22,7 +22,9 @@ let lastResult: CheckResult = {
 };
 const CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
-export async function checkManifestVersion(force = false): Promise<CheckResult> {
+export async function checkManifestVersion(
+  force = false,
+): Promise<ManifestVersionCheckResult> {
   const now = Date.now();
   if (!force && now - lastCheckAt < CHECK_INTERVAL_MS) {
     return lastResult;
