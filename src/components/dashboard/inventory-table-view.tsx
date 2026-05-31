@@ -44,12 +44,12 @@ const INVENTORY_TABLE_COLGROUP = (
   </colgroup>
 );
 
-/** Mirror body scroll gutter so split header/body tables stay the same width. */
+/** Stable scrollbar gutter keeps column widths steady while the body scrolls. */
 const TABLE_SCROLL_GUTTER =
   "overflow-y-auto [scrollbar-gutter:stable] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 /** Approximate single-row height; the virtualizer remeasures real rows on mount. */
-const ESTIMATED_ROW_HEIGHT_PX = 41;
+const ESTIMATED_ROW_HEIGHT_PX = 48;
 
 function formatLocation(piece: DerivedArmorPieceJson): string {
   const loc = piece.location;
@@ -185,161 +185,162 @@ export function InventoryTableView({
             <WorkspaceSyncGatePanel state={emptyState} onRetry={retrySync} />
           ) : (
             <div className="flex min-h-0 flex-1 min-w-0 w-full flex-col overflow-hidden rounded-none border-x border-b border-border bg-card">
-              <div className="flex min-h-0 flex-1 min-w-0 flex-col overflow-hidden">
-                <div className={`min-w-0 shrink-0 ${TABLE_SCROLL_GUTTER}`}>
-                  <Table
-                    className="w-full table-fixed border-separate border-spacing-0"
-                    containerClassName="overflow-visible"
+              <div
+                ref={showTableBody ? scrollerRefCallback : undefined}
+                className={
+                  showTableBody
+                    ? `menu-scrollbar min-h-0 flex-1 overflow-x-hidden ${TABLE_SCROLL_GUTTER}`
+                    : "min-w-0 shrink-0"
+                }
+              >
+                <Table
+                  className="w-full table-fixed border-separate border-spacing-0"
+                  containerClassName="overflow-visible"
+                >
+                  {INVENTORY_TABLE_COLGROUP}
+                  <TableHeader
+                    className={
+                      showTableBody
+                        ? "sticky top-0 z-10 bg-table-header [&_tr]:border-b-0"
+                        : "[&_tr]:border-b-0"
+                    }
                   >
-                    {INVENTORY_TABLE_COLGROUP}
-                    <TableHeader className="[&_tr]:border-b-0">
-                      <TableRow className="border-b-0 border-border hover:bg-transparent [&:hover]:bg-transparent">
-                        <TableHead
-                          colSpan={7}
-                          className="h-auto w-full max-w-0 border-b-0 bg-table-header px-3 py-0 text-left align-middle font-medium text-muted-foreground shadow-[inset_0_-1px_0_0_var(--border)] [&:has([role=checkbox])]:pr-0"
-                        >
-                          <TrackerFilterBar
-                            selectors={selectors}
-                            value={filters}
-                            onChange={onFiltersChange}
-                            pinnedHashes={pinnedHashes}
-                            onTogglePin={togglePin}
-                            resultCount={filteredRows.length}
-                            resultNoun={{
-                              singular: "piece",
-                              plural: "pieces",
-                            }}
-                            showRarityFilter
-                            savedViews={savedViews}
-                          />
-                        </TableHead>
-                      </TableRow>
-                      <TableRow className="border-b-0 border-border hover:bg-transparent [&:hover]:bg-transparent">
-                        <TableHead
-                          className="w-px border-b border-border bg-table-header pe-2 text-table-header-foreground"
-                          aria-label="Icon"
+                    <TableRow className="border-b-0 border-border hover:bg-transparent [&:hover]:bg-transparent">
+                      <TableHead
+                        colSpan={7}
+                        className="h-auto w-full max-w-0 border-b-0 bg-table-header px-3 py-0 text-left align-middle font-medium text-muted-foreground shadow-[inset_0_-1px_0_0_var(--border)] [&:has([role=checkbox])]:pr-0"
+                      >
+                        <TrackerFilterBar
+                          selectors={selectors}
+                          value={filters}
+                          onChange={onFiltersChange}
+                          pinnedHashes={pinnedHashes}
+                          onTogglePin={togglePin}
+                          resultCount={filteredRows.length}
+                          resultNoun={{
+                            singular: "piece",
+                            plural: "pieces",
+                          }}
+                          showRarityFilter
+                          savedViews={savedViews}
                         />
-                        <TableHead className="border-b border-border bg-table-header text-table-header-foreground">
-                          Name
-                        </TableHead>
-                        <TableHead className="border-b border-border bg-table-header text-table-header-foreground">
-                          Archetype
-                        </TableHead>
-                        <TableHead className="border-b border-border bg-table-header text-table-header-foreground">
-                          Tertiary
-                        </TableHead>
-                        <TableHead className="border-b border-border bg-table-header text-table-header-foreground">
-                          Tuning
-                        </TableHead>
-                        <TableHead className="border-b border-border bg-table-header text-table-header-foreground">
-                          Location
-                        </TableHead>
-                        <TableHead className="border-b border-border bg-table-header text-table-header-foreground">
-                          Actions
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                  </Table>
-                </div>
-                {showTableBody ? (
-                  <div
-                    ref={scrollerRefCallback}
-                    className={`menu-scrollbar min-h-0 flex-1 overflow-x-hidden ${TABLE_SCROLL_GUTTER}`}
-                  >
-                    <Table
-                      className="w-full table-fixed border-separate border-spacing-0"
-                      containerClassName="overflow-visible"
-                    >
-                      {INVENTORY_TABLE_COLGROUP}
-                      <TableBody>
-                        {filteredRows.length === 0 ? (
-                          <TableRow className="border-b-0 border-border hover:bg-transparent shadow-[inset_0_-1px_0_0_var(--border)]">
-                            <TableCell
-                              colSpan={7}
-                              className="py-8 text-center text-sm text-muted-foreground/80"
-                            >
-                              No armor matches these filters.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          <>
-                            {paddingTop > 0 ? (
-                              <tr aria-hidden>
-                                <td colSpan={7} style={{ height: paddingTop }} />
-                              </tr>
-                            ) : null}
-                            {virtualRows.map((vRow) => {
-                              const piece = filteredRows[vRow.index];
-                              return (
-                                <TableRow
-                                  key={piece.itemInstanceId}
-                                  data-index={vRow.index}
-                                  ref={rowVirtualizer.measureElement}
-                                  className="border-b-0 shadow-[inset_0_-1px_0_0_var(--border)] hover:bg-accent/60"
-                                >
-                                  <TableCell className="w-px whitespace-nowrap py-1 pe-2 align-middle">
-                                    {piece.iconPath ? (
-                                      <span className="inline-flex rounded-none border border-border bg-accent leading-none">
-                                        {/* eslint-disable-next-line @next/next/no-img-element -- Bungie CDN thumbnails; avoid bloating the bundle with next/image remotePatterns. */}
-                                        <img
-                                          src={bungieIconUrl(piece.iconPath)}
-                                          alt={`${SLOT_LABELS[piece.slot]} — ${inventoryPieceDisplayName(piece) ?? "armor"}`}
-                                          className="block h-auto max-h-7 max-w-9 w-auto"
-                                          loading="lazy"
-                                        />
-                                      </span>
-                                    ) : (
-                                      <div
-                                        role="img"
-                                        aria-label={`${SLOT_LABELS[piece.slot]} — no artwork`}
-                                        className="inline-block size-7 rounded-none border border-border bg-accent/60"
+                      </TableHead>
+                    </TableRow>
+                    <TableRow className="border-b-0 border-border hover:bg-transparent [&:hover]:bg-transparent">
+                      <TableHead
+                        className="w-px border-b border-border bg-table-header px-3 pe-2 text-table-header-foreground"
+                        aria-label="Icon"
+                      />
+                      <TableHead className="border-b border-border bg-table-header px-3 text-table-header-foreground">
+                        Name
+                      </TableHead>
+                      <TableHead className="border-b border-border bg-table-header px-3 text-table-header-foreground">
+                        Archetype
+                      </TableHead>
+                      <TableHead className="border-b border-border bg-table-header px-3 text-table-header-foreground">
+                        Tertiary
+                      </TableHead>
+                      <TableHead className="border-b border-border bg-table-header px-3 text-table-header-foreground">
+                        Tuning
+                      </TableHead>
+                      <TableHead className="border-b border-border bg-table-header px-3 text-table-header-foreground">
+                        Location
+                      </TableHead>
+                      <TableHead className="border-b border-border bg-table-header px-3 pe-2 text-table-header-foreground">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  {showTableBody ? (
+                    <TableBody>
+                      {filteredRows.length === 0 ? (
+                        <TableRow className="border-b-0 border-border hover:bg-transparent shadow-[inset_0_-1px_0_0_var(--border)]">
+                          <TableCell
+                            colSpan={7}
+                            className="py-8 text-center text-sm text-muted-foreground/80"
+                          >
+                            No armor matches these filters.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        <>
+                          {paddingTop > 0 ? (
+                            <tr aria-hidden>
+                              <td colSpan={7} style={{ height: paddingTop }} />
+                            </tr>
+                          ) : null}
+                          {virtualRows.map((vRow) => {
+                            const piece = filteredRows[vRow.index];
+                            return (
+                              <TableRow
+                                key={piece.itemInstanceId}
+                                data-index={vRow.index}
+                                ref={rowVirtualizer.measureElement}
+                                className="border-b-0 shadow-[inset_0_-1px_0_0_var(--border)] hover:bg-accent/60"
+                              >
+                                <TableCell className="w-px whitespace-nowrap py-2 pe-2 align-middle">
+                                  {piece.iconPath ? (
+                                    <span className="inline-flex rounded-none border border-border bg-accent leading-none">
+                                      {/* eslint-disable-next-line @next/next/no-img-element -- Bungie CDN thumbnails; avoid bloating the bundle with next/image remotePatterns. */}
+                                      <img
+                                        src={bungieIconUrl(piece.iconPath)}
+                                        alt={`${SLOT_LABELS[piece.slot]} — ${inventoryPieceDisplayName(piece) ?? "armor"}`}
+                                        className="block size-8 object-contain"
+                                        loading="lazy"
                                       />
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="py-1.5 text-foreground/90">
-                                    {inventoryPieceDisplayName(piece) ?? "—"}
-                                  </TableCell>
-                                  <TableCell className="py-1.5 text-foreground/90">
-                                    {piece.archetypeName ?? "—"}
-                                  </TableCell>
-                                  <TableCell className="py-1.5 text-foreground/80">
-                                    {piece.tertiaryStat ?? "—"}
-                                  </TableCell>
-                                  <TableCell className="py-1.5 text-foreground/90">
-                                    {piece.tuningName ?? "—"}
-                                  </TableCell>
-                                  <TableCell className="py-1.5 text-muted-foreground">
-                                    {formatLocation(piece)}
-                                  </TableCell>
-                                  <TableCell className="py-1.5 pe-2 align-middle">
-                                    <InventoryItemActions
-                                      piece={piece}
-                                      targetClass={filters.class}
+                                    </span>
+                                  ) : (
+                                    <div
+                                      role="img"
+                                      aria-label={`${SLOT_LABELS[piece.slot]} — no artwork`}
+                                      className="inline-block size-8 rounded-none border border-border bg-accent/60"
                                     />
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                            {paddingBottom > 0 ? (
-                              <tr aria-hidden>
-                                <td
-                                  colSpan={7}
-                                  style={{ height: paddingBottom }}
-                                />
-                              </tr>
-                            ) : null}
-                          </>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                ) : emptyState ? (
-                  <WorkspaceSyncGatePanel
-                    state={emptyState}
-                    onRetry={retrySync}
-                  />
-                ) : null}
+                                  )}
+                                </TableCell>
+                                <TableCell className="py-2 text-foreground/90">
+                                  {inventoryPieceDisplayName(piece) ?? "—"}
+                                </TableCell>
+                                <TableCell className="py-2 text-foreground/90">
+                                  {piece.archetypeName ?? "—"}
+                                </TableCell>
+                                <TableCell className="py-2 text-foreground/80">
+                                  {piece.tertiaryStat ?? "—"}
+                                </TableCell>
+                                <TableCell className="py-2 text-foreground/90">
+                                  {piece.tuningName ?? "—"}
+                                </TableCell>
+                                <TableCell className="py-2 text-muted-foreground">
+                                  {formatLocation(piece)}
+                                </TableCell>
+                                <TableCell className="py-2 pe-2 align-middle">
+                                  <InventoryItemActions
+                                    piece={piece}
+                                    targetClass={filters.class}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                          {paddingBottom > 0 ? (
+                            <tr aria-hidden>
+                              <td
+                                colSpan={7}
+                                style={{ height: paddingBottom }}
+                              />
+                            </tr>
+                          ) : null}
+                        </>
+                      )}
+                    </TableBody>
+                  ) : null}
+                </Table>
               </div>
+              {!showTableBody && emptyState ? (
+                <WorkspaceSyncGatePanel
+                  state={emptyState}
+                  onRetry={retrySync}
+                />
+              ) : null}
             </div>
           )}
         </div>
