@@ -6,6 +6,11 @@ import {
   MOCK_GRID_FILTERS_EMPTY,
   MOCK_GRID_FILTERS_POPULATED,
 } from "../../../.storybook/mocks/grid-filters";
+import {
+  MOCK_SAVED_FILTER_VIEW_OWNED,
+  MOCK_SAVED_FILTER_VIEW_SHARED,
+} from "../../../.storybook/mocks/saved-filter-views";
+import type { SavedViewsBarProps } from "./saved-views-menu";
 import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
 
 const meta: Meta<typeof TrackerFilterBar> = {
@@ -21,14 +26,30 @@ function Render({
   initial,
   showTertiaryStatFilter = true,
   showRarityFilter = false,
+  withSavedViews = true,
   width = 960,
 }: {
   initial: GridFiltersJson;
   showTertiaryStatFilter?: boolean;
   showRarityFilter?: boolean;
+  withSavedViews?: boolean;
   width?: number;
 }) {
   const [value, setValue] = useState<GridFiltersJson>(initial);
+  const [views, setViews] = useState([
+    MOCK_SAVED_FILTER_VIEW_OWNED,
+    MOCK_SAVED_FILTER_VIEW_SHARED,
+  ]);
+  const savedViews: SavedViewsBarProps | undefined = withSavedViews
+    ? {
+        views,
+        activeViewId: null,
+        filters: value,
+        onViewsChange: setViews,
+        onApply: () => {},
+        onClearActive: () => {},
+      }
+    : undefined;
   return (
     <div className="border border-border bg-card px-3" style={{ width }}>
       <TrackerFilterBar
@@ -41,6 +62,7 @@ function Render({
         resultNoun={{ singular: "tracker", plural: "trackers" }}
         showTertiaryStatFilter={showTertiaryStatFilter}
         showRarityFilter={showRarityFilter}
+        savedViews={savedViews}
       />
     </div>
   );

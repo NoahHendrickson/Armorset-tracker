@@ -52,7 +52,7 @@ export function ArmorSetsFilterDimension({
   inlineWrapperClass = "",
   stowedSubTriggerClass = "",
 }: ArmorSetsFilterDimensionProps) {
-  const label = "Sets";
+  const label = "Armor Sets";
   const panel = (
     <ArmorSetMultiSelectPanel
       key={classKey}
@@ -102,7 +102,7 @@ export function ArmorSetsFilterDimension({
   return (
     <DropdownMenuSub>
       <FilterDimensionSubTrigger
-        label="Armor sets"
+        label="Armor Sets"
         selectionCount={values.length}
         className={stowedSubTriggerClass}
       />
