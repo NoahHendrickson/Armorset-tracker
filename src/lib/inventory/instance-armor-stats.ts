@@ -1,3 +1,4 @@
+import { buildDestinyStatHashToArmorStat } from "@/lib/inventory/armor-stat-destiny-hashes";
 import type { ProfileResponse } from "@/lib/bungie/types";
 import type { ArmorStatName } from "@/lib/db/types";
 
@@ -10,9 +11,14 @@ export function instanceArmorStatTotals(
   const block = profile.itemComponents?.stats?.data?.[itemInstanceId]?.stats;
   if (!block) return null;
 
+  const hashToStat =
+    destinyStatHashToArmorStat.size > 0
+      ? destinyStatHashToArmorStat
+      : buildDestinyStatHashToArmorStat();
+
   const totals: Partial<Record<ArmorStatName, number>> = {};
   for (const entry of Object.values(block)) {
-    const stat = destinyStatHashToArmorStat.get(entry.statHash);
+    const stat = hashToStat.get(entry.statHash);
     if (!stat) continue;
     totals[stat] = entry.value;
   }

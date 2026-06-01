@@ -9,7 +9,9 @@ export type StatDelta = { stat: ArmorStatName; value: number };
 
 /** Tier-5 intrinsic plug magnitudes (primary / secondary / tertiary). */
 const INTRINSIC_STAT_MAGNITUDES = [30, 25, 20] as const;
-const DEFAULT_TUNING_MAGNITUDE = 10;
+/** Armor 3.0 +5/−5 tuning mod when manifest rows are unavailable. */
+export const TUNING_PLUG_STAT_MAGNITUDE = 5;
+const DEFAULT_TUNING_MAGNITUDE = TUNING_PLUG_STAT_MAGNITUDE;
 
 /** Sum intrinsic armor_stats plugs plus optional tuning deltas. */
 export function buildStatTotals(
@@ -45,7 +47,7 @@ export function parseTuningPairFromName(
 /** Fallback when manifest rows are missing — assumes symmetric +/- magnitudes. */
 export function tuningDeltasFromDisplayName(
   name: string,
-  magnitude = 10,
+  magnitude = TUNING_PLUG_STAT_MAGNITUDE,
 ): StatDelta[] | null {
   const pair = parseTuningPairFromName(name);
   if (!pair) return null;

@@ -4,6 +4,7 @@ import type { ArmorSlot } from "@/lib/bungie/constants";
 import { SLOT_ORDER } from "@/lib/bungie/constants";
 import { getServiceRoleClient } from "@/lib/db/server";
 import type { ArmorStatName } from "@/lib/db/types";
+import { buildDestinyStatHashToArmorStat } from "@/lib/inventory/armor-stat-destiny-hashes";
 import { mergeExoticStatTotals } from "@/lib/manifest/exotic-stat-budget";
 import { exoticPieceIdentityKey } from "@/lib/optimizer/exotic-lock";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -597,7 +598,7 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
         })
         .filter((e): e is readonly [ArmorStatName, string] => e !== null),
     ),
-    destinyStatHashToArmorStat: new Map(
+    destinyStatHashToArmorStat: buildDestinyStatHashToArmorStat(
       armorStatIcons
         .map((r) => {
           const hash = r.destiny_stat_hash;

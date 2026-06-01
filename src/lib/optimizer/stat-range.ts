@@ -5,6 +5,9 @@ export const OPTIMIZER_STAT_MAX = 200;
 /** Tier milestone ticks on the 0–200 stat track (D2ArmorPicker-style). */
 export const OPTIMIZER_STAT_TIER_MARKS = [50, 100, 150, 200] as const;
 
+/** Clickable min-target presets on the stat slider track. */
+export const OPTIMIZER_STAT_SEGMENTS = [0, 50, 100, 200] as const;
+
 export function clampOptimizerStat(value: number): number {
   return Math.round(
     Math.min(OPTIMIZER_STAT_MAX, Math.max(OPTIMIZER_STAT_MIN, value)),

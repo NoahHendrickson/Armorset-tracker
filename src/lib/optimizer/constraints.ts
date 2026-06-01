@@ -4,6 +4,12 @@ import {
   type DerivedArmorPieceJson,
 } from "@/lib/db/types";
 import { getPieceStatValue } from "@/lib/inventory/compute-stat-totals";
+import {
+  ARTIFICE_ARMOR_STAT_MOD,
+  MAJOR_ARMOR_STAT_MOD,
+  totalAssumedModBudget,
+  type AssumedStatMods,
+} from "@/lib/optimizer/mod-offset";
 import type { StatConstraintRow } from "@/lib/optimizer/types";
 import { OPTIMIZER_STAT_MAX, OPTIMIZER_STAT_MIN } from "@/lib/optimizer/stat-range";
 
@@ -15,11 +21,74 @@ export function defaultStatConstraints(): StatConstraintRow[] {
 }
 
 export function hasStatTargets(constraints: StatConstraintRow[]): boolean {
-  return constraints.some((row) => row.min > OPTIMIZER_STAT_MIN);
+  return constraints.some(isActiveStatConstraint);
 }
 
-function isActiveConstraint(row: StatConstraintRow): boolean {
+export function statConstraintsEqual(
+  a: StatConstraintRow[],
+  b: StatConstraintRow[],
+): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((row, i) => {
+    const other = b[i]!;
+    return row.stat === other.stat && row.min === other.min;
+  });
+}
+
+export function isActiveStatConstraint(row: StatConstraintRow): boolean {
   return row.min > OPTIMIZER_STAT_MIN;
+}
+
+/** Per-stat build total cap on the 0–200 track (+ one major mod overshoot). */
+export function maxAllowedStatTotal(): number {
+  return OPTIMIZER_STAT_MAX + MAJOR_ARMOR_STAT_MOD;
+}
+
+/** Upper bound for an active target — tight at 200, looser on lower mins. */
+export function maxAllowedStatTotalForRow(row: StatConstraintRow): number {
+  if (!isActiveStatConstraint(row)) {
+    return Number.POSITIVE_INFINITY;
+  }
+  if (row.min >= OPTIMIZER_STAT_MAX) {
+    return OPTIMIZER_STAT_MAX + MAJOR_ARMOR_STAT_MOD;
+  }
+  // Still reject corrupted/impossible totals (see satisfiesConstraints test).
+  return OPTIMIZER_STAT_MAX + MAJOR_ARMOR_STAT_MOD * 5;
+}
+
+/** Active minimum targets on stats other than `exceptStat` (for slider achievable bands). */
+export function satisfiesOtherStatConstraints(
+  totals: Record<ArmorStatName, number>,
+  constraints: StatConstraintRow[],
+  exceptStat: ArmorStatName,
+): boolean {
+  for (const stat of ARMOR_STAT_NAMES) {
+    if (displayedStatTotal(totals[stat] ?? 0) < OPTIMIZER_STAT_MIN) {
+      return false;
+    }
+  }
+  for (const row of constraints) {
+    if (row.stat === exceptStat) continue;
+    if (!isActiveStatConstraint(row)) continue;
+    const value = totals[row.stat] ?? 0;
+    if (value < row.min) return false;
+    if (value > maxAllowedStatTotalForRow(row)) return false;
+  }
+  return true;
+}
+
+export function otherActiveStatConstraints(
+  constraints: StatConstraintRow[],
+  exceptStat: ArmorStatName,
+): StatConstraintRow[] {
+  return constraints.filter(
+    (row) => row.stat !== exceptStat && isActiveStatConstraint(row),
+  );
+}
+
+/** In-game armor stats floor at 0 (tuning debuffs on unused stats may sum below zero). */
+export function displayedStatTotal(value: number): number {
+  return Math.max(OPTIMIZER_STAT_MIN, value);
 }
 
 export function totalsFromPieces(
@@ -41,13 +110,16 @@ export function satisfiesConstraints(
   constraints: StatConstraintRow[],
 ): boolean {
   for (const stat of ARMOR_STAT_NAMES) {
-    const value = totals[stat] ?? 0;
-    if (value < OPTIMIZER_STAT_MIN) return false;
+    if (displayedStatTotal(totals[stat] ?? 0) < OPTIMIZER_STAT_MIN) {
+      return false;
+    }
   }
   for (const row of constraints) {
-    if (!isActiveConstraint(row)) continue;
+    if (!isActiveStatConstraint(row)) continue;
     const value = totals[row.stat] ?? 0;
-    if (value < row.min || value > OPTIMIZER_STAT_MAX) return false;
+    if (value < row.min) return false;
+    // Targets top out at 200, but a single +10 assumed mod can land slightly above.
+    if (value > maxAllowedStatTotalForRow(row)) return false;
   }
   return true;
 }
@@ -60,7 +132,7 @@ export function scoreSolution(
   let score = 0;
   for (let i = 0; i < constraints.length; i++) {
     const row = constraints[i]!;
-    if (!isActiveConstraint(row)) continue;
+    if (!isActiveStatConstraint(row)) continue;
     const value = totals[row.stat] ?? 0;
     const waste = Math.max(0, value - row.min);
     score += waste * Math.pow(10, constraints.length - i);
@@ -73,13 +145,31 @@ export function partialCanReachMins(
   remainingSlots: number,
   perSlotMax: Record<ArmorStatName, number>,
   constraints: StatConstraintRow[],
+  assumedMods?: AssumedStatMods,
 ): boolean {
-  for (const row of constraints) {
-    if (!isActiveConstraint(row)) continue;
-    const maxPossible =
+  const activeRows = constraints.filter(isActiveStatConstraint);
+  if (activeRows.length === 0) {
+    return true;
+  }
+
+  let modBudget = 0;
+  if (assumedMods) {
+    modBudget = totalAssumedModBudget(assumedMods).total;
+    if (assumedMods.artifice !== false) {
+      modBudget += ARTIFICE_ARMOR_STAT_MOD;
+    }
+  }
+
+  let modDeficitSum = 0;
+  for (const row of activeRows) {
+    const armorCeiling =
       (partialTotals[row.stat] ?? 0) +
       remainingSlots * (perSlotMax[row.stat] ?? 0);
-    if (maxPossible < row.min) return false;
+    if (armorCeiling + modBudget < row.min) {
+      return false;
+    }
+    modDeficitSum += Math.max(0, row.min - armorCeiling);
   }
-  return true;
+
+  return modDeficitSum <= modBudget;
 }

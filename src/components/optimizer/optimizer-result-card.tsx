@@ -1,12 +1,80 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { ArmorStatIcon } from "@/components/ui/armor-stat-icon";
 import { ARMOR_STAT_NAMES, type ArmorStatName } from "@/lib/db/types";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
-import { SLOT_LABELS, SLOT_ORDER, bungieIconUrl } from "@/lib/bungie/constants";
+import { SLOT_ORDER, bungieIconUrl } from "@/lib/bungie/constants";
 import { inventoryPieceDisplayName } from "@/lib/filters/filter-inventory";
 import type { OptimizerSolution } from "@/lib/optimizer/types";
+import { tuningPositiveArmorStat } from "@/lib/views/tuning-positive-stat";
 import { cn } from "@/lib/utils";
+
+function pieceRollStats(
+  piece: DerivedArmorPieceJson,
+  statIconByName: Partial<Record<ArmorStatName, string>>,
+): ReactNode {
+  const tuningPositive = piece.tuningName
+    ? tuningPositiveArmorStat(piece.tuningName)
+    : null;
+  const tuningTitle =
+    piece.tuningHash === null
+      ? "Tuning unknown"
+      : `${piece.tuningName ?? "Tuning unknown"}${
+          piece.tuningCommitted === false ? " (uncommitted)" : ""
+        }`;
+
+  return (
+    <div className="flex shrink-0 items-center gap-2.5 text-[10px]">
+      <span
+        className="w-[4.5rem] truncate font-medium text-muted-foreground"
+        title={`Archetype: ${piece.archetypeName ?? "unknown"}`}
+      >
+        {piece.archetypeName ?? "—"}
+      </span>
+      <span
+        className="inline-flex w-[4.25rem] items-center gap-0.5"
+        title={`Tertiary: ${piece.tertiaryStat ?? "unknown"}`}
+      >
+        {piece.tertiaryStat ? (
+          <>
+            <ArmorStatIcon
+              stat={piece.tertiaryStat}
+              iconPath={statIconByName[piece.tertiaryStat]}
+              size="sm"
+            />
+            <span className="truncate font-medium text-foreground">
+              {piece.tertiaryStat}
+            </span>
+          </>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </span>
+      <span
+        className="inline-flex max-w-[5.5rem] items-center gap-0.5"
+        title={tuningTitle}
+      >
+        {tuningPositive ? (
+          <>
+            <ArmorStatIcon
+              stat={tuningPositive}
+              iconPath={statIconByName[tuningPositive]}
+              size="sm"
+            />
+            <span className="truncate font-medium text-foreground">
+              +{tuningPositive}
+            </span>
+          </>
+        ) : (
+          <span className="truncate text-muted-foreground">
+            {piece.tuningName ?? "—"}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
 
 function pieceLocationLabel(piece: DerivedArmorPieceJson): string {
   if (piece.location.kind === "vault") return "Vault";
@@ -87,20 +155,22 @@ export function OptimizerResultCard({
               {piece?.iconPath ? (
                 <img
                   src={bungieIconUrl(piece.iconPath)}
-                  alt=""
+                  alt={
+                    piece
+                      ? (inventoryPieceDisplayName(piece) ?? "Armor piece")
+                      : ""
+                  }
                   className="size-8 shrink-0 rounded-none border border-border object-cover"
                 />
               ) : (
                 <span className="size-8 shrink-0 rounded-none border border-border bg-muted" />
               )}
-              <span className="w-12 shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                {SLOT_LABELS[slot]}
-              </span>
               <span className="min-w-0 flex-1 truncate text-foreground">
                 {piece
                   ? (inventoryPieceDisplayName(piece) ?? "Unknown piece")
                   : "Unknown piece"}
               </span>
+              {piece ? pieceRollStats(piece, statIconByName) : null}
               {swaps > 0 ? (
                 <span
                   className="shrink-0 text-[10px] text-muted-foreground"

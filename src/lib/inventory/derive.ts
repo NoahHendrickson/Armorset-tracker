@@ -241,8 +241,7 @@ export function deriveArmorPiece(
 
   if (
     isExotic &&
-    Object.keys(statTotals).length === 0 &&
-    lookups.destinyStatHashToArmorStat.size > 0
+    Object.keys(statTotals).length === 0
   ) {
     const fromInstance = instanceArmorStatTotals(
       item.itemInstanceId,

@@ -39,6 +39,17 @@ export function partialCanSatisfySetBonuses(
 ): boolean {
   if (selections.length === 0) return true;
   const counts = countPiecesBySetHash(chosen);
+  let totalNeed = 0;
+  for (const sel of selections) {
+    const have = counts.get(sel.setHash) ?? 0;
+    const need = sel.requiredCount - have;
+    if (need > 0) {
+      totalNeed += need;
+    }
+  }
+  if (totalNeed > remainingSlots.length) {
+    return false;
+  }
   for (const sel of selections) {
     const have = counts.get(sel.setHash) ?? 0;
     const need = sel.requiredCount - have;

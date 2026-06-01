@@ -1,16 +1,32 @@
 "use client";
 
-import { useCallback, useId } from "react";
+import { Check } from "@phosphor-icons/react/dist/ssr";
+import { useCallback, useId, type CSSProperties } from "react";
 import { ArmorStatIcon } from "@/components/ui/armor-stat-icon";
+import {
+  checkboxBoxClassName,
+  checkboxIconClassName,
+} from "@/components/ui/checkbox";
 import type { ArmorStatName } from "@/lib/db/types";
 import {
   clampOptimizerStat,
   OPTIMIZER_STAT_MAX,
   OPTIMIZER_STAT_MIN,
-  OPTIMIZER_STAT_TIER_MARKS,
+  OPTIMIZER_STAT_SEGMENTS,
   pctOnOptimizerTrack,
 } from "@/lib/optimizer/stat-range";
 import { cn } from "@/lib/utils";
+
+function segmentPositionStyle(value: number): CSSProperties {
+  const pct = pctOnOptimizerTrack(value);
+  if (value <= OPTIMIZER_STAT_MIN) {
+    return { left: `${pct}%`, transform: "translateY(-50%)" };
+  }
+  if (value >= OPTIMIZER_STAT_MAX) {
+    return { left: `${pct}%`, transform: "translate(-100%, -50%)" };
+  }
+  return { left: `${pct}%`, transform: "translate(-50%, -50%)" };
+}
 
 export type StatRangeSliderProps = {
   stat: ArmorStatName;
@@ -46,11 +62,29 @@ export function StatRangeSlider({
     onChange(clampOptimizerStat(achievableMax));
   };
 
-  const achLeft = pctOnOptimizerTrack(achievableMin);
-  const achWidth = Math.max(
-    0,
-    pctOnOptimizerTrack(achievableMax) - achLeft,
+  const handleSegmentClick = useCallback(
+    (segment: (typeof OPTIMIZER_STAT_SEGMENTS)[number]) => {
+      if (safeMin === segment) {
+        if (segment > OPTIMIZER_STAT_MIN) {
+          setMin(OPTIMIZER_STAT_MIN);
+        }
+        return;
+      }
+      setMin(segment);
+    },
+    [safeMin, setMin],
   );
+
+  const bandMin = Math.max(OPTIMIZER_STAT_MIN, achievableMin);
+  const bandMax = Math.max(bandMin, achievableMax);
+  let achLeft = pctOnOptimizerTrack(bandMin);
+  let achWidth = Math.max(0, pctOnOptimizerTrack(bandMax) - achLeft);
+  /** Minimum visible band so a point range (min === max) still reads on the track. */
+  const MIN_BAND_PCT = 3;
+  if (achWidth < MIN_BAND_PCT && bandMax > OPTIMIZER_STAT_MIN) {
+    achWidth = MIN_BAND_PCT;
+    achLeft = Math.min(achLeft, 100 - MIN_BAND_PCT);
+  }
   const selWidth = pctOnOptimizerTrack(safeMin);
 
   return (
@@ -101,29 +135,57 @@ export function StatRangeSlider({
         >
           <div className="absolute top-1/2 right-0 left-0 h-2 -translate-y-1/2 rounded-full bg-muted" />
 
-          {OPTIMIZER_STAT_TIER_MARKS.map((tier) => (
-            <span
-              key={tier}
-              className="pointer-events-none absolute top-1/2 z-10 h-3 w-px -translate-x-1/2 -translate-y-1/2 bg-border"
-              style={{ left: `${pctOnOptimizerTrack(tier)}%` }}
-              aria-hidden
-            />
-          ))}
-
           <div
-            className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-muted-foreground/35"
+            className="absolute top-1/2 z-[8] h-2 -translate-y-1/2 rounded-full bg-muted-foreground/35"
             style={{ left: `${achLeft}%`, width: `${achWidth}%` }}
-            title={`Achievable ${achievableMin}–${achievableMax} — double-click to set min to ${achievableMax}`}
+            title={`Achievable ${bandMin}–${bandMax} — double-click to set min to ${bandMax}`}
             onDoubleClick={handleAchievableDoubleClick}
           />
 
           {safeMin > OPTIMIZER_STAT_MIN ? (
             <div
-              className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-primary/55"
+              className="absolute top-1/2 z-[5] h-2 -translate-y-1/2 rounded-full bg-primary/55"
               style={{ left: "0%", width: `${selWidth}%` }}
               aria-hidden
             />
           ) : null}
+
+          {OPTIMIZER_STAT_SEGMENTS.map((segment) => {
+            const checked = safeMin === segment;
+            return (
+              <button
+                key={segment}
+                type="button"
+                role="checkbox"
+                aria-checked={checked}
+                aria-label={
+                  segment === OPTIMIZER_STAT_MIN
+                    ? `${stat} minimum none`
+                    : `${stat} minimum ${segment}`
+                }
+                className={cn(
+                  checkboxBoxClassName,
+                  "absolute top-1/2 z-[15] cursor-pointer",
+                  compact ? "size-3" : "size-4",
+                  checked
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/70 bg-background text-transparent hover:border-foreground/50",
+                )}
+                style={segmentPositionStyle(segment)}
+                onClick={() => handleSegmentClick(segment)}
+              >
+                {checked ? (
+                  <Check
+                    weight="bold"
+                    className={cn(
+                      checkboxIconClassName,
+                      compact ? "h-2 w-2" : undefined,
+                    )}
+                  />
+                ) : null}
+              </button>
+            );
+          })}
 
           <input
             type="range"

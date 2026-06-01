@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  startTransition,
+  type ReactNode,
+} from "react";
+import { Info } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AssumedStatModsPanel } from "@/components/optimizer/assumed-stat-mods-panel";
 import { ExoticArmorPicker } from "@/components/optimizer/exotic-armor-picker";
 import { OptimizerResultCard } from "@/components/optimizer/optimizer-result-card";
 import { OptimizerSettingsSection } from "@/components/optimizer/optimizer-settings-section";
@@ -10,15 +18,25 @@ import { SetBonusPicker } from "@/components/optimizer/set-bonus-picker";
 import { StatRangeSlider } from "@/components/optimizer/stat-range-slider";
 import { SubclassFragmentPanel } from "@/components/optimizer/subclass-fragment-panel";
 import type { GridLookupPayload } from "@/lib/views/grid-lookup-payload";
-import { CLASS_NAMES, SLOT_ORDER } from "@/lib/bungie/constants";
+import { SLOT_ORDER } from "@/lib/bungie/constants";
 import { ARMOR_STAT_NAMES, type ArmorStatName } from "@/lib/db/types";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
-import { ClassGlyph } from "@/components/ui/class-glyph";
-import { cn } from "@/lib/utils";
-import { computeStatBounds } from "@/lib/optimizer/bounds";
+import { ClassSwitcher } from "@/components/workspace/class-switcher";
+import {
+  computeStatBounds,
+  estimateOptimizerComboCount,
+  SEARCH_AUTO_RUN_COMBO_LIMIT,
+} from "@/lib/optimizer/bounds";
+import {
+  estimateFilteredComboCount,
+} from "@/lib/optimizer/combo-count";
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
+import { useStatBoundsForSliders } from "@/lib/optimizer/use-stat-bounds-for-sliders";
+import { enrichPieceWithExoticBudget } from "@/lib/inventory/exotic-stat-fallback";
 import {
   defaultStatConstraints,
   hasStatTargets,
+  statConstraintsEqual,
 } from "@/lib/optimizer/constraints";
 import {
   DEFAULT_EXOTIC_LOCK,
@@ -26,9 +44,8 @@ import {
   uniqueOwnedExoticsForClass,
   type ExoticLock,
 } from "@/lib/optimizer/exotic-lock";
-import { computeFragmentStatOffset, addStatOffsets } from "@/lib/optimizer/fragment-offset";
+import { computeFragmentStatOffset } from "@/lib/optimizer/fragment-offset";
 import {
-  computeAssumedModStatOffset,
   DEFAULT_ASSUMED_STAT_MODS,
   type AssumedStatMods,
 } from "@/lib/optimizer/mod-offset";
@@ -49,15 +66,15 @@ import { WorkspaceSyncGatePanel } from "@/components/dashboard/workspace-sync-ga
 import { useWorkspaceSync } from "@/components/dashboard/workspace-sync-status";
 import { inventoryTableEmptyState } from "@/lib/workspace/workspace-data-health.shared";
 
-const OPTIMIZER_CLASS_OPTIONS: Array<{ value: GridFilterClass; label: string }> =
-  [
-    { value: 0, label: CLASS_NAMES[0] ?? "Titan" },
-    { value: 1, label: CLASS_NAMES[1] ?? "Hunter" },
-    { value: 2, label: CLASS_NAMES[2] ?? "Warlock" },
-  ];
-
 /** Subclass fragment slots are aspect-gated; current sandbox tops out at 5. */
 const MAX_FRAGMENTS = 5;
+
+function formatSearchComboCount(count: number, capped: boolean): string {
+  if (capped) {
+    return `${SEARCH_AUTO_RUN_COMBO_LIMIT.toLocaleString()}+`;
+  }
+  return count.toLocaleString();
+}
 
 export interface LoadoutOptimizerViewProps {
   className?: string;
@@ -94,9 +111,15 @@ export function LoadoutOptimizerView({
 
   // Optimizer state is independent from the Table/Tracker tabs — changing class
   // here doesn't mutate the shared workspace filters.
-  const [classType, setClassType] = useState<number>(filters.class);
+  const [classType, setClassType] = useState<GridFilterClass>(filters.class);
   const [constraints, setConstraints] = useState<StatConstraintRow[]>(
     defaultStatConstraints,
+  );
+  /** Debounced so dragging stat sliders does not restart vault search every tick. */
+  const searchConstraints = useDebouncedValue(constraints, 400);
+  const targetsPending = useMemo(
+    () => !statConstraintsEqual(constraints, searchConstraints),
+    [constraints, searchConstraints],
   );
   const [exoticLock, setExoticLock] = useState<ExoticLock>(DEFAULT_EXOTIC_LOCK);
   const [subclassState, setSubclassState] = useState<{
@@ -135,32 +158,35 @@ export function LoadoutOptimizerView({
       ),
     [selectedFragmentHashes, optimizerLookup, classType],
   );
-  const activeTargetStats = useMemo(
+  const statOffset = fragmentStatOffset;
+  const inventoryWithExoticBudget = useMemo(
     () =>
-      constraints
-        .filter((row) => row.min > 0)
-        .map((row) => row.stat),
-    [constraints],
-  );
-  const modStatOffset = useMemo(
-    () => computeAssumedModStatOffset(assumedStatMods, 5, activeTargetStats),
-    [assumedStatMods, activeTargetStats],
-  );
-  const statOffset = useMemo(
-    () => addStatOffsets(fragmentStatOffset, modStatOffset),
-    [fragmentStatOffset, modStatOffset],
+      optimizerLookup.exoticStatBudget
+        ? inventory.map((piece) =>
+            enrichPieceWithExoticBudget(
+              piece,
+              optimizerLookup.exoticStatBudget!,
+            ),
+          )
+        : inventory,
+    [inventory, optimizerLookup.exoticStatBudget],
   );
   const eligiblePieces = useMemo(
-    () => optimizerEligiblePieces(inventory, classType),
-    [inventory, classType],
+    () => optimizerEligiblePieces(inventoryWithExoticBudget, classType),
+    [inventoryWithExoticBudget, classType],
   );
   const optimizerPool = useMemo(
     () =>
-      filterOptimizerPool(inventory, classType, {
+      filterOptimizerPool(inventoryWithExoticBudget, classType, {
         exoticLock,
         exoticStatBudget: optimizerLookup.exoticStatBudget,
       }),
-    [inventory, classType, exoticLock, optimizerLookup.exoticStatBudget],
+    [
+      inventoryWithExoticBudget,
+      classType,
+      exoticLock,
+      optimizerLookup.exoticStatBudget,
+    ],
   );
   const ownedExotics = useMemo(
     () => uniqueOwnedExoticsForClass(inventory, classType),
@@ -185,37 +211,124 @@ export function LoadoutOptimizerView({
     () => inventory.filter((p) => p.classType === classType).length,
     [inventory, classType],
   );
-  const bounds = useMemo(
-    () => computeStatBounds(optimizerPool, statOffset, exoticLock),
-    [optimizerPool, statOffset, exoticLock],
-  );
-  const boundsWithExotics = useMemo(
+  const bounds = useStatBoundsForSliders({
+    pool: optimizerPool,
+    statOffset,
+    assumedStatMods,
+    exoticLock,
+    constraints,
+    setBonusSelections: selectedSetBonuses,
+  });
+  const rawComboCount = useMemo(
     () =>
-      exoticLock.mode === "none" && ownedExotics.length > 0
-        ? computeStatBounds(
-            filterOptimizerPool(inventory, classType, {
-              exoticLock: { mode: "any" },
-              exoticStatBudget: optimizerLookup.exoticStatBudget,
-            }),
-            statOffset,
-            { mode: "any" },
-          )
-        : null,
-    [
-      exoticLock.mode,
-      ownedExotics.length,
-      inventory,
-      classType,
-      statOffset,
-      optimizerLookup.exoticStatBudget,
-    ],
+      optimizerPool.length > 0
+        ? estimateOptimizerComboCount(optimizerPool, exoticLock)
+        : 0,
+    [optimizerPool, exoticLock],
   );
-  const exoticBoundsHint = useMemo(() => {
-    if (boundsWithExotics == null) return null;
-    return ARMOR_STAT_NAMES.some(
-      (stat) => boundsWithExotics[stat].max > bounds[stat].max,
-    );
-  }, [bounds, boundsWithExotics]);
+  const filteredComboEstimate = useMemo(() => {
+    if (optimizerPool.length === 0) {
+      return { count: 0, capped: false };
+    }
+    return estimateFilteredComboCount(optimizerPool, exoticLock, {
+      constraints: searchConstraints,
+      setBonusSelections: selectedSetBonuses,
+      statOffset: fragmentStatOffset,
+      assumedMods: assumedStatMods,
+      cap: SEARCH_AUTO_RUN_COMBO_LIMIT + 1,
+    });
+  }, [
+    optimizerPool,
+    exoticLock,
+    searchConstraints,
+    selectedSetBonuses,
+    fragmentStatOffset,
+    assumedStatMods,
+  ]);
+  const hasSearchFilters =
+    hasStatTargets(searchConstraints) || selectedSetBonuses.length > 0;
+  const exoticAnyFeasible = useMemo(() => {
+    if (
+      exoticLock.mode !== "none" ||
+      optimizerPool.length === 0 ||
+      !hasSearchFilters
+    ) {
+      return false;
+    }
+    const { count } = estimateFilteredComboCount(optimizerPool, {
+      mode: "any",
+    }, {
+      constraints: searchConstraints,
+      setBonusSelections: selectedSetBonuses,
+      statOffset: fragmentStatOffset,
+      assumedMods: assumedStatMods,
+      cap: 1,
+    });
+    return count > 0;
+  }, [
+    exoticLock.mode,
+    optimizerPool,
+    hasSearchFilters,
+    searchConstraints,
+    selectedSetBonuses,
+    fragmentStatOffset,
+    assumedStatMods,
+  ]);
+  const searchComboCount = hasSearchFilters
+    ? filteredComboEstimate.count
+    : rawComboCount;
+  const searchComboCapped = hasSearchFilters && filteredComboEstimate.capped;
+  const searchTooLarge =
+    searchComboCapped || searchComboCount > SEARCH_AUTO_RUN_COMBO_LIMIT;
+  const [exoticBoundsHint, setExoticBoundsHint] = useState(false);
+  useEffect(() => {
+    if (exoticLock.mode !== "none" || ownedExotics.length === 0) {
+      setExoticBoundsHint(false);
+      return;
+    }
+    let cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      const poolAny = filterOptimizerPool(inventoryWithExoticBudget, classType, {
+        exoticLock: { mode: "any" },
+        exoticStatBudget: optimizerLookup.exoticStatBudget,
+      });
+      const withExotics = computeStatBounds(
+        poolAny,
+        statOffset,
+        { mode: "any" },
+        constraints,
+        assumedStatMods,
+      );
+      setExoticBoundsHint(
+        ARMOR_STAT_NAMES.some((stat) => withExotics[stat].max > bounds[stat].max),
+      );
+    };
+    const idleId =
+      typeof requestIdleCallback === "function"
+        ? requestIdleCallback(run, { timeout: 3000 })
+        : null;
+    const timeoutId = idleId == null ? window.setTimeout(run, 50) : null;
+    return () => {
+      cancelled = true;
+      if (idleId != null && typeof cancelIdleCallback === "function") {
+        cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [
+    exoticLock.mode,
+    ownedExotics.length,
+    inventoryWithExoticBudget,
+    classType,
+    statOffset,
+    optimizerLookup.exoticStatBudget,
+    bounds,
+    constraints,
+    assumedStatMods,
+  ]);
   const canRunOptimizer =
     optimizerPool.length > 0 && poolCoversAllSlots(optimizerPool);
   const missingSlotCoverage =
@@ -226,21 +339,67 @@ export function LoadoutOptimizerView({
   const optimizerRequest = useMemo(
     () => ({
       pool: optimizerPool,
-      constraints,
-      statOffset,
+      constraints: searchConstraints,
+      statOffset: fragmentStatOffset,
+      assumedStatMods,
       exoticLock,
       setBonusSelections: selectedSetBonuses,
       topN: 20,
     }),
-    [optimizerPool, constraints, statOffset, exoticLock, selectedSetBonuses],
+    [
+      optimizerPool,
+      searchConstraints,
+      fragmentStatOffset,
+      assumedStatMods,
+      exoticLock,
+      selectedSetBonuses,
+    ],
   );
+
+  const lockedExoticLabel = useMemo(() => {
+    if (exoticLock.mode !== "locked") return null;
+    const piece = inventory.find(
+      (p) => p.itemInstanceId === exoticLock.itemInstanceId,
+    );
+    return piece?.displayName ?? "Exotic armor";
+  }, [exoticLock, inventory]);
+  const activeStatTargets = hasStatTargets(constraints);
+  const canGenerateBuilds =
+    activeStatTargets || selectedSetBonuses.length > 0;
 
   useOptimizerAutoRun(
     optimizerRequest,
-    canRunOptimizer && setBonusConflict == null,
+    canRunOptimizer &&
+      setBonusConflict == null &&
+      !searchTooLarge &&
+      canGenerateBuilds,
     run,
     cancel,
   );
+
+  /** Hard-stop in-flight search when the pool or targets become invalid. */
+  useEffect(() => {
+    if (
+      !canRunOptimizer ||
+      setBonusConflict != null ||
+      (!hasStatTargets(searchConstraints) && selectedSetBonuses.length === 0)
+    ) {
+      cancel();
+    }
+  }, [
+    canRunOptimizer,
+    setBonusConflict,
+    searchConstraints,
+    selectedSetBonuses.length,
+    cancel,
+  ]);
+
+  /** Stop search only while targets are still moving (not after debounced commit). */
+  useEffect(() => {
+    if (targetsPending && hasStatTargets(constraints)) {
+      cancel();
+    }
+  }, [targetsPending, constraints, cancel]);
 
   const groupedResults = useMemo(
     () => groupSolutionsBySignature(workerState.solutions),
@@ -279,12 +438,13 @@ export function LoadoutOptimizerView({
 
   const hasTopMessage = Boolean(banners) || Boolean(syncWarning);
   const ready = hasInventory && emptyState === null;
-  const activeStatTargets = hasStatTargets(constraints);
 
   const updateConstraint = (stat: ArmorStatName, min: number) => {
-    setConstraints((rows) =>
-      rows.map((row) => (row.stat === stat ? { ...row, min } : row)),
-    );
+    startTransition(() => {
+      setConstraints((rows) =>
+        rows.map((row) => (row.stat === stat ? { ...row, min } : row)),
+      );
+    });
   };
 
   const handleSubclassChange = (key: string | null) => {
@@ -318,6 +478,13 @@ export function LoadoutOptimizerView({
 
   return (
     <div className={`flex min-h-0 flex-1 flex-col ${className}`}>
+      <div
+        role="status"
+        className="flex shrink-0 items-center gap-2 border-b border-blue-500/30 bg-blue-500/5 px-4 py-2 sm:px-6"
+      >
+        <Info weight="duotone" className="size-4 shrink-0 text-blue-500" aria-hidden />
+        <p className="text-sm font-medium">beta, barely works</p>
+      </div>
       {hasTopMessage ? (
         <div className="shrink-0">
           {banners ? (
@@ -351,39 +518,36 @@ export function LoadoutOptimizerView({
                       title="Class"
                       description="Optimizer uses vault and character armor for the selected class."
                     >
-                      <div
-                        className="flex flex-wrap items-center gap-2"
-                        role="group"
-                        aria-label="Class"
-                      >
-                        {OPTIMIZER_CLASS_OPTIONS.map((option) => {
-                          const selected = classType === option.value;
-                          return (
-                            <button
-                              key={option.value}
-                              type="button"
-                              aria-pressed={selected}
-                              title={option.label}
-                              className={cn(
-                                "inline-flex items-center gap-1.5 rounded-none border px-3 py-2 text-sm transition-colors",
-                                selected
-                                  ? "border-foreground bg-foreground text-background"
-                                  : "border-border bg-background text-foreground hover:bg-muted",
-                              )}
-                              onClick={() => setClassType(option.value)}
-                            >
-                              <ClassGlyph
-                                classType={option.value}
-                                className="size-5 shrink-0"
-                              />
-                              {option.label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <ClassSwitcher
+                        value={classType}
+                        onChange={setClassType}
+                      />
                       <p className="mt-2 text-xs text-muted-foreground">
-                        {optimizerPool.length} Tier&nbsp;5 piece
-                        {optimizerPool.length === 1 ? "" : "s"} in pool
+                        {optimizerPool.length.toLocaleString()} Tier&nbsp;5
+                        piece{optimizerPool.length === 1 ? "" : "s"}
+                        {searchComboCount > 0 ? (
+                          <>
+                            {" "}
+                            · {formatSearchComboCount(searchComboCount, searchComboCapped)}{" "}
+                            loadout combination
+                            {searchComboCount === 1 && !searchComboCapped
+                              ? ""
+                              : "s"}
+                            {hasSearchFilters ? " match your filters" : ""}
+                            {exoticLock.mode === "locked" && lockedExoticLabel
+                              ? ` (locked ${lockedExoticLabel})`
+                              : null}
+                          </>
+                        ) : hasSearchFilters ? (
+                          <> · no loadouts match your filters</>
+                        ) : null}
+                        {hasSearchFilters && rawComboCount > searchComboCount ? (
+                          <>
+                            {" "}
+                            ({rawComboCount.toLocaleString()} in pool before
+                            filters)
+                          </>
+                        ) : null}
                       </p>
                     </OptimizerSettingsSection>
 
@@ -396,41 +560,7 @@ export function LoadoutOptimizerView({
                           description="Minimums on the 0–200 track. Double-click the shaded band to snap to max."
                           className="border-b-0"
                         >
-                          <fieldset className="space-y-1">
-                            <legend className="text-[11px] font-medium text-foreground">
-                              Assumed stat mods
-                            </legend>
-                            <div className="flex flex-wrap gap-x-3 gap-y-1">
-                              <label className="inline-flex items-center gap-1.5 text-xs">
-                                <input
-                                  type="checkbox"
-                                  checked={assumedStatMods.major}
-                                  onChange={(e) =>
-                                    setAssumedStatMods((prev) => ({
-                                      ...prev,
-                                      major: e.target.checked,
-                                    }))
-                                  }
-                                  className="size-3 shrink-0 rounded-none border-input"
-                                />
-                                Major (+50)
-                              </label>
-                              <label className="inline-flex items-center gap-1.5 text-xs">
-                                <input
-                                  type="checkbox"
-                                  checked={assumedStatMods.minor}
-                                  onChange={(e) =>
-                                    setAssumedStatMods((prev) => ({
-                                      ...prev,
-                                      minor: e.target.checked,
-                                    }))
-                                  }
-                                  className="size-3 shrink-0 rounded-none border-input"
-                                />
-                                Minor (+25)
-                              </label>
-                            </div>
-                          </fieldset>
+                          <div className="space-y-3">
                           {noTier5 ? (
                             <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
                               No Tier&nbsp;5 armor found for this class. Refresh
@@ -452,7 +582,17 @@ export function LoadoutOptimizerView({
                               item.
                             </p>
                           ) : null}
-                          <ul className="mt-2 space-y-1">
+                          {searchTooLarge && canGenerateBuilds ? (
+                            <p className="text-xs text-amber-600 dark:text-amber-500">
+                              {formatSearchComboCount(
+                                searchComboCount,
+                                searchComboCapped,
+                              )}{" "}
+                              matching loadouts — shaded bands are estimates.
+                              Click Generate builds in Results.
+                            </p>
+                          ) : null}
+                          <ul className="space-y-1">
                             {ARMOR_STAT_NAMES.map((stat) => {
                               const row = constraints.find((r) => r.stat === stat)!;
                               const range = bounds[stat];
@@ -471,6 +611,11 @@ export function LoadoutOptimizerView({
                               );
                             })}
                           </ul>
+                          <AssumedStatModsPanel
+                            value={assumedStatMods}
+                            onChange={setAssumedStatMods}
+                          />
+                          </div>
                         </OptimizerSettingsSection>
 
                         <OptimizerSettingsSection
@@ -553,23 +698,41 @@ export function LoadoutOptimizerView({
                             </p>
                           ) : null}
                         </div>
-                        {workerState.running ? (
-                          <span className="inline-flex items-center gap-2 text-xs text-foreground">
-                            <span
-                              className="size-3 animate-spin rounded-full border-2 border-muted-foreground/40 border-t-foreground"
-                              aria-hidden
-                            />
-                            Generating… {Math.round(workerState.progress)}%
+                        <div className="flex flex-wrap items-center gap-2">
+                          {canGenerateBuilds &&
+                          canRunOptimizer &&
+                          setBonusConflict == null &&
+                          !workerState.running &&
+                          !targetsPending ? (
                             <Button
                               type="button"
-                              variant="outline"
+                              variant={
+                                searchTooLarge ? "default" : "outline"
+                              }
                               size="sm"
-                              onClick={cancel}
+                              onClick={() => run(optimizerRequest)}
                             >
-                              Cancel
+                              Generate builds
                             </Button>
-                          </span>
-                        ) : null}
+                          ) : null}
+                          {workerState.running ? (
+                            <span className="inline-flex items-center gap-2 text-xs text-foreground">
+                              <span
+                                className="size-3 animate-spin rounded-full border-2 border-muted-foreground/40 border-t-foreground"
+                                aria-hidden
+                              />
+                              Generating… {Math.round(workerState.progress)}%
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={cancel}
+                              >
+                                Cancel
+                              </Button>
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                       {workerState.error ? (
                         <p role="alert" className="mt-2 text-sm text-destructive">
@@ -598,11 +761,19 @@ export function LoadoutOptimizerView({
                       </ul>
                     ) : groupedResults.size === 0 ? (
                       <p className="mt-2 text-sm text-muted-foreground">
-                        {!activeStatTargets
-                          ? "Set at least one stat minimum to generate builds."
+                        {!canGenerateBuilds
+                          ? "Set at least one stat minimum or armor set requirement to generate builds."
+                          : workerState.running
+                            ? `Generating builds… ${Math.round(workerState.progress)}%`
                           : workerState.hasCompletedRun
-                            ? "No builds match your targets. Lower a stat minimum, adjust set bonuses, or change the exotic."
-                            : "Generating builds…"}
+                            ? exoticAnyFeasible
+                              ? "No all-legendary builds match. Lock your exotic helmet (e.g. Speaker's Sight) or choose Any exotic below."
+                              : "No builds match your targets. Lower a stat minimum, adjust set bonuses, or change the exotic."
+                          : targetsPending
+                            ? "Updating targets…"
+                          : searchTooLarge
+                            ? "Large search space — click Generate builds above."
+                            : "Starting search…"}
                       </p>
                     ) : (
                       <ul className="space-y-3">
