@@ -8,38 +8,12 @@ import {
 import { estimateOptimizerComboCount } from "@/lib/optimizer/combo-count";
 import { maxFeasibleStatTarget } from "@/lib/optimizer/combo-count";
 import { defaultStatConstraints } from "@/lib/optimizer/constraints";
+import { mockPiece } from "@/lib/optimizer/__fixtures__/pieces";
 import { filterOptimizerPool } from "@/lib/optimizer/pool";
 import type { ExoticStatBudgetLookup } from "@/lib/inventory/exotic-stat-fallback";
 import { NO_ASSUMED_STAT_MODS } from "@/lib/optimizer/mod-offset";
 
 const NO_ASSUMED_MODS = NO_ASSUMED_STAT_MODS;
-
-function mockPiece(
-  slot: DerivedArmorPieceJson["slot"],
-  id: string,
-  statTotals: Partial<Record<string, number>>,
-  options: { isExotic?: boolean } = {},
-): DerivedArmorPieceJson {
-  return {
-    itemInstanceId: id,
-    itemHash: 1,
-    slot,
-    classType: 0,
-    setHash: 1,
-    setName: "Test",
-    displayName: "Test",
-    isExotic: options.isExotic,
-    archetypeHash: 1,
-    archetypeName: "Gunner",
-    tuningHash: 1,
-    tuningName: "+Weapons",
-    primaryStat: "Weapons",
-    secondaryStat: "Health",
-    tertiaryStat: "Class",
-    statTotals: statTotals as DerivedArmorPieceJson["statTotals"],
-    location: { kind: "vault" },
-  };
-}
 
 describe("computeStatBounds", () => {
   it("sums per-slot extrema across five slots", () => {
