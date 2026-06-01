@@ -6,38 +6,12 @@ import {
   totalsFromPieces,
 } from "@/lib/optimizer/constraints";
 import { searchLoadouts } from "@/lib/optimizer/search";
+import { mockPiece } from "@/lib/optimizer/__fixtures__/pieces";
 import { SLOT_ORDER } from "@/lib/bungie/constants";
-
-function mockPiece(
-  slot: DerivedArmorPieceJson["slot"],
-  id: string,
-  statTotals: Partial<Record<string, number>>,
-  extra: Partial<DerivedArmorPieceJson> = {},
-): DerivedArmorPieceJson {
-  return {
-    itemInstanceId: id,
-    itemHash: 1,
-    slot,
-    classType: 0,
-    setHash: 1,
-    setName: "Test",
-    displayName: "Test",
-    archetypeHash: 1,
-    archetypeName: "Gunner",
-    tuningHash: 1,
-    tuningName: "+Weapons / -Grenade",
-    primaryStat: "Weapons",
-    secondaryStat: "Health",
-    tertiaryStat: "Class",
-    statTotals: statTotals as DerivedArmorPieceJson["statTotals"],
-    location: { kind: "vault" },
-    ...extra,
-  };
-}
 
 describe("searchLoadouts", () => {
   it("returns solutions for a minimal five-piece pool", () => {
-    const pool = SLOT_ORDER.map((slot, index) =>
+    const pool = SLOT_ORDER.map((slot) =>
       mockPiece(slot, `id-${slot}`, {
         Weapons: 40,
         Health: 25,
@@ -49,7 +23,7 @@ describe("searchLoadouts", () => {
       pool,
       constraints: ARMOR_STAT_NAMES.map((stat) => ({
         stat,
-        min: 0,
+        min: stat === "Weapons" ? 100 : 0,
       })),
     });
     expect(solutions.length).toBeGreaterThan(0);

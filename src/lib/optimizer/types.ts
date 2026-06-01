@@ -52,12 +52,7 @@ export type WorkerRunMessage = {
   payload: OptimizerRequest;
 };
 
-export type WorkerCancelMessage = {
-  type: "cancel";
-  id: string;
-};
-
-export type WorkerRequest = WorkerRunMessage | WorkerCancelMessage;
+export type WorkerRequest = WorkerRunMessage;
 
 export type WorkerBoundsMessage = {
   type: "bounds";

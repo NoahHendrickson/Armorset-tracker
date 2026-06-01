@@ -1,35 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { ARMOR_STAT_NAMES } from "@/lib/db/types";
 import { estimateFilteredComboCount, maxFeasibleStatTarget } from "@/lib/optimizer/combo-count";
+import { mockPiece } from "@/lib/optimizer/__fixtures__/pieces";
 import { SLOT_ORDER } from "@/lib/bungie/constants";
-
-function mockPiece(
-  slot: DerivedArmorPieceJson["slot"],
-  id: string,
-  statTotals: Partial<Record<string, number>>,
-  extra: Partial<DerivedArmorPieceJson> = {},
-): DerivedArmorPieceJson {
-  return {
-    itemInstanceId: id,
-    itemHash: 1,
-    slot,
-    classType: 0,
-    setHash: 1,
-    setName: "Test",
-    displayName: "Test",
-    archetypeHash: 1,
-    archetypeName: "Gunner",
-    tuningHash: 1,
-    tuningName: "+Weapons / -Grenade",
-    primaryStat: "Weapons",
-    secondaryStat: "Health",
-    tertiaryStat: "Class",
-    statTotals: statTotals as DerivedArmorPieceJson["statTotals"],
-    location: { kind: "vault" },
-    ...extra,
-  };
-}
 
 describe("estimateFilteredComboCount", () => {
   it("matches raw pool count when no filters are active", () => {

@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { ARMOR_STAT_NAMES } from "@/lib/db/types";
-import { SLOT_ORDER } from "@/lib/bungie/constants";
 import {
   DEFAULT_ASSUMED_STAT_MODS,
   MAJOR_ARMOR_STAT_MOD,
@@ -12,45 +10,7 @@ import {
   maxVerifiedTotalSum,
   resolveLoadoutTotals,
 } from "@/lib/optimizer/resolve-loadout-totals";
-
-function mockPiece(
-  slot: DerivedArmorPieceJson["slot"],
-  id: string,
-  statTotals: Partial<Record<string, number>>,
-  extra: Partial<DerivedArmorPieceJson> = {},
-): DerivedArmorPieceJson {
-  return {
-    itemInstanceId: id,
-    itemHash: 1,
-    slot,
-    classType: 0,
-    setHash: 1,
-    setName: "Test",
-    displayName: "Test",
-    archetypeHash: 1,
-    archetypeName: "Gunner",
-    tuningHash: 1,
-    tuningName: "+Weapons / -Grenade",
-    primaryStat: "Weapons",
-    secondaryStat: "Health",
-    tertiaryStat: "Class",
-    statTotals: statTotals as DerivedArmorPieceJson["statTotals"],
-    location: { kind: "vault" },
-    ...extra,
-  };
-}
-
-function fivePiecePool(
-  perSlot: Partial<Record<string, number>>,
-  slotOverrides: Partial<
-    Record<DerivedArmorPieceJson["slot"], Partial<DerivedArmorPieceJson>>
-  > = {},
-): DerivedArmorPieceJson[] {
-  return SLOT_ORDER.map((slot) => {
-    const override = slotOverrides[slot] ?? {};
-    return mockPiece(slot, `id-${slot}`, perSlot, override);
-  });
-}
+import { mockFivePiecePool } from "@/lib/optimizer/__fixtures__/pieces";
 
 describe("totalAssumedModBudget", () => {
   it("returns 50 total mod points for 5 majors, not per target stat", () => {
@@ -69,7 +29,7 @@ describe("totalAssumedModBudget", () => {
 
 describe("resolveLoadoutTotals", () => {
   it("adds up to +50 on a single target with five committed pieces", () => {
-    const pieces = fivePiecePool({
+    const pieces = mockFivePiecePool({
       Weapons: 30,
       Health: 25,
       Class: 20,
@@ -89,7 +49,7 @@ describe("resolveLoadoutTotals", () => {
   });
 
   it("cannot zero out both debuff penalties from uncommitted variants", () => {
-    const pieces = fivePiecePool(
+    const pieces = mockFivePiecePool(
       { Weapons: 30, Health: 25, Class: 20, Grenade: 10, Melee: 10 },
       {
         helmet: {
@@ -117,7 +77,7 @@ describe("resolveLoadoutTotals", () => {
   });
 
   it("assigns split major/minor mods across multiple targets without exceeding cap", () => {
-    const pieces = fivePiecePool({
+    const pieces = mockFivePiecePool({
       Weapons: 38,
       Health: 25,
       Class: 20,
@@ -145,7 +105,7 @@ describe("resolveLoadoutTotals", () => {
   });
 
   it("rejects loadouts that need more mod points than the shared pool", () => {
-    const pieces = fivePiecePool({ Weapons: 10 });
+    const pieces = mockFivePiecePool({ Weapons: 10 });
     const resolved = resolveLoadoutTotals(
       pieces,
       ARMOR_STAT_NAMES.map((stat) => ({
@@ -159,7 +119,7 @@ describe("resolveLoadoutTotals", () => {
   });
 
   it("caps total sum at armor + mod pool + fragments for many active targets", () => {
-    const pieces = fivePiecePool({
+    const pieces = mockFivePiecePool({
       Weapons: 40,
       Health: 25,
       Class: 20,
