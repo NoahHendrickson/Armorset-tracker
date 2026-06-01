@@ -50,7 +50,7 @@ export function useExoticBoundsHint({
       if (cancelled) return;
       const poolAny = filterOptimizerPool(inventoryWithExoticBudget, classType, {
         exoticLock: { mode: "any" },
-        exoticStatBudget,
+        exoticStatBudget: exoticStatBudget ?? undefined,
       });
       const withExotics = computeStatBounds(
         poolAny,

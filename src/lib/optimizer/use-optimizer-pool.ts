@@ -61,7 +61,7 @@ export function useOptimizerPool({
     () =>
       filterOptimizerPool(inventoryWithExoticBudget, classType, {
         exoticLock,
-        exoticStatBudget,
+        exoticStatBudget: exoticStatBudget ?? undefined,
       }),
     [inventoryWithExoticBudget, classType, exoticLock, exoticStatBudget],
   );

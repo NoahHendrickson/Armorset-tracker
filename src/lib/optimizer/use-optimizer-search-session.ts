@@ -7,7 +7,7 @@ import type { ExoticLock } from "@/lib/optimizer/exotic-lock";
 import type { AssumedStatMods } from "@/lib/optimizer/mod-offset";
 import type { SetBonusSelection } from "@/lib/optimizer/set-bonus";
 import { groupSolutionsBySignature } from "@/lib/optimizer/signature";
-import type { OptimizerRequest, StatConstraintRow } from "@/lib/optimizer/types";
+import type { OptimizerRequest, OptimizerSolution, StatConstraintRow } from "@/lib/optimizer/types";
 import { useOptimizerAutoRun } from "@/lib/optimizer/use-optimizer-auto-run";
 import {
   useOptimizerWorker,
@@ -34,7 +34,7 @@ export type UseOptimizerSearchSessionResult = {
   run: (payload: OptimizerRequest) => void;
   cancel: () => void;
   optimizerRequest: OptimizerRequest;
-  groupedResults: ReturnType<typeof groupSolutionsBySignature>;
+  groupedResults: Map<string, OptimizerSolution[]>;
 };
 
 export function useOptimizerSearchSession({
