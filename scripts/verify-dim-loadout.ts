@@ -60,7 +60,7 @@ async function main(): Promise<void> {
   const pieces: DerivedArmorPieceJson[] = [];
 
   for (const row of rows ?? []) {
-    const items = row.items as DerivedArmorPieceJson[];
+    const items = row.items as unknown as DerivedArmorPieceJson[];
     if (!Array.isArray(items)) continue;
     const matched = items.filter((p) => idSet.has(p.itemInstanceId));
     if (matched.length === 0) continue;
@@ -219,7 +219,7 @@ async function main(): Promise<void> {
   let warlockInventory: DerivedArmorPieceJson[] = [];
   for (const row of rows ?? []) {
     if (ownerUserId != null && row.user_id !== ownerUserId) continue;
-    const items = row.items as DerivedArmorPieceJson[];
+    const items = row.items as unknown as DerivedArmorPieceJson[];
     if (!Array.isArray(items)) continue;
     warlockInventory.push(...items.filter((p) => p.classType === classType));
   }
