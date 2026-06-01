@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useEffect,
   useMemo,
   useState,
   startTransition,
@@ -22,17 +21,8 @@ import { SLOT_ORDER } from "@/lib/bungie/constants";
 import { ARMOR_STAT_NAMES, type ArmorStatName } from "@/lib/db/types";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { ClassSwitcher } from "@/components/workspace/class-switcher";
-import {
-  computeStatBounds,
-  SEARCH_AUTO_RUN_COMBO_LIMIT,
-} from "@/lib/optimizer/bounds";
-import {
-  estimateFilteredComboCount,
-  estimateOptimizerComboCount,
-} from "@/lib/optimizer/combo-count";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { useStatBoundsForSliders } from "@/lib/optimizer/use-stat-bounds-for-sliders";
-import { enrichPieceWithExoticBudget } from "@/lib/inventory/exotic-stat-fallback";
 import {
   defaultStatConstraints,
   hasStatTargets,
@@ -40,8 +30,6 @@ import {
 } from "@/lib/optimizer/constraints";
 import {
   DEFAULT_EXOTIC_LOCK,
-  normalizeExoticLock,
-  uniqueOwnedExoticsForClass,
   type ExoticLock,
 } from "@/lib/optimizer/exotic-lock";
 import { computeFragmentStatOffset } from "@/lib/optimizer/fragment-offset";
@@ -49,16 +37,15 @@ import {
   DEFAULT_ASSUMED_STAT_MODS,
   type AssumedStatMods,
 } from "@/lib/optimizer/mod-offset";
-import {
-  filterOptimizerPool,
-  optimizerEligiblePieces,
-  poolCoversAllSlots,
-} from "@/lib/optimizer/pool";
 import { setBonusSelectionConflict, type SetBonusSelection } from "@/lib/optimizer/set-bonus";
-import { groupSolutionsBySignature } from "@/lib/optimizer/signature";
+import { useExoticBoundsHint } from "@/lib/optimizer/use-exotic-bounds-hint";
+import {
+  formatSearchComboCount,
+  useOptimizerComboEstimates,
+} from "@/lib/optimizer/use-optimizer-combo-estimates";
+import { useOptimizerPool } from "@/lib/optimizer/use-optimizer-pool";
+import { useOptimizerSearchSession } from "@/lib/optimizer/use-optimizer-search-session";
 import type { StatConstraintRow } from "@/lib/optimizer/types";
-import { useOptimizerAutoRun } from "@/lib/optimizer/use-optimizer-auto-run";
-import { useOptimizerWorker } from "@/lib/optimizer/use-optimizer-worker";
 import type { OptimizerLookupPayload } from "@/lib/views/optimizer-lookup-payload";
 import { EMPTY_OPTIMIZER_LOOKUP } from "@/lib/views/optimizer-lookup-payload";
 import type { GridFilterClass, GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
@@ -68,13 +55,6 @@ import { inventoryTableEmptyState } from "@/lib/workspace/workspace-data-health.
 
 /** Subclass fragment slots are aspect-gated; current sandbox tops out at 5. */
 const MAX_FRAGMENTS = 5;
-
-function formatSearchComboCount(count: number, capped: boolean): string {
-  if (capped) {
-    return `${SEARCH_AUTO_RUN_COMBO_LIMIT.toLocaleString()}+`;
-  }
-  return count.toLocaleString();
-}
 
 export interface LoadoutOptimizerViewProps {
   className?: string;
@@ -109,20 +89,17 @@ export function LoadoutOptimizerView({
     retrySync,
   } = useWorkspaceSync();
 
-  // Optimizer state is independent from the Table/Tracker tabs — changing class
-  // here doesn't mutate the shared workspace filters.
   const [classType, setClassType] = useState<GridFilterClass>(filters.class);
   const [constraints, setConstraints] = useState<StatConstraintRow[]>(
     defaultStatConstraints,
   );
-  /** Debounced so dragging stat sliders does not restart vault search every tick. */
   const searchConstraints = useDebouncedValue(constraints, 400);
-  /** Debounced separately — bounds recompute is expensive on large vaults. */
   const boundsConstraints = useDebouncedValue(constraints, 150);
   const targetsPending = useMemo(
     () => !statConstraintsEqual(constraints, searchConstraints),
     [constraints, searchConstraints],
   );
+
   const [exoticLock, setExoticLock] = useState<ExoticLock>(DEFAULT_EXOTIC_LOCK);
   const [subclassState, setSubclassState] = useState<{
     classType: number;
@@ -149,7 +126,6 @@ export function LoadoutOptimizerView({
   const [assumedStatMods, setAssumedStatMods] = useState<AssumedStatMods>(
     DEFAULT_ASSUMED_STAT_MODS,
   );
-  const { state: workerState, run, cancel } = useOptimizerWorker();
 
   const fragmentStatOffset = useMemo(
     () =>
@@ -160,203 +136,84 @@ export function LoadoutOptimizerView({
       ),
     [selectedFragmentHashes, optimizerLookup, classType],
   );
-  const statOffset = fragmentStatOffset;
-  const inventoryWithExoticBudget = useMemo(
-    () =>
-      optimizerLookup.exoticStatBudget
-        ? inventory.map((piece) =>
-            enrichPieceWithExoticBudget(
-              piece,
-              optimizerLookup.exoticStatBudget!,
-            ),
-          )
-        : inventory,
-    [inventory, optimizerLookup.exoticStatBudget],
-  );
-  const eligiblePieces = useMemo(
-    () => optimizerEligiblePieces(inventoryWithExoticBudget, classType),
-    [inventoryWithExoticBudget, classType],
-  );
-  const optimizerPool = useMemo(
-    () =>
-      filterOptimizerPool(inventoryWithExoticBudget, classType, {
-        exoticLock,
-        exoticStatBudget: optimizerLookup.exoticStatBudget,
-      }),
-    [
-      inventoryWithExoticBudget,
-      classType,
-      exoticLock,
-      optimizerLookup.exoticStatBudget,
-    ],
-  );
-  const ownedExotics = useMemo(
-    () => uniqueOwnedExoticsForClass(inventory, classType),
-    [inventory, classType],
-  );
 
-  useEffect(() => {
-    setExoticLock((prev) => {
-      const next = normalizeExoticLock(prev, inventory, classType);
-      if (
-        prev.mode === next.mode &&
-        (prev.mode !== "locked" ||
-          (next.mode === "locked" &&
-            prev.itemInstanceId === next.itemInstanceId))
-      ) {
-        return prev;
-      }
-      return next;
-    });
-  }, [inventory, classType]);
-  const classPieceCount = useMemo(
-    () => inventory.filter((p) => p.classType === classType).length,
-    [inventory, classType],
-  );
+  const {
+    inventoryWithExoticBudget,
+    optimizerPool,
+    ownedExotics,
+    classPieceCount,
+    canRunOptimizer,
+    missingSlotCoverage,
+    noTier5,
+  } = useOptimizerPool({
+    inventory,
+    classType,
+    exoticLock,
+    setExoticLock,
+    exoticStatBudget: optimizerLookup.exoticStatBudget,
+  });
+
   const bounds = useStatBoundsForSliders({
     pool: optimizerPool,
-    statOffset,
+    statOffset: fragmentStatOffset,
     assumedStatMods,
     exoticLock,
     constraints: boundsConstraints,
     setBonusSelections: selectedSetBonuses,
   });
-  const rawComboCount = useMemo(
-    () =>
-      optimizerPool.length > 0
-        ? estimateOptimizerComboCount(optimizerPool, exoticLock)
-        : 0,
-    [optimizerPool, exoticLock],
-  );
-  const filteredComboEstimate = useMemo(() => {
-    if (optimizerPool.length === 0) {
-      return { count: 0, capped: false };
-    }
-    return estimateFilteredComboCount(optimizerPool, exoticLock, {
-      constraints: searchConstraints,
-      setBonusSelections: selectedSetBonuses,
-      statOffset: fragmentStatOffset,
-      assumedMods: assumedStatMods,
-      cap: SEARCH_AUTO_RUN_COMBO_LIMIT + 1,
-    });
-  }, [
+
+  const {
+    rawComboCount,
+    searchComboCount,
+    searchComboCapped,
+    hasSearchFilters,
+    searchTooLarge,
+    exoticAnyFeasible,
+  } = useOptimizerComboEstimates({
     optimizerPool,
     exoticLock,
     searchConstraints,
     selectedSetBonuses,
     fragmentStatOffset,
     assumedStatMods,
-  ]);
-  const hasSearchFilters =
-    hasStatTargets(searchConstraints) || selectedSetBonuses.length > 0;
-  const exoticAnyFeasible = useMemo(() => {
-    if (
-      exoticLock.mode !== "none" ||
-      optimizerPool.length === 0 ||
-      !hasSearchFilters
-    ) {
-      return false;
-    }
-    const { count } = estimateFilteredComboCount(optimizerPool, {
-      mode: "any",
-    }, {
-      constraints: searchConstraints,
-      setBonusSelections: selectedSetBonuses,
-      statOffset: fragmentStatOffset,
-      assumedMods: assumedStatMods,
-      cap: 1,
-    });
-    return count > 0;
-  }, [
-    exoticLock.mode,
-    optimizerPool,
-    hasSearchFilters,
-    searchConstraints,
-    selectedSetBonuses,
-    fragmentStatOffset,
-    assumedStatMods,
-  ]);
-  const searchComboCount = hasSearchFilters
-    ? filteredComboEstimate.count
-    : rawComboCount;
-  const searchComboCapped = hasSearchFilters && filteredComboEstimate.capped;
-  const searchTooLarge =
-    searchComboCapped || searchComboCount > SEARCH_AUTO_RUN_COMBO_LIMIT;
-  const [exoticBoundsHint, setExoticBoundsHint] = useState(false);
-  useEffect(() => {
-    if (exoticLock.mode !== "none" || ownedExotics.length === 0) {
-      setExoticBoundsHint(false);
-      return;
-    }
-    let cancelled = false;
-    const run = () => {
-      if (cancelled) return;
-      const poolAny = filterOptimizerPool(inventoryWithExoticBudget, classType, {
-        exoticLock: { mode: "any" },
-        exoticStatBudget: optimizerLookup.exoticStatBudget,
-      });
-      const withExotics = computeStatBounds(
-        poolAny,
-        statOffset,
-        { mode: "any" },
-        constraints,
-        assumedStatMods,
-      );
-      setExoticBoundsHint(
-        ARMOR_STAT_NAMES.some((stat) => withExotics[stat].max > bounds[stat].max),
-      );
-    };
-    const idleId =
-      typeof requestIdleCallback === "function"
-        ? requestIdleCallback(run, { timeout: 3000 })
-        : null;
-    const timeoutId = idleId == null ? window.setTimeout(run, 50) : null;
-    return () => {
-      cancelled = true;
-      if (idleId != null && typeof cancelIdleCallback === "function") {
-        cancelIdleCallback(idleId);
-      }
-      if (timeoutId != null) {
-        window.clearTimeout(timeoutId);
-      }
-    };
-  }, [
-    exoticLock.mode,
-    ownedExotics.length,
+  });
+
+  const exoticBoundsHint = useExoticBoundsHint({
+    exoticLockMode: exoticLock.mode,
+    ownedExoticCount: ownedExotics.length,
     inventoryWithExoticBudget,
     classType,
-    statOffset,
-    optimizerLookup.exoticStatBudget,
+    statOffset: fragmentStatOffset,
+    exoticStatBudget: optimizerLookup.exoticStatBudget,
     bounds,
     constraints,
     assumedStatMods,
-  ]);
-  const canRunOptimizer =
-    optimizerPool.length > 0 && poolCoversAllSlots(optimizerPool);
-  const missingSlotCoverage =
-    optimizerPool.length > 0 && !poolCoversAllSlots(optimizerPool);
-  const noTier5 = classPieceCount > 0 && eligiblePieces.length === 0;
-  const setBonusConflict = setBonusSelectionConflict(selectedSetBonuses);
+  });
 
-  const optimizerRequest = useMemo(
-    () => ({
-      pool: optimizerPool,
-      constraints: searchConstraints,
-      statOffset: fragmentStatOffset,
-      assumedStatMods,
-      exoticLock,
-      setBonusSelections: selectedSetBonuses,
-      topN: 20,
-    }),
-    [
-      optimizerPool,
-      searchConstraints,
-      fragmentStatOffset,
-      assumedStatMods,
-      exoticLock,
-      selectedSetBonuses,
-    ],
-  );
+  const setBonusConflict = setBonusSelectionConflict(selectedSetBonuses);
+  const canGenerateBuilds =
+    hasStatTargets(constraints) || selectedSetBonuses.length > 0;
+
+  const {
+    workerState,
+    run,
+    cancel,
+    optimizerRequest,
+    groupedResults,
+  } = useOptimizerSearchSession({
+    optimizerPool,
+    searchConstraints,
+    constraints,
+    fragmentStatOffset,
+    assumedStatMods,
+    exoticLock,
+    selectedSetBonuses,
+    canRunOptimizer,
+    setBonusConflict,
+    searchTooLarge,
+    canGenerateBuilds,
+    targetsPending,
+  });
 
   const lockedExoticLabel = useMemo(() => {
     if (exoticLock.mode !== "locked") return null;
@@ -365,48 +222,7 @@ export function LoadoutOptimizerView({
     );
     return piece?.displayName ?? "Exotic armor";
   }, [exoticLock, inventory]);
-  const activeStatTargets = hasStatTargets(constraints);
-  const canGenerateBuilds =
-    activeStatTargets || selectedSetBonuses.length > 0;
 
-  useOptimizerAutoRun(
-    optimizerRequest,
-    canRunOptimizer &&
-      setBonusConflict == null &&
-      !searchTooLarge &&
-      canGenerateBuilds,
-    run,
-    cancel,
-  );
-
-  /** Hard-stop in-flight search when the pool or targets become invalid. */
-  useEffect(() => {
-    if (
-      !canRunOptimizer ||
-      setBonusConflict != null ||
-      (!hasStatTargets(searchConstraints) && selectedSetBonuses.length === 0)
-    ) {
-      cancel();
-    }
-  }, [
-    canRunOptimizer,
-    setBonusConflict,
-    searchConstraints,
-    selectedSetBonuses.length,
-    cancel,
-  ]);
-
-  /** Stop search only while targets are still moving (not after debounced commit). */
-  useEffect(() => {
-    if (targetsPending && hasStatTargets(constraints)) {
-      cancel();
-    }
-  }, [targetsPending, constraints, cancel]);
-
-  const groupedResults = useMemo(
-    () => groupSolutionsBySignature(workerState.solutions),
-    [workerState.solutions],
-  );
   const piecesById = useMemo(() => {
     const map = new Map<string, DerivedArmorPieceJson>();
     for (const piece of inventory) {
