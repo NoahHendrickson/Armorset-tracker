@@ -25,6 +25,7 @@ import {
 import { WorkspaceAutoSync } from "@/components/dashboard/workspace-auto-sync";
 import { WorkspaceSyncProvider } from "@/components/dashboard/workspace-sync-status";
 import type { WorkspaceDataHealth } from "@/lib/workspace/workspace-data-health.shared";
+import { cn } from "@/lib/utils";
 import {
   InventoryEquipmentOnlyBanner,
   InventoryEquipmentOnlyProvider,
@@ -162,41 +163,60 @@ export function DashboardWorkspace({
           profilePictureUrl={profilePictureUrl}
           leadingAccessory={tabs}
         />
-        {mode === "table" ? (
-          <InventoryTableView
-            banners={banners}
-            syncWarning={syncWarning}
-            hasInventory={hasInventory}
-            inventory={inventory}
-            selectors={selectors}
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            savedViews={savedViewsMenuProps}
-          />
-        ) : mode === "grid" ? (
-          <GridWorkspace
-            banners={banners}
-            syncWarning={syncWarning}
-            hasInventory={hasInventory}
-            selectors={selectors}
-            inventory={inventory}
-            lookupPayload={lookupPayload}
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            savedViews={savedViewsMenuProps}
-          />
-        ) : (
-          <LoadoutOptimizerView
-            banners={banners}
-            syncWarning={syncWarning}
-            hasInventory={hasInventory}
-            inventory={inventory}
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            optimizerLookup={optimizerLookup}
-            statIconByName={lookupPayload.statIconByName}
-          />
-        )}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div
+            className={cn(
+              "flex min-h-0 flex-1 flex-col",
+              mode !== "table" && "hidden",
+            )}
+          >
+            <InventoryTableView
+              banners={banners}
+              syncWarning={syncWarning}
+              hasInventory={hasInventory}
+              inventory={inventory}
+              selectors={selectors}
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              savedViews={savedViewsMenuProps}
+            />
+          </div>
+          <div
+            className={cn(
+              "flex min-h-0 flex-1 flex-col",
+              mode !== "grid" && "hidden",
+            )}
+          >
+            <GridWorkspace
+              banners={banners}
+              syncWarning={syncWarning}
+              hasInventory={hasInventory}
+              selectors={selectors}
+              inventory={inventory}
+              lookupPayload={lookupPayload}
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              savedViews={savedViewsMenuProps}
+            />
+          </div>
+          <div
+            className={cn(
+              "flex min-h-0 flex-1 flex-col",
+              mode !== "optimizer" && "hidden",
+            )}
+          >
+            <LoadoutOptimizerView
+              banners={banners}
+              syncWarning={syncWarning}
+              hasInventory={hasInventory}
+              inventory={inventory}
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              optimizerLookup={optimizerLookup}
+              statIconByName={lookupPayload.statIconByName}
+            />
+          </div>
+        </div>
         </div>
       </WorkspaceSyncProvider>
     </InventoryEquipmentOnlyProvider>

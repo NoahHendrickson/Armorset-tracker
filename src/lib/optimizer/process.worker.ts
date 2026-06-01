@@ -1,6 +1,11 @@
 /// <reference lib="webworker" />
 
-import { computeStatBounds } from "@/lib/optimizer/bounds";
+import {
+  computeStatBounds,
+  estimateOptimizerComboCount,
+  SEARCH_AUTO_RUN_COMBO_LIMIT,
+} from "@/lib/optimizer/bounds";
+import { DEFAULT_EXOTIC_LOCK } from "@/lib/optimizer/exotic-lock";
 import { searchLoadouts } from "@/lib/optimizer/search";
 import type { WorkerRequest, WorkerResponse } from "@/lib/optimizer/types";
 
@@ -18,28 +23,40 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   cancelled = false;
 
   try {
-    const bounds = computeStatBounds(
-      message.payload.pool,
-      message.payload.statOffset,
-      message.payload.exoticLock,
-    );
-    const boundsMsg: WorkerResponse = {
-      type: "bounds",
+    const progressMsg = (percent: number): WorkerResponse => ({
+      type: "progress",
       id: message.id,
-      bounds,
-    };
-    self.postMessage(boundsMsg);
+      percent,
+    });
+    self.postMessage(progressMsg(0));
+
+    const exoticLock = message.payload.exoticLock ?? DEFAULT_EXOTIC_LOCK;
+    const comboCount = estimateOptimizerComboCount(
+      message.payload.pool,
+      exoticLock,
+    );
+
+    if (comboCount <= SEARCH_AUTO_RUN_COMBO_LIMIT) {
+      const bounds = computeStatBounds(
+        message.payload.pool,
+        message.payload.statOffset,
+        exoticLock,
+        message.payload.constraints,
+        message.payload.assumedStatMods,
+      );
+      const boundsMsg: WorkerResponse = {
+        type: "bounds",
+        id: message.id,
+        bounds,
+      };
+      self.postMessage(boundsMsg);
+    }
 
     const solutions = searchLoadouts(
       message.payload,
       (percent) => {
         if (cancelled) return;
-        const progressMsg: WorkerResponse = {
-          type: "progress",
-          id: message.id,
-          percent,
-        };
-        self.postMessage(progressMsg);
+        self.postMessage(progressMsg(percent));
       },
       () => cancelled,
     );

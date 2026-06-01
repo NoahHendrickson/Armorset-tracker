@@ -82,6 +82,36 @@ describe("exotic stat budget", () => {
     expect(totals.Class).toBe(20);
   });
 
+  it("prefers singleInitialItemHash over reusable plug sets", () => {
+    const statPlugs = new Map([
+      [100, { stat: "Weapons" as const, value: 5 }],
+      [200, { stat: "Weapons" as const, value: 99 }],
+    ]);
+    const item = {
+      hash: 1,
+      sockets: {
+        socketEntries: [
+          {
+            socketTypeHash: 1,
+            singleInitialItemHash: 100,
+            reusablePlugSetHash: 9000,
+          },
+        ],
+      },
+    } as ManifestInventoryItemDefinition;
+    const plugSets = {
+      "9000": { hash: 9000, reusablePlugItems: [{ plugItemHash: 200 }] },
+    };
+
+    const totals = exoticStatBudgetFromItemSockets(item, {
+      statPlugs,
+      tuningPlugStats: new Map(),
+      plugToTuning: new Map(),
+      plugSets,
+    });
+    expect(totals.Weapons).toBe(5);
+  });
+
   it("mergeExoticStatTotals keeps the higher value per stat", () => {
     expect(
       mergeExoticStatTotals({ Weapons: 10 }, { Weapons: 40 }),

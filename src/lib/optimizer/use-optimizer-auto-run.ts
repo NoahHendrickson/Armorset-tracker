@@ -4,11 +4,17 @@ import { useEffect, useRef } from "react";
 import { hasStatTargets } from "@/lib/optimizer/constraints";
 import type { OptimizerRequest } from "@/lib/optimizer/types";
 
-const AUTO_RUN_DEBOUNCE_MS = 300;
+/** Request debounce lives in `searchConstraints`; run as soon as that commits. */
+const AUTO_RUN_DEBOUNCE_MS = 0;
 
+/**
+ * Schedules automatic optimizer runs when `canAutoRun` is true.
+ * Does not cancel in-flight work when auto-run is disabled (large vault) —
+ * hard aborts are handled separately in the view layer.
+ */
 export function useOptimizerAutoRun(
   request: OptimizerRequest,
-  canRun: boolean,
+  canAutoRun: boolean,
   run: (payload: OptimizerRequest) => void,
   cancel: () => void,
 ) {
@@ -21,10 +27,9 @@ export function useOptimizerAutoRun(
   });
 
   useEffect(() => {
-    const shouldRun = canRun && hasStatTargets(request.constraints);
-
-    if (!shouldRun) {
-      cancelRef.current();
+    const hasTargets = hasStatTargets(request.constraints);
+    const hasSetBonuses = (request.setBonusSelections?.length ?? 0) > 0;
+    if (!canAutoRun || (!hasTargets && !hasSetBonuses)) {
       return;
     }
 
@@ -34,6 +39,7 @@ export function useOptimizerAutoRun(
 
     return () => {
       window.clearTimeout(timer);
+      cancelRef.current();
     };
-  }, [canRun, request]);
+  }, [canAutoRun, request]);
 }

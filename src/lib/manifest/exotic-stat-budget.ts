@@ -31,10 +31,10 @@ function plugHashesForSocketEntry(
   >["socketEntries"][number],
   plugSets?: Record<string, ManifestPlugSetDefinition>,
 ): number[] {
-  const hashes: number[] = [];
   if (entry.singleInitialItemHash) {
-    hashes.push(entry.singleInitialItemHash);
+    return [entry.singleInitialItemHash];
   }
+  const hashes: number[] = [];
   for (const setHash of [
     entry.reusablePlugSetHash,
     entry.randomizedPlugSetHash,

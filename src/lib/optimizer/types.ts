@@ -1,5 +1,7 @@
 import type { ArmorStatName, DerivedArmorPieceJson } from "@/lib/db/types";
 import type { ExoticLock } from "@/lib/optimizer/exotic-lock";
+import type { AssumedStatMods } from "@/lib/optimizer/mod-offset";
+import type { ResolvedLoadout } from "@/lib/optimizer/resolve-loadout-totals";
 import type { SetBonusSelection } from "@/lib/optimizer/set-bonus";
 
 /** Per-stat minimum target; array order = priority. min 0 = no target. */
@@ -11,8 +13,10 @@ export type StatConstraintRow = {
 export type OptimizerRequest = {
   pool: DerivedArmorPieceJson[];
   constraints: StatConstraintRow[];
-  /** Fixed armor-stat bonus from selected subclass fragments (and similar plugs). */
+  /** Fragment (and similar) flat per-stat offset — not assumed armor mods. */
   statOffset?: Partial<Record<ArmorStatName, number>>;
+  /** Shared major/minor mod pool assumed across the loadout. */
+  assumedStatMods?: AssumedStatMods;
   exoticLock?: ExoticLock;
   setBonusSelections?: SetBonusSelection[];
   pinnedInstanceIds?: string[];
@@ -38,6 +42,8 @@ export type OptimizerSolution = {
    * the chosen piece (always includes the chosen piece itself).
    */
   interchangeable?: Record<OptimizerSlotKey, string[]>;
+  /** Verified tuning branches and mod allocation when available. */
+  resolved?: ResolvedLoadout;
 };
 
 export type WorkerRunMessage = {

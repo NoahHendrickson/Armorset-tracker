@@ -36,13 +36,8 @@ import {
   SavedViewsMenu,
   type SavedViewsBarProps,
 } from "@/components/workspace/saved-views-menu";
+import { ClassSwitcher } from "@/components/workspace/class-switcher";
 import { TrackerFilterBarOverflowMenus } from "@/components/workspace/tracker-filter-bar-overflow-menus";
-
-const CLASS_TABS: Array<{ value: GridFilterClass; label: string }> = [
-  { value: 0, label: "Titan" },
-  { value: 1, label: "Hunter" },
-  { value: 2, label: "Warlock" },
-];
 
 interface ResultNoun {
   singular: string;
@@ -270,43 +265,6 @@ export function TrackerFilterBar({
       </button>
     ) : null;
 
-  function classTabButtonClass(active: boolean, condensed = false) {
-    return cn(
-      "flex shrink-0 items-center border font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-      condensed ? "h-full self-stretch px-2 text-[10px] leading-none" : "h-9 px-3 text-xs",
-      condensed
-        ? active
-          ? "border-transparent bg-primary/15 font-semibold text-foreground"
-          : "border-transparent text-muted-foreground hover:bg-background/50 hover:text-foreground dark:hover:bg-accent/50 dark:hover:text-accent-foreground"
-        : active
-          ? "border-border bg-background/80 text-foreground dark:bg-accent/80 dark:text-accent-foreground"
-          : "border-transparent text-muted-foreground hover:bg-background/50 hover:text-foreground dark:hover:bg-accent/50 dark:hover:text-accent-foreground",
-    );
-  }
-
-  const embeddedClassSwitcher = (
-    <div
-      role="group"
-      aria-label="Class"
-      className="flex shrink-0 items-stretch self-stretch pl-1"
-    >
-      {CLASS_TABS.map((tab) => {
-        const active = value.class === tab.value;
-        return (
-          <button
-            key={tab.value}
-            type="button"
-            className={classTabButtonClass(active, true)}
-            onClick={() => switchClass(tab.value)}
-            aria-pressed={active}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-
   const searchField = searchExpanded ? (
     embedClassInSearch ? (
       <div
@@ -335,7 +293,11 @@ export function TrackerFilterBar({
           />
           {clearSearchButton(true)}
         </div>
-        {embeddedClassSwitcher}
+        <ClassSwitcher
+          variant="condensed"
+          value={value.class}
+          onChange={switchClass}
+        />
       </div>
     ) : (
       <div
@@ -426,26 +388,7 @@ export function TrackerFilterBar({
       ) : null}
 
       {!embedClassInSearch ? (
-        <div
-          className="flex h-9 min-w-0 shrink-0 bg-card"
-          role="group"
-          aria-label="Class"
-        >
-          {CLASS_TABS.map((tab) => {
-            const active = value.class === tab.value;
-            return (
-              <button
-                key={tab.value}
-                type="button"
-                className={classTabButtonClass(active)}
-                onClick={() => switchClass(tab.value)}
-                aria-pressed={active}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        <ClassSwitcher value={value.class} onChange={switchClass} />
       ) : null}
 
       {showSetFilter ? (

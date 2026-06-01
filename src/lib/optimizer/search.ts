@@ -1,11 +1,13 @@
 import { SLOT_ORDER } from "@/lib/bungie/constants";
 import { ARMOR_STAT_NAMES, type DerivedArmorPieceJson } from "@/lib/db/types";
 import { getPieceStatCeiling } from "@/lib/inventory/compute-stat-totals";
+import { areConstraintsAchievable } from "@/lib/optimizer/bounds";
+import { estimateFilteredComboCount } from "@/lib/optimizer/combo-count";
 import {
   partialCanReachMins,
-  satisfiesConstraints,
   scoreSolution,
   totalsFromPieces,
+  hasStatTargets,
 } from "@/lib/optimizer/constraints";
 import { dedupeSlotPieces } from "@/lib/optimizer/dedupe";
 import {
@@ -16,6 +18,8 @@ import {
   resolveLockedExoticIdentityKey,
 } from "@/lib/optimizer/exotic-lock";
 import { addStatOffsets } from "@/lib/optimizer/fragment-offset";
+import { DEFAULT_ASSUMED_STAT_MODS } from "@/lib/optimizer/mod-offset";
+import { resolveLoadoutTotals } from "@/lib/optimizer/resolve-loadout-totals";
 import {
   partialCanSatisfySetBonuses,
   satisfiesSetBonuses,
@@ -61,6 +65,42 @@ export function searchLoadouts(
   const topN = request.topN ?? 20;
   const exoticLock = request.exoticLock ?? DEFAULT_EXOTIC_LOCK;
   const setBonusSelections = request.setBonusSelections ?? [];
+  const assumedMods = request.assumedStatMods ?? DEFAULT_ASSUMED_STAT_MODS;
+  const fragmentOffset = request.statOffset ?? {};
+
+  if (
+    hasStatTargets(request.constraints) ||
+    setBonusSelections.length > 0
+  ) {
+    const { count: anyFeasible } = estimateFilteredComboCount(
+      request.pool,
+      exoticLock,
+      {
+        constraints: request.constraints,
+        setBonusSelections,
+        statOffset: fragmentOffset,
+        assumedMods,
+        cap: 1,
+      },
+    );
+    if (anyFeasible === 0) {
+      onProgress?.(100);
+      return [];
+    }
+  } else if (
+    !areConstraintsAchievable(
+      request.pool,
+      request.constraints,
+      fragmentOffset,
+      exoticLock,
+      assumedMods,
+      setBonusSelections,
+    )
+  ) {
+    onProgress?.(100);
+    return [];
+  }
+
   const bySlot = groupPoolBySlot(request.pool);
   const lockedIdentityKey = resolveLockedExoticIdentityKey(
     exoticLock,
@@ -129,25 +169,33 @@ export function searchLoadouts(
       if (!satisfiesSetBonuses(chosen, setBonusSelections)) {
         return;
       }
-      if (satisfiesConstraints(partialTotals, request.constraints)) {
-        const slots = Object.fromEntries(
-          chosen.map((piece, i) => [SLOT_ORDER[i]!, piece.itemInstanceId]),
-        ) as OptimizerSolution["slots"];
-        const interchangeable = Object.fromEntries(
-          chosen.map((piece, i) => [
-            SLOT_ORDER[i]!,
-            membersByInstanceId.get(piece.itemInstanceId) ?? [
-              piece.itemInstanceId,
-            ],
-          ]),
-        ) as NonNullable<OptimizerSolution["interchangeable"]>;
-        candidates.push({
-          slots,
-          totals: partialTotals,
-          signature: solutionSignature(partialTotals),
-          interchangeable,
-        });
+      const resolved = resolveLoadoutTotals(
+        chosen,
+        request.constraints,
+        fragmentOffset,
+        assumedMods,
+      );
+      if (resolved == null) {
+        return;
       }
+      const slots = Object.fromEntries(
+        chosen.map((piece, i) => [SLOT_ORDER[i]!, piece.itemInstanceId]),
+      ) as OptimizerSolution["slots"];
+      const interchangeable = Object.fromEntries(
+        chosen.map((piece, i) => [
+          SLOT_ORDER[i]!,
+          membersByInstanceId.get(piece.itemInstanceId) ?? [
+            piece.itemInstanceId,
+          ],
+        ]),
+      ) as NonNullable<OptimizerSolution["interchangeable"]>;
+      candidates.push({
+        slots,
+        totals: resolved.totals,
+        signature: solutionSignature(resolved.totals),
+        interchangeable,
+        resolved,
+      });
       return;
     }
 
@@ -180,6 +228,7 @@ export function searchLoadouts(
           remaining - 1,
           perSlotMax,
           request.constraints,
+          assumedMods,
         )
       ) {
         continue;
@@ -200,10 +249,10 @@ export function searchLoadouts(
 
   const zeroTotals = totalsFromPieces([]);
   const startTotals =
-    request.statOffset && Object.keys(request.statOffset).length > 0
+    Object.keys(fragmentOffset).length > 0
       ? addStatOffsets(
           zeroTotals,
-          request.statOffset as Record<(typeof ARMOR_STAT_NAMES)[number], number>,
+          fragmentOffset as Record<(typeof ARMOR_STAT_NAMES)[number], number>,
         )
       : zeroTotals;
   visit(0, [], startTotals);

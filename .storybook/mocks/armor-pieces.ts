@@ -13,15 +13,15 @@ const TUNE = MOCK_TUNINGS[0]!;
 const CHAR_TITAN = "char-titan-01";
 const CHAR_HUNTER = "char-hunter-01";
 
-/** Tier-5 style totals: +30 / +25 / +20 plugs plus +Weapons / -Grenade tuning. */
+/** Tier-5 style totals: +30 / +25 / +20 plugs plus +5 / −5 tuning. */
 function mockStatTotals(
   tertiary: ArmorStatName,
 ): Partial<Record<ArmorStatName, number>> {
   return {
-    Weapons: 40,
+    Weapons: 35,
     Health: 25,
     [tertiary]: 20,
-    Grenade: -10,
+    Grenade: -5,
   };
 }
 

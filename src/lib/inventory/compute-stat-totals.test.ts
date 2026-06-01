@@ -19,15 +19,15 @@ describe("buildStatTotals", () => {
         { stat: "Class", value: 20 },
       ],
       [
-        { stat: "Weapons", value: 10 },
-        { stat: "Grenade", value: -10 },
+        { stat: "Weapons", value: 5 },
+        { stat: "Grenade", value: -5 },
       ],
     );
     expect(totals).toEqual({
-      Weapons: 40,
+      Weapons: 35,
       Health: 25,
       Class: 20,
-      Grenade: -10,
+      Grenade: -5,
     });
   });
 });
@@ -47,9 +47,9 @@ describe("parseTuningPairFromName", () => {
 
 describe("tuningDeltasFromDisplayName", () => {
   it("builds symmetric +/- magnitudes", () => {
-    expect(tuningDeltasFromDisplayName("+Class / -Super", 10)).toEqual([
-      { stat: "Class", value: 10 },
-      { stat: "Super", value: -10 },
+    expect(tuningDeltasFromDisplayName("+Class / -Super")).toEqual([
+      { stat: "Class", value: 5 },
+      { stat: "Super", value: -5 },
     ]);
   });
 });
@@ -73,7 +73,7 @@ describe("estimateStatTotalsFromLabels", () => {
       location: { kind: "vault" },
     };
     expect(estimateStatTotalsFromLabels(piece)).toEqual({
-      Weapons: 40,
+      Weapons: 35,
       Health: 25,
       Class: 20,
     });
@@ -125,7 +125,7 @@ describe("isTier5Piece", () => {
     expect(
       isTier5Piece({
         ...base,
-        statTotals: { Weapons: 40, Health: 25, Class: 20, Grenade: -10 },
+        statTotals: { Weapons: 35, Health: 25, Class: 20, Grenade: -5 },
       }),
     ).toBe(true);
     expect(

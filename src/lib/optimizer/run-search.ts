@@ -1,4 +1,9 @@
-import { computeStatBounds } from "@/lib/optimizer/bounds";
+import {
+  computeStatBounds,
+  estimateOptimizerComboCount,
+  SEARCH_AUTO_RUN_COMBO_LIMIT,
+} from "@/lib/optimizer/bounds";
+import { DEFAULT_EXOTIC_LOCK } from "@/lib/optimizer/exotic-lock";
 import { searchLoadouts } from "@/lib/optimizer/search";
 import type {
   OptimizerRequest,
@@ -17,11 +22,27 @@ export async function runOptimizerSearch(
   onProgress?: (percent: number) => void,
   isCancelled?: () => boolean,
 ): Promise<OptimizerSearchResult> {
-  const bounds = computeStatBounds(
-    payload.pool,
-    payload.statOffset,
-    payload.exoticLock,
-  );
+  onProgress?.(0);
+
+  const exoticLock = payload.exoticLock ?? DEFAULT_EXOTIC_LOCK;
+  const comboCount = estimateOptimizerComboCount(payload.pool, exoticLock);
+  const bounds =
+    comboCount <= SEARCH_AUTO_RUN_COMBO_LIMIT
+      ? computeStatBounds(
+          payload.pool,
+          payload.statOffset,
+          exoticLock,
+          payload.constraints,
+          payload.assumedStatMods,
+        )
+      : computeStatBounds(
+          payload.pool,
+          payload.statOffset,
+          exoticLock,
+          undefined,
+          payload.assumedStatMods,
+        );
+
   await new Promise<void>((resolve) => {
     setTimeout(resolve, 0);
   });

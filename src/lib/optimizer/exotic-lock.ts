@@ -37,10 +37,23 @@ export function resolveLockedExoticIdentityKey(
   lookupPieces: DerivedArmorPieceJson[],
 ): string | null {
   if (lock.mode !== "locked") return null;
-  const locked = lookupPieces.find(
+  const direct = lookupPieces.find(
     (p) => p.itemInstanceId === lock.itemInstanceId,
   );
-  return locked ? exoticPieceIdentityKey(locked) : null;
+  if (direct?.isExotic) return exoticPieceIdentityKey(direct);
+
+  const slotExotics = lookupPieces.filter(
+    (p) => p.isExotic && p.slot === lock.slot,
+  );
+  if (slotExotics.length === 0) return null;
+
+  const keys = new Set(slotExotics.map((p) => exoticPieceIdentityKey(p)));
+  if (keys.size === 1) return [...keys][0]!;
+
+  const fallback = slotExotics.find(
+    (p) => p.itemInstanceId === lock.itemInstanceId,
+  );
+  return fallback ? exoticPieceIdentityKey(fallback) : null;
 }
 
 export function pieceMatchesLockedExotic(
@@ -216,14 +229,34 @@ function pickRepresentativeExoticCopy(
 }
 
 /** Map a locked instance to the canonical copy when duplicates exist. */
+export function resolveLockedExoticInInventory(
+  lock: ExoticLock,
+  inventory: DerivedArmorPieceJson[],
+  classType: number,
+): DerivedArmorPieceJson | null {
+  if (lock.mode !== "locked") return null;
+  const owned = ownedExoticsForClass(inventory, classType);
+  const byId = owned.find((p) => p.itemInstanceId === lock.itemInstanceId);
+  if (byId) return byId;
+
+  const inSlot = owned.filter((p) => p.slot === lock.slot);
+  if (inSlot.length === 1) return inSlot[0]!;
+
+  const keysForSlot = new Set(inSlot.map((p) => exoticPieceIdentityKey(p)));
+  if (keysForSlot.size === 1 && inSlot[0]) {
+    return inSlot[0];
+  }
+
+  return null;
+}
+
 export function normalizeExoticLock(
   lock: ExoticLock,
   inventory: DerivedArmorPieceJson[],
   classType: number,
 ): ExoticLock {
   if (lock.mode !== "locked") return lock;
-  const owned = ownedExoticsForClass(inventory, classType);
-  const locked = owned.find((p) => p.itemInstanceId === lock.itemInstanceId);
+  const locked = resolveLockedExoticInInventory(lock, inventory, classType);
   if (!locked) return { mode: "any" };
   const lockedKey = exoticPieceIdentityKey(locked);
   const representative = uniqueOwnedExoticsForClass(inventory, classType).find(

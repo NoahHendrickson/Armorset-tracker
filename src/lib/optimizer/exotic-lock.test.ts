@@ -120,6 +120,21 @@ describe("exotic lock", () => {
     expect(unique[0]?.itemInstanceId).toBe("ex-current");
   });
 
+  it("resolves stale instance id when only one exotic occupies the slot", () => {
+    const exo = piece("helmet", "ex-new", true);
+    exo.displayName = "Cenotaph Mask";
+    const next = normalizeExoticLock(
+      { mode: "locked", itemInstanceId: "ex-stale", slot: "helmet" },
+      [exo],
+      0,
+    );
+    expect(next).toEqual({
+      mode: "locked",
+      itemInstanceId: "ex-new",
+      slot: "helmet",
+    });
+  });
+
   it("normalizes a locked duplicate to the representative instance", () => {
     const dupA = piece("helmet", "ex-dup-a", true);
     dupA.itemHash = 4242;
