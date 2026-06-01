@@ -6,10 +6,18 @@ import type {
   ManifestCollectibleDefinition,
   ManifestEquipableItemSetDefinition,
   ManifestInventoryItemDefinition,
+  ManifestPlugSetDefinition,
+  ManifestSandboxPerkDefinition,
   ManifestSocketCategoryDefinition,
   ManifestSocketTypeDefinition,
   ManifestStatDefinition,
 } from "./types";
+import {
+  exoticStatBudgetFromItemSockets,
+  investmentStatsToStatTotals,
+  mergeExoticStatTotals,
+} from "@/lib/manifest/exotic-stat-budget";
+import { parseSubclassKeyFromPlugCategory } from "@/lib/optimizer/subclass-key";
 
 export interface DeriveInputs {
   version: string;
@@ -19,6 +27,8 @@ export interface DeriveInputs {
   collectibles: Record<string, ManifestCollectibleDefinition>;
   stats: Record<string, ManifestStatDefinition>;
   equipableItemSets: Record<string, ManifestEquipableItemSetDefinition>;
+  sandboxPerks: Record<string, ManifestSandboxPerkDefinition>;
+  plugSets: Record<string, ManifestPlugSetDefinition>;
 }
 
 const SLOT_SUFFIX_PATTERNS: Array<{ slot: ArmorSlot; patterns: RegExp[] }> = [
@@ -119,6 +129,17 @@ function categorizePlug(plug: ManifestInventoryItemDefinition): "archetype" | "t
   return null;
 }
 
+/** Subclass fragment plugs (aspects use different categories — excluded here). */
+function isSubclassFragmentPlug(item: ManifestInventoryItemDefinition): boolean {
+  const id = item.plug?.plugCategoryIdentifier?.toLowerCase() ?? "";
+  if (!id) return false;
+  return (
+    id.includes(".fragments") ||
+    id.endsWith("fragments") ||
+    id.includes(".trinkets")
+  );
+}
+
 // Build a stat-hash -> canonical ArmorStatName map from DestinyStatDefinition.
 // Multiple stat hashes may resolve to the same name (the manifest has dupes
 // for "Class" and "Melee") — we accept all of them since we only care about
@@ -150,15 +171,23 @@ function pickStatIconPath(dp: ManifestStatDefinition["displayProperties"]): stri
 function buildArmorStatIcons(
   stats: Record<string, ManifestStatDefinition>,
   statNameByHash: Map<number, ArmorStatName>,
-): Array<{ stat: ArmorStatName; icon_path: string }> {
+): Array<{
+  stat: ArmorStatName;
+  icon_path: string;
+  destiny_stat_hash: number | null;
+}> {
   const byStat = new Map<ArmorStatName, string>();
+  const hashByStat = new Map<ArmorStatName, number>();
 
   for (const def of Object.values(stats)) {
     if (def.redacted) continue;
     const statName = statNameByHash.get(def.hash);
     if (!statName) continue;
     const path = pickStatIconPath(def.displayProperties);
-    if (path && !byStat.has(statName)) byStat.set(statName, path);
+    if (path && !byStat.has(statName)) {
+      byStat.set(statName, path);
+      hashByStat.set(statName, def.hash);
+    }
   }
 
   for (const statName of ARMOR_STAT_NAMES) {
@@ -169,12 +198,16 @@ function buildArmorStatIcons(
       return n === statName && Boolean(pickStatIconPath(d.displayProperties));
     });
     const path = pickStatIconPath(def?.displayProperties);
-    if (path) byStat.set(statName, path);
+    if (path) {
+      byStat.set(statName, path);
+      if (def) hashByStat.set(statName, def.hash);
+    }
   }
 
   return ARMOR_STAT_NAMES.filter((s) => byStat.has(s)).map((stat) => ({
     stat,
     icon_path: byStat.get(stat)!,
+    destiny_stat_hash: hashByStat.get(stat) ?? null,
   }));
 }
 
@@ -245,6 +278,8 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
     collectibles,
     stats,
     equipableItemSets,
+    sandboxPerks,
+    plugSets,
   } = inputs;
 
   const { archetype: archetypeCategoryHashes, tuning: tuningCategoryHashes } =
@@ -264,10 +299,23 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
   const tuningBucketByStat = new Map<string, { hash: number; name: string }>();
   const plugToArchetype = new Map<number, number>();
   const plugToTuning = new Map<number, number>();
+  const tuningPlugStats = new Map<
+    number,
+    Array<{ stat: ArmorStatName; value: number }>
+  >();
   // armor_stats plug -> (stat name, magnitude). The manifest has 180 of these
   // (6 stats x 30 magnitudes). We use them at inventory time to label each
   // piece's primary/secondary/tertiary stat by ranking the 3 plugs by magnitude.
   const statPlugs = new Map<number, { stat: ArmorStatName; value: number }>();
+  const subclassFragmentPlugs = new Map<
+    number,
+    {
+      name: string;
+      icon_path: string;
+      subclass_key: string;
+      deltas: Array<{ stat: ArmorStatName; value: number }>;
+    }
+  >();
 
   for (const item of Object.values(items)) {
     if (item.redacted || item.blacklisted) continue;
@@ -303,6 +351,40 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
       tuningBucketByStat.set(positive, bucket);
     }
     plugToTuning.set(item.hash, bucket.hash);
+    const deltas: Array<{ stat: ArmorStatName; value: number }> = [];
+    for (const inv of item.investmentStats ?? []) {
+      if (inv.isConditionallyActive) continue;
+      const statName = statNameByHash.get(inv.statTypeHash);
+      if (!statName || inv.value === 0) continue;
+      deltas.push({ stat: statName, value: inv.value });
+    }
+    if (deltas.length > 0) {
+      tuningPlugStats.set(item.hash, deltas);
+    }
+  }
+
+  for (const item of Object.values(items)) {
+    if (item.redacted || item.blacklisted) continue;
+    if (!isSubclassFragmentPlug(item)) continue;
+    const name = item.displayProperties?.name?.trim();
+    if (!name) continue;
+    const deltas: Array<{ stat: ArmorStatName; value: number }> = [];
+    for (const inv of item.investmentStats ?? []) {
+      const statName = statNameByHash.get(inv.statTypeHash);
+      if (!statName || inv.value === 0) continue;
+      // Fragment armor-stat bonuses are often isConditionallyActive in the manifest
+      // even though they always apply when the fragment is slotted (DIM treats them as active).
+      deltas.push({ stat: statName, value: inv.value });
+    }
+    if (deltas.length === 0) continue;
+    subclassFragmentPlugs.set(item.hash, {
+      name,
+      icon_path: pickStatIconPath(item.displayProperties),
+      subclass_key: parseSubclassKeyFromPlugCategory(
+        item.plug?.plugCategoryIdentifier ?? "",
+      ),
+      deltas,
+    });
   }
 
   // Group armor by manifest equipable set hash (avoids merging unrelated rows that share a display name).
@@ -329,6 +411,7 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
     class_type: number;
     name: string;
     icon_path: string;
+    stat_totals: Partial<Record<ArmorStatName, number>>;
   }> = [];
 
   for (const item of Object.values(items)) {
@@ -346,6 +429,17 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
         item.displayProperties?.name?.trim() ||
         exoticCollectible?.displayProperties?.name?.trim();
       if (!exoticName) continue;
+      const statTotals = mergeExoticStatTotals(
+        investmentStatsToStatTotals(item.investmentStats, statNameByHash),
+        exoticStatBudgetFromItemSockets(item, {
+          statPlugs,
+          tuningPlugStats,
+          plugToTuning,
+          items,
+          statNameByHash,
+          plugSets,
+        }),
+      );
       exoticArmor.push({
         item_hash: item.hash,
         slot,
@@ -354,6 +448,7 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
         icon_path:
           pickStatIconPath(item.displayProperties) ||
           pickStatIconPath(exoticCollectible?.displayProperties),
+        stat_totals: statTotals,
       });
       continue;
     }
@@ -443,6 +538,33 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
 
   const filteredArmorItems = armorItems.filter((it) => keptSetHashes.has(it.set_hash));
 
+  const armorSetPerks: DerivedManifestData["armorSetPerks"] = [];
+  for (const set of armorSets) {
+    const eqDef = equipableItemSets[String(set.set_hash)];
+    if (!eqDef?.setPerks?.length) continue;
+    for (const raw of eqDef.setPerks) {
+      const perk = raw as {
+        requiredSetCount?: number;
+        sandboxPerkHash?: number;
+      };
+      const required = perk.requiredSetCount;
+      const sandboxHash = perk.sandboxPerkHash;
+      if (!required || !sandboxHash) continue;
+      const sandbox = sandboxPerks[String(sandboxHash)];
+      if (!sandbox || sandbox.redacted) continue;
+      const name = sandbox.displayProperties?.name?.trim();
+      if (!name) continue;
+      armorSetPerks.push({
+        set_hash: set.set_hash,
+        required_set_count: required,
+        sandbox_perk_hash: sandboxHash,
+        name,
+        description: sandbox.displayProperties?.description?.trim() ?? "",
+        icon_path: pickStatIconPath(sandbox.displayProperties),
+      });
+    }
+  }
+
   return {
     version,
     archetypeCategoryHashes: [...archetypeCategoryHashes],
@@ -477,6 +599,23 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
       stat,
       value,
     })),
+    tuningPlugStats: [...tuningPlugStats.entries()].flatMap(
+      ([plug_hash, deltas]) =>
+        deltas.map(({ stat, value }) => ({ plug_hash, stat, value })),
+    ),
+    subclassFragmentPlugs: [...subclassFragmentPlugs.entries()].map(
+      ([plug_hash, meta]) => ({
+        plug_hash,
+        name: meta.name,
+        icon_path: meta.icon_path,
+        subclass_key: meta.subclass_key,
+      }),
+    ),
+    subclassFragmentPlugStats: [...subclassFragmentPlugs.entries()].flatMap(
+      ([plug_hash, meta]) =>
+        meta.deltas.map(({ stat, value }) => ({ plug_hash, stat, value })),
+    ),
     armorStatIcons,
+    armorSetPerks,
   };
 }

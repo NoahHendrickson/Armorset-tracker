@@ -2,14 +2,18 @@ import "server-only";
 import { fetchManifestSlice, getDestinyManifest } from "@/lib/bungie/client";
 import { getServiceRoleClient } from "@/lib/db/server";
 import { invalidateManifestLookups } from "@/lib/manifest/lookups";
+import { invalidateManifestVersionCheck } from "@/lib/manifest/version-check";
 import { deriveManifestData } from "./derive";
+import { optimizerFragmentCatalogComplete } from "@/lib/optimizer/subclass-key";
 import type {
   ManifestCollectibleDefinition,
   ManifestEquipableItemSetDefinition,
   ManifestInventoryItemDefinition,
+  ManifestPlugSetDefinition,
   ManifestSocketCategoryDefinition,
   ManifestSocketTypeDefinition,
   ManifestStatDefinition,
+  ManifestSandboxPerkDefinition,
 } from "./types";
 
 const TABLES_OF_INTEREST = [
@@ -19,6 +23,8 @@ const TABLES_OF_INTEREST = [
   "DestinyCollectibleDefinition",
   "DestinyStatDefinition",
   "DestinyEquipableItemSetDefinition",
+  "DestinySandboxPerkDefinition",
+  "DestinyPlugSetDefinition",
 ] as const;
 
 export interface SyncResult {
@@ -34,6 +40,10 @@ export interface SyncResult {
     plug_to_tuning: number;
     archetype_stat_pairs: number;
     armor_stat_plugs: number;
+    tuning_plug_stats: number;
+    subclass_fragment_plugs: number;
+    subclass_fragment_plug_stats: number;
+    armor_set_perks: number;
     armor_stat_icons: number;
   };
 }
@@ -61,8 +71,12 @@ export async function syncManifest({
         { count: armorSetsCount },
         { count: armorItemsCount },
         { count: exoticArmorCount },
+        { count: fragmentPlugsCount },
+        { count: setPerksCount },
+        { count: unknownSubclassKeysCount },
         { count: setsMissingLegacyHashes },
         { data: armorItemIconSample },
+        { data: fragmentSubclassKeys },
       ] = await Promise.all([
         sb.from("archetype_stat_pairs").select("*", { count: "exact", head: true }),
         sb.from("armor_stat_plugs").select("*", { count: "exact", head: true }),
@@ -70,12 +84,23 @@ export async function syncManifest({
         sb.from("armor_sets").select("*", { count: "exact", head: true }),
         sb.from("armor_items").select("*", { count: "exact", head: true }),
         sb.from("exotic_armor").select("*", { count: "exact", head: true }),
+        sb.from("subclass_fragment_plugs").select("*", { count: "exact", head: true }),
+        sb.from("armor_set_perks").select("*", { count: "exact", head: true }),
+        sb
+          .from("subclass_fragment_plugs")
+          .select("*", { count: "exact", head: true })
+          .eq("subclass_key", "unknown"),
         sb
           .from("armor_sets")
           .select("*", { count: "exact", head: true })
           .is("legacy_set_hashes", null),
         sb.from("armor_items").select("item_hash").neq("icon_path", "").limit(1).maybeSingle(),
+        sb.from("subclass_fragment_plugs").select("subclass_key"),
       ]);
+      const fragmentCatalogComplete = optimizerFragmentCatalogComplete(
+        (fragmentSubclassKeys ?? []).map((row) => row.subclass_key),
+        fragmentPlugsCount ?? 0,
+      );
       const derivedComplete =
         (pairsCount ?? 0) > 0 &&
         (plugsCount ?? 0) > 0 &&
@@ -84,7 +109,12 @@ export async function syncManifest({
         (armorItemsCount ?? 0) > 0 &&
         /** Re-run derive after schema adds `exotic_armor` — empty until tables are replaced. */
         (exoticArmorCount ?? 0) > 0 &&
+        (fragmentPlugsCount ?? 0) > 0 &&
+        fragmentCatalogComplete &&
+        (setPerksCount ?? 0) > 0 &&
         (setsMissingLegacyHashes ?? 0) === 0 &&
+        /** Re-run derive when subclass keys were never backfilled after migration. */
+        (unknownSubclassKeysCount ?? 0) === 0 &&
         /** Re-run derive after schema adds `icon_path` — old rows keep "" until tables are replaced. */
         armorItemIconSample != null;
       if (derivedComplete) {
@@ -122,11 +152,20 @@ export async function syncManifest({
       string,
       ManifestEquipableItemSetDefinition
     >,
+    sandboxPerks: slices.DestinySandboxPerkDefinition as Record<
+      string,
+      ManifestSandboxPerkDefinition
+    >,
+    plugSets: slices.DestinyPlugSetDefinition as Record<
+      string,
+      ManifestPlugSetDefinition
+    >,
   });
 
   await replaceDerivedTables(derived);
   await markVersionActive(version);
   invalidateManifestLookups();
+  invalidateManifestVersionCheck();
 
   return {
     version,
@@ -141,6 +180,10 @@ export async function syncManifest({
       plug_to_tuning: derived.plugToTuning.length,
       archetype_stat_pairs: derived.archetypeStatPairs.length,
       armor_stat_plugs: derived.armorStatPlugs.length,
+      tuning_plug_stats: derived.tuningPlugStats.length,
+      subclass_fragment_plugs: derived.subclassFragmentPlugs.length,
+      subclass_fragment_plug_stats: derived.subclassFragmentPlugStats.length,
+      armor_set_perks: derived.armorSetPerks.length,
       armor_stat_icons: derived.armorStatIcons.length,
     },
   };
@@ -156,6 +199,10 @@ type DerivedTable =
   | "plug_to_tuning"
   | "archetype_stat_pairs"
   | "armor_stat_plugs"
+  | "tuning_plug_stats"
+  | "subclass_fragment_plugs"
+  | "subclass_fragment_plug_stats"
+  | "armor_set_perks"
   | "armor_stat_icons";
 
 async function currentCounts(sb: ReturnType<typeof getServiceRoleClient>) {
@@ -169,6 +216,10 @@ async function currentCounts(sb: ReturnType<typeof getServiceRoleClient>) {
     plug_to_tuning,
     archetype_stat_pairs,
     armor_stat_plugs,
+    tuning_plug_stats,
+    subclass_fragment_plugs,
+    subclass_fragment_plug_stats,
+    armor_set_perks,
     armor_stat_icons,
   ] = await Promise.all([
     countTable(sb, "armor_sets"),
@@ -180,6 +231,10 @@ async function currentCounts(sb: ReturnType<typeof getServiceRoleClient>) {
     countTable(sb, "plug_to_tuning"),
     countTable(sb, "archetype_stat_pairs"),
     countTable(sb, "armor_stat_plugs"),
+    countTable(sb, "tuning_plug_stats"),
+    countTable(sb, "subclass_fragment_plugs"),
+    countTable(sb, "subclass_fragment_plug_stats"),
+    countTable(sb, "armor_set_perks"),
     countTable(sb, "armor_stat_icons"),
   ]);
   return {
@@ -192,6 +247,10 @@ async function currentCounts(sb: ReturnType<typeof getServiceRoleClient>) {
     plug_to_tuning,
     archetype_stat_pairs,
     armor_stat_plugs,
+    tuning_plug_stats,
+    subclass_fragment_plugs,
+    subclass_fragment_plug_stats,
+    armor_set_perks,
     armor_stat_icons,
   };
 }
@@ -213,6 +272,10 @@ async function replaceDerivedTables(derived: ReturnType<typeof deriveManifestDat
   await sb.from("plug_to_archetype").delete().not("plug_hash", "is", null);
   await sb.from("plug_to_tuning").delete().not("plug_hash", "is", null);
   await sb.from("archetype_stat_pairs").delete().not("archetype_hash", "is", null);
+  await sb.from("subclass_fragment_plug_stats").delete().not("plug_hash", "is", null);
+  await sb.from("subclass_fragment_plugs").delete().not("plug_hash", "is", null);
+  await sb.from("armor_set_perks").delete().not("set_hash", "is", null);
+  await sb.from("tuning_plug_stats").delete().not("plug_hash", "is", null);
   await sb.from("armor_stat_plugs").delete().not("plug_hash", "is", null);
   await sb.from("armor_stat_icons").delete().not("stat", "is", null);
   await sb.from("archetypes").delete().not("archetype_hash", "is", null);
@@ -228,6 +291,14 @@ async function replaceDerivedTables(derived: ReturnType<typeof deriveManifestDat
   await chunkInsert(sb, "plug_to_tuning", derived.plugToTuning);
   await chunkInsert(sb, "archetype_stat_pairs", derived.archetypeStatPairs);
   await chunkInsert(sb, "armor_stat_plugs", derived.armorStatPlugs);
+  await chunkInsert(sb, "tuning_plug_stats", derived.tuningPlugStats);
+  await chunkInsert(sb, "subclass_fragment_plugs", derived.subclassFragmentPlugs);
+  await chunkInsert(
+    sb,
+    "subclass_fragment_plug_stats",
+    derived.subclassFragmentPlugStats,
+  );
+  await chunkInsert(sb, "armor_set_perks", derived.armorSetPerks);
   await chunkInsert(sb, "armor_stat_icons", derived.armorStatIcons);
 }
 

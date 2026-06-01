@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { useState } from "react";
+import { expect, userEvent, within } from "storybook/test";
 import { TrackerFilterBar } from "./tracker-filter-bar";
 import { MOCK_TRACKER_FORM_SELECTORS } from "../../../.storybook/mocks/tracker-options";
 import {
@@ -28,6 +29,7 @@ function Render({
   showRarityFilter = false,
   searchPlacement,
   searchDefaultExpanded,
+  embedClassInSearch,
   withSavedViews = true,
   width = 960,
 }: {
@@ -36,6 +38,7 @@ function Render({
   showRarityFilter?: boolean;
   searchPlacement?: "start" | "end";
   searchDefaultExpanded?: boolean;
+  embedClassInSearch?: boolean;
   withSavedViews?: boolean;
   width?: number;
 }) {
@@ -68,6 +71,7 @@ function Render({
         showRarityFilter={showRarityFilter}
         searchPlacement={searchPlacement}
         searchDefaultExpanded={searchDefaultExpanded}
+        embedClassInSearch={embedClassInSearch}
         savedViews={savedViews}
       />
     </div>
@@ -124,7 +128,7 @@ export const InventoryTableWithRarity: Story = {
   ),
 };
 
-/** Table view: primary set search leftmost and expanded by default. */
+/** Table view: class icons embedded in search; F focuses search. */
 export const InventoryTableSearchPrimary: Story = {
   render: () => (
     <Render
@@ -132,7 +136,16 @@ export const InventoryTableSearchPrimary: Story = {
       showRarityFilter
       searchPlacement="start"
       searchDefaultExpanded
+      embedClassInSearch
       width={1200}
     />
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.keyboard("f");
+    const search = await canvas.findByRole("searchbox", {
+      name: /search armor sets/i,
+    });
+    await expect(search).toHaveFocus();
+  },
 };

@@ -51,13 +51,26 @@ export interface ManifestEquipableItemSetDefinition {
   displayProperties?: DisplayProperties;
   /** Item definition hashes that belong to this set (when omitted or empty, accept any item with matching `equipableItemSetHash`). */
   setItems?: number[];
-  setPerks?: unknown[];
+  setPerks?: Array<{ requiredSetCount?: number; sandboxPerkHash?: number }>;
+}
+
+export interface ManifestSandboxPerkDefinition {
+  hash: number;
+  redacted?: boolean;
+  displayProperties?: DisplayProperties;
 }
 
 export interface ManifestStatDefinition {
   hash: number;
   redacted?: boolean;
   displayProperties?: DisplayProperties;
+}
+
+/** Bungie `DestinyPlugSetDefinition` — reusable/randomized socket plug lists. */
+export interface ManifestPlugSetDefinition {
+  hash: number;
+  redacted?: boolean;
+  reusablePlugItems?: Array<{ plugItemHash?: number; currentlyCanRoll?: boolean }>;
 }
 
 export interface ManifestSocketCategoryDefinition {
@@ -116,6 +129,7 @@ export interface DerivedManifestData {
     class_type: number;
     name: string;
     icon_path: string;
+    stat_totals: Partial<Record<ArmorStatName, number>>;
   }>;
   archetypes: Array<{ archetype_hash: number; name: string }>;
   tunings: Array<{ tuning_hash: number; name: string }>;
@@ -131,9 +145,34 @@ export interface DerivedManifestData {
     stat: ArmorStatName;
     value: number;
   }>;
+  tuningPlugStats: Array<{
+    plug_hash: number;
+    stat: ArmorStatName;
+    value: number;
+  }>;
+  subclassFragmentPlugs: Array<{
+    plug_hash: number;
+    name: string;
+    icon_path: string;
+    subclass_key: string;
+  }>;
+  subclassFragmentPlugStats: Array<{
+    plug_hash: number;
+    stat: ArmorStatName;
+    value: number;
+  }>;
   /** One icon path per armor stat (DestinyStatDefinition.displayProperties.icon). */
   armorStatIcons: Array<{
     stat: ArmorStatName;
+    icon_path: string;
+    destiny_stat_hash: number | null;
+  }>;
+  armorSetPerks: Array<{
+    set_hash: number;
+    required_set_count: number;
+    sandbox_perk_hash: number;
+    name: string;
+    description: string;
     icon_path: string;
   }>;
 }

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { revalidatePath } from "next/cache";
 import { syncManifest } from "@/lib/manifest/sync";
 import { invalidateManifestLookups } from "@/lib/manifest/lookups";
 import { invalidateManifestVersionCheck } from "@/lib/manifest/version-check";
@@ -20,6 +21,7 @@ async function handleManifestSync(force: boolean) {
   const result = await syncManifest({ force });
   invalidateManifestLookups();
   invalidateManifestVersionCheck();
+  revalidatePath("/dashboard");
   return NextResponse.json({ ok: true, ...result });
 }
 

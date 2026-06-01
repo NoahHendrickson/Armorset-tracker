@@ -9,6 +9,7 @@ import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
 import { buildWorkspaceDataHealth } from "@/lib/workspace/workspace-data-health.shared";
 import { manifestSelectorsFromLookups } from "@/lib/views/manifest-selectors-from-lookup";
 import { buildGridLookupPayload } from "@/lib/views/grid-lookup-payload.server";
+import { buildOptimizerLookupPayload } from "@/lib/views/optimizer-lookup-payload.server";
 import { parseGridFilters } from "@/lib/workspace/grid-filters-schema";
 import { listSavedViewsForUser } from "@/lib/saved-views/queries";
 import {
@@ -79,6 +80,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const selectors = manifestSelectorsFromLookups(lookups);
   const lookupPayload = buildGridLookupPayload(lookups);
+  const optimizerLookup = buildOptimizerLookupPayload(lookups);
 
   const banners = dataHealth.manifestNeedsSync ? (
     <ManifestStatusBanner
@@ -98,6 +100,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       selectors={selectors}
       inventory={inventory}
       lookupPayload={lookupPayload}
+      optimizerLookup={optimizerLookup}
       initialGridFilters={initialGridFilters}
       initialSavedViews={savedViews}
       appliedFromShare={appliedFromShare}

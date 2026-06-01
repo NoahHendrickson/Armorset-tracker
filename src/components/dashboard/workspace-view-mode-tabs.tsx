@@ -1,10 +1,14 @@
 "use client";
 
-import { SquaresFour, Table } from "@phosphor-icons/react/dist/ssr";
+import {
+  SlidersHorizontal,
+  SquaresFour,
+  Table,
+} from "@phosphor-icons/react/dist/ssr";
 import { cn } from "@/lib/utils";
 import { chromeToolbarShellClass } from "@/components/ui/chrome-square-icon-button";
 
-export type WorkspaceViewMode = "grid" | "table";
+export type WorkspaceViewMode = "grid" | "table" | "optimizer";
 
 interface WorkspaceViewModeTabsProps {
   mode: WorkspaceViewMode;
@@ -50,6 +54,20 @@ export function WorkspaceViewModeTabs({
       >
         <SquaresFour className="h-4 w-4" weight="duotone" aria-hidden />
         Tracker
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "optimizer"}
+        className={cn(
+          segmentBtn,
+          "border-l border-border",
+          mode === "optimizer" && "bg-accent text-foreground",
+        )}
+        onClick={() => onModeChange("optimizer")}
+      >
+        <SlidersHorizontal className="h-4 w-4" weight="duotone" aria-hidden />
+        Optimize
       </button>
     </div>
   );

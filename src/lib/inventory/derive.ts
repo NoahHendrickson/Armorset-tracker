@@ -8,11 +8,19 @@ import {
   resolveArmorCatalogItem,
   type ManifestLookups,
 } from "@/lib/manifest/lookups";
-import type {
-  ArmorStatName,
-  DerivedArmorPieceJson,
-  ItemLocationJson,
+import {
+  ARMOR_STAT_NAMES,
+  type ArmorStatName,
+  type DerivedArmorPieceJson,
+  type ItemLocationJson,
 } from "@/lib/db/types";
+import {
+  armorTierFromIntrinsicMagnitudes,
+  buildStatTotals,
+  tuningDeltasFromDisplayName,
+} from "@/lib/inventory/compute-stat-totals";
+import { instanceArmorStatTotals } from "@/lib/inventory/instance-armor-stats";
+import { exoticPieceIdentityKey } from "@/lib/optimizer/exotic-lock";
 
 interface ItemEntry {
   item: ItemComponent;
@@ -110,39 +118,78 @@ export function deriveArmorPiece(
   let archetypeName: string | null = null;
   let tuningHash: number | null = null;
   let tuningName: string | null = null;
+  let tuningPlugHash: number | null = null;
   let tuningCommitted = false;
   // Armor 3.0 pieces have 3 hidden "armor_stats" plugs whose magnitudes (+30 /
   // +25 / +20 for Tier 5) determine the primary / secondary / tertiary stat.
   const statPlugs: Array<{ stat: ArmorStatName; value: number }> = [];
 
-  // First pass — read the currently installed plug per socket. We
-  // intentionally do NOT filter by `socket.isVisible`: the Armor 3.0
-  // archetype plug (e.g. "Gunner") and the 3 stat plugs are `isVisible: false`
-  // because they're intrinsic, not interactive. Tuning is visible. We only
-  // require an enabled plug hash.
-  for (let i = 0; i < sockets.length; i++) {
-    const socket = sockets[i];
-    if (!socket.plugHash || !socket.isEnabled) continue;
-    if (archetypeHash === null && lookups.archetypeByPlug.has(socket.plugHash)) {
-      archetypeHash = lookups.archetypeByPlug.get(socket.plugHash) ?? null;
-      archetypeName =
-        archetypeHash !== null
-          ? lookups.archetypeNameByHash.get(archetypeHash) ?? null
-          : null;
-      continue;
+  const readSockets = (requireEnabled: boolean) => {
+    for (let i = 0; i < sockets.length; i++) {
+      const socket = sockets[i];
+      if (!socket.plugHash) continue;
+      if (requireEnabled && !socket.isEnabled) continue;
+      if (archetypeHash === null && lookups.archetypeByPlug.has(socket.plugHash)) {
+        archetypeHash = lookups.archetypeByPlug.get(socket.plugHash) ?? null;
+        archetypeName =
+          archetypeHash !== null
+            ? lookups.archetypeNameByHash.get(archetypeHash) ?? null
+            : null;
+        continue;
+      }
+      if (tuningHash === null && lookups.tuningByPlug.has(socket.plugHash)) {
+        tuningHash = lookups.tuningByPlug.get(socket.plugHash) ?? null;
+        tuningName =
+          tuningHash !== null
+            ? lookups.tuningNameByHash.get(tuningHash) ?? null
+            : null;
+        tuningPlugHash = socket.plugHash;
+        tuningCommitted = true;
+        continue;
+      }
+      const stat = lookups.statPlug.get(socket.plugHash);
+      if (stat) statPlugs.push(stat);
     }
-    if (tuningHash === null && lookups.tuningByPlug.has(socket.plugHash)) {
-      tuningHash = lookups.tuningByPlug.get(socket.plugHash) ?? null;
-      tuningName =
-        tuningHash !== null
-          ? lookups.tuningNameByHash.get(tuningHash) ?? null
-          : null;
-      tuningCommitted = true;
-      continue;
+  };
+
+  // Armor 3.0 intrinsics are often `isVisible: false`; exotics may report
+  // stat plugs as disabled — legendaries still require an enabled plug.
+  readSockets(!isExotic);
+
+  if (isExotic && statPlugs.length === 0) {
+    let budget =
+      lookups.exoticStatBudgetByItemHash.get(item.itemHash) ?? null;
+    if (
+      (!budget || Object.keys(budget).length === 0) &&
+      displayName != null
+    ) {
+      budget =
+        lookups.exoticStatBudgetByIdentity.get(
+          exoticPieceIdentityKey({
+            itemInstanceId: item.itemInstanceId,
+            itemHash: item.itemHash,
+            slot,
+            classType,
+            setHash: null,
+            setName: null,
+            displayName,
+            isExotic: true,
+            archetypeHash: null,
+            archetypeName: null,
+            tuningHash: null,
+            tuningName: null,
+            primaryStat: null,
+            secondaryStat: null,
+            tertiaryStat: null,
+            location,
+          }),
+        ) ?? null;
     }
-    const stat = lookups.statPlug.get(socket.plugHash);
-    if (stat) {
-      statPlugs.push(stat);
+    if (budget) {
+      for (const stat of ARMOR_STAT_NAMES) {
+        const value = budget[stat];
+        if (value) statPlugs.push({ stat, value });
+      }
     }
   }
 
@@ -153,6 +200,7 @@ export function deriveArmorPiece(
   // direction (and only differ by which stat they debuff), so any one
   // reveals the piece's tuning. Pulling this means a dropped-but-uncommitted
   // piece still gets bucketed into the correct tuning view of the tracker.
+  const tuningVariantPlugHashes: number[] = [];
   if (tuningHash === null) {
     for (let i = 0; i < sockets.length; i++) {
       const candidates = reusablePlugs[String(i)] ?? [];
@@ -160,23 +208,75 @@ export function deriveArmorPiece(
       for (const c of candidates) {
         const t = lookups.tuningByPlug.get(c.plugItemHash);
         if (t !== undefined) {
-          found = t;
-          break;
+          if (found === null) found = t;
+          tuningVariantPlugHashes.push(c.plugItemHash);
         }
       }
       if (found !== null) {
         tuningHash = found;
         tuningName = lookups.tuningNameByHash.get(found) ?? null;
+        tuningPlugHash = tuningVariantPlugHashes[0] ?? null;
         tuningCommitted = false;
         break;
       }
     }
   }
 
-  const ranked = [...statPlugs].sort((a, b) => b.value - a.value);
+  const resolveTuningDeltas = (plugHash: number | null) => {
+    if (plugHash === null) return [];
+    const fromManifest = lookups.tuningPlugStats.get(plugHash);
+    if (fromManifest && fromManifest.length > 0) return fromManifest;
+    const plugTuningHash = lookups.tuningByPlug.get(plugHash);
+    const displayName =
+      plugTuningHash != null
+        ? lookups.tuningNameByHash.get(plugTuningHash)
+        : tuningName;
+    return tuningDeltasFromDisplayName(displayName ?? "") ?? [];
+  };
+
+  let statTotals = buildStatTotals(
+    statPlugs,
+    resolveTuningDeltas(tuningPlugHash),
+  );
+
+  if (
+    isExotic &&
+    Object.keys(statTotals).length === 0 &&
+    lookups.destinyStatHashToArmorStat.size > 0
+  ) {
+    const fromInstance = instanceArmorStatTotals(
+      item.itemInstanceId,
+      profile,
+      lookups.destinyStatHashToArmorStat,
+    );
+    if (fromInstance) statTotals = fromInstance;
+  }
+
+  const uniqueVariantPlugHashes = [
+    ...new Set(tuningVariantPlugHashes),
+  ];
+  const tuningVariants =
+    !tuningCommitted && uniqueVariantPlugHashes.length > 1
+      ? uniqueVariantPlugHashes.map((plugHash) =>
+          buildStatTotals(statPlugs, resolveTuningDeltas(plugHash)),
+        )
+      : undefined;
+
+  const rankedSource =
+    statPlugs.length > 0
+      ? statPlugs
+      : ARMOR_STAT_NAMES.map((stat) => ({
+          stat,
+          value: statTotals[stat] ?? 0,
+        })).filter((row) => row.value > 0);
+  const ranked = [...rankedSource].sort((a, b) => b.value - a.value);
   const primaryStat = ranked[0]?.stat ?? null;
   const secondaryStat = ranked[1]?.stat ?? null;
   const tertiaryStat = ranked[2]?.stat ?? null;
+  // Exotics aren't tier-gated; only legendaries carry a 1–5 gear tier.
+  const tier = isExotic
+    ? null
+    : armorTierFromIntrinsicMagnitudes(statPlugs.map((p) => p.value));
 
   return {
     itemInstanceId: item.itemInstanceId,
@@ -196,6 +296,9 @@ export function deriveArmorPiece(
     primaryStat,
     secondaryStat,
     tertiaryStat,
+    tier,
+    statTotals,
+    ...(tuningVariants ? { tuningVariants } : {}),
     location,
   };
 }

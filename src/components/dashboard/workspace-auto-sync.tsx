@@ -12,13 +12,8 @@ import {
   inventoryCacheNeedsSync,
   inventoryMsUntilResync,
 } from "@/lib/inventory/cache-status";
-import type { WorkspaceDataHealth } from "@/lib/workspace/workspace-data-health.shared";
 import { useInventoryEquipmentOnlyAlert } from "@/components/dashboard/inventory-equipment-only-alert";
 import { useWorkspaceSync } from "@/components/dashboard/workspace-sync-status";
-
-interface WorkspaceAutoSyncProps {
-  health: WorkspaceDataHealth;
-}
 
 type ManifestSyncResponse = {
   error?: string;
@@ -48,16 +43,18 @@ const manifestToastDefaults = {
  * Coordinates manifest sync (when unhealthy) then inventory refresh (when stale
  * or after manifest sync). Mounted once from {@link DashboardWorkspace}.
  */
-export function WorkspaceAutoSync({ health }: WorkspaceAutoSyncProps) {
+export function WorkspaceAutoSync() {
   const router = useRouter();
   const equipmentOnlyAlert = useInventoryEquipmentOnlyAlert();
   const {
+    health,
     setPhase,
     setManifestError,
     setInventoryError,
     setInventoryWarnings,
     setReauthMessage,
     registerRetry,
+    acknowledgeManifestSync,
   } = useWorkspaceSync();
 
   const inFlightRef = useRef(false);
@@ -116,6 +113,7 @@ export function WorkspaceAutoSync({ health }: WorkspaceAutoSyncProps) {
             manifestToastDefaults,
           );
         }
+        acknowledgeManifestSync();
         router.refresh();
         return true;
       } catch (err) {
@@ -127,7 +125,7 @@ export function WorkspaceAutoSync({ health }: WorkspaceAutoSyncProps) {
         setPhase("idle");
       }
     },
-    [router, setManifestError, setPhase],
+    [router, setManifestError, setPhase, acknowledgeManifestSync],
   );
 
   const runInventorySync = useCallback(

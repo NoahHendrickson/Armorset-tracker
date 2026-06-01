@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { useFilterBarCollapseTier } from "@/components/workspace/use-filter-bar-collapse-tier";
 import {
   MagnifyingGlass,
@@ -10,7 +10,6 @@ import { CLASS_NAMES } from "@/lib/bungie/constants";
 import type { ArmorStatName } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { chromeToolbarShellClass } from "@/components/ui/chrome-square-icon-button";
 import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import {
   gridFiltersHaveUnblockingSelection,
@@ -29,6 +28,9 @@ import {
   FILTER_INLINE_ARCHETYPES,
   FILTER_INLINE_CORE,
   FILTER_INLINE_TUNINGS_TERTIARY,
+  INLINE_TRIGGER_ACTIVE_CLASS,
+  INLINE_TRIGGER_FRAME_CLASS,
+  INLINE_TRIGGER_IDLE_CLASS,
 } from "@/components/workspace/filter-bar-primitives";
 import {
   SavedViewsMenu,
@@ -60,6 +62,8 @@ interface TrackerFilterBarProps {
   /** Table view: search is the primary control — leftmost and always visible. */
   searchPlacement?: "start" | "end";
   searchDefaultExpanded?: boolean;
+  /** Table view: embed compact icon-only class switcher inside the search compound. */
+  embedClassInSearch?: boolean;
   savedViews?: SavedViewsBarProps;
   className?: string;
 }
@@ -76,6 +80,7 @@ export function TrackerFilterBar({
   showRarityFilter = false,
   searchPlacement = "end",
   searchDefaultExpanded = false,
+  embedClassInSearch = false,
   savedViews,
   className,
 }: TrackerFilterBarProps) {
@@ -87,8 +92,9 @@ export function TrackerFilterBar({
     searchDefaultExpanded ||
     searchUiOpen ||
     value.search.trim().length > 0;
-  const searchPlaceholder =
-    searchPlacement === "start"
+  const searchPlaceholder = embedClassInSearch
+    ? "Press F to search"
+    : searchPlacement === "start"
       ? "Search sets (e.g. ferro smoke)"
       : "Search armor";
   const collapseTier = useFilterBarCollapseTier(barRef);
@@ -198,56 +204,167 @@ export function TrackerFilterBar({
     ? inventoryFiltersHaveShareableSelection(value)
     : gridFiltersHaveUnblockingSelection(value);
 
-  const searchField = searchExpanded ? (
+  const searchActive = value.search.trim().length > 0;
+
+  useEffect(() => {
+    if (!embedClassInSearch || !searchDefaultExpanded) return;
+
+    function onKeyDown(e: globalThis.KeyboardEvent) {
+      if (e.key !== "f" && e.key !== "F") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target;
+      if (
+        t instanceof HTMLInputElement ||
+        t instanceof HTMLTextAreaElement ||
+        t instanceof HTMLSelectElement ||
+        (t instanceof HTMLElement && t.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      setSearchUiOpen(true);
+      searchInputRef.current?.focus({ preventScroll: true });
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [embedClassInSearch, searchDefaultExpanded]);
+
+  const searchInputProps = {
+    ref: searchInputRef,
+    type: "search" as const,
+    value: value.search,
+    onChange: (e: ChangeEvent<HTMLInputElement>) =>
+      onChange({ ...value, search: e.target.value }),
+    placeholder: searchPlaceholder,
+    "aria-label": "Search armor sets",
+    onBlur: () => {
+      if (!searchDefaultExpanded && !value.search.trim()) {
+        setSearchUiOpen(false);
+      }
+    },
+    onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key !== "Escape") return;
+      if (value.search.trim()) {
+        onChange({ ...value, search: "" });
+      } else if (!searchDefaultExpanded) {
+        setSearchUiOpen(false);
+        e.currentTarget.blur();
+      }
+    },
+  };
+
+  const clearSearchButton = (embedded = false) =>
+    value.search ? (
+      <button
+        type="button"
+        aria-label="Clear search"
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={() => onChange({ ...value, search: "" })}
+        className={cn(
+          "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-none text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          !embedded && "absolute right-2 top-1/2 -translate-y-1/2",
+        )}
+      >
+        <X weight="bold" className="h-3.5 w-3.5" aria-hidden />
+      </button>
+    ) : null;
+
+  function classTabButtonClass(active: boolean, condensed = false) {
+    return cn(
+      "flex shrink-0 items-center border font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+      condensed ? "h-full self-stretch px-2 text-[10px] leading-none" : "h-9 px-3 text-xs",
+      condensed
+        ? active
+          ? "border-transparent bg-primary/15 font-semibold text-foreground"
+          : "border-transparent text-muted-foreground hover:bg-background/50 hover:text-foreground dark:hover:bg-accent/50 dark:hover:text-accent-foreground"
+        : active
+          ? "border-border bg-background/80 text-foreground dark:bg-accent/80 dark:text-accent-foreground"
+          : "border-transparent text-muted-foreground hover:bg-background/50 hover:text-foreground dark:hover:bg-accent/50 dark:hover:text-accent-foreground",
+    );
+  }
+
+  const embeddedClassSwitcher = (
     <div
-      role="search"
-      className={cn(
-        "relative -my-2 min-h-[60px] min-w-0",
-        searchPlacement === "start"
-          ? "w-44 shrink-0 sm:w-52 lg:w-60"
-          : "lg:max-w-xs",
-      )}
+      role="group"
+      aria-label="Class"
+      className="flex shrink-0 items-stretch self-stretch pl-1"
     >
-      <MagnifyingGlass
-        weight="regular"
-        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-        aria-hidden
-      />
-      <input
-        ref={searchInputRef}
-        type="search"
-        value={value.search}
-        onChange={(e) => onChange({ ...value, search: e.target.value })}
-        placeholder={searchPlaceholder}
-        aria-label="Search armor sets"
-        onBlur={() => {
-          if (!searchDefaultExpanded && !value.search.trim()) {
-            setSearchUiOpen(false);
-          }
-        }}
-        onKeyDown={(e) => {
-          if (e.key !== "Escape") return;
-          if (value.search.trim()) {
-            onChange({ ...value, search: "" });
-          } else if (!searchDefaultExpanded) {
-            setSearchUiOpen(false);
-            e.currentTarget.blur();
-          }
-        }}
-        className="h-[60px] w-full min-w-0 border-0 border-b border-white bg-transparent py-0 ps-9 pe-9 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground/80 focus-visible:border-b focus-visible:border-white focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-search-cancel-button]:hidden"
-      />
-      {value.search ? (
-        <button
-          type="button"
-          aria-label="Clear search"
-          onPointerDown={(e) => e.preventDefault()}
-          onClick={() => onChange({ ...value, search: "" })}
-          className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-none text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <X weight="bold" className="h-3.5 w-3.5" aria-hidden />
-        </button>
-      ) : null}
+      {CLASS_TABS.map((tab) => {
+        const active = value.class === tab.value;
+        return (
+          <button
+            key={tab.value}
+            type="button"
+            className={classTabButtonClass(active, true)}
+            onClick={() => switchClass(tab.value)}
+            aria-pressed={active}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
     </div>
+  );
+
+  const searchField = searchExpanded ? (
+    embedClassInSearch ? (
+      <div
+        role="search"
+        className={cn(
+          "relative isolate shrink-0 flex h-9 min-w-0 items-stretch border",
+          "w-80 sm:w-96 lg:w-[26rem]",
+          "focus-within:outline-none",
+          searchActive
+            ? INLINE_TRIGGER_ACTIVE_CLASS
+            : cn(
+                INLINE_TRIGGER_IDLE_CLASS,
+                "border-border focus-within:border-primary/60 focus-within:bg-primary/5",
+              ),
+        )}
+      >
+        <div className="relative flex min-w-0 flex-1 items-center gap-1 ps-8 pe-2">
+          <MagnifyingGlass
+            weight="regular"
+            className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <input
+            {...searchInputProps}
+            className="h-full min-w-0 flex-1 border-0 bg-transparent py-0 text-xs shadow-none outline-none placeholder:text-muted-foreground/80 focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-search-cancel-button]:hidden"
+          />
+          {clearSearchButton(true)}
+        </div>
+        {embeddedClassSwitcher}
+      </div>
+    ) : (
+      <div
+        role="search"
+        className={cn(
+          INLINE_TRIGGER_FRAME_CLASS,
+          "relative min-w-0",
+          searchPlacement === "start"
+            ? "w-44 shrink-0 sm:w-52 lg:w-60"
+            : "lg:max-w-xs",
+        )}
+      >
+        <MagnifyingGlass
+          weight="regular"
+          className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <input
+          {...searchInputProps}
+          className={cn(
+            "h-9 w-full min-w-0 rounded-none border border-border py-0 ps-9 pe-9 text-xs shadow-none outline-none placeholder:text-muted-foreground/80 focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-search-cancel-button]:hidden",
+            searchActive
+              ? INLINE_TRIGGER_ACTIVE_CLASS
+              : INLINE_TRIGGER_IDLE_CLASS,
+          )}
+        />
+        {clearSearchButton()}
+      </div>
+    )
   ) : (
     <Button
       type="button"
@@ -308,23 +425,28 @@ export function TrackerFilterBar({
         <div className="shrink-0">{searchField}</div>
       ) : null}
 
-      <div className={cn(chromeToolbarShellClass, "min-w-0")} role="group" aria-label="Class">
-        {CLASS_TABS.map((tab, index) => (
-          <button
-            key={tab.value}
-            type="button"
-            className={cn(
-              "flex h-9 shrink-0 items-center px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-              index > 0 && "border-l border-border",
-              value.class === tab.value && "bg-accent text-foreground",
-            )}
-            onClick={() => switchClass(tab.value)}
-            aria-pressed={value.class === tab.value}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {!embedClassInSearch ? (
+        <div
+          className="flex h-9 min-w-0 shrink-0 bg-card"
+          role="group"
+          aria-label="Class"
+        >
+          {CLASS_TABS.map((tab) => {
+            const active = value.class === tab.value;
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                className={classTabButtonClass(active)}
+                onClick={() => switchClass(tab.value)}
+                aria-pressed={active}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {showSetFilter ? (
         <ArmorSetsFilterDimension

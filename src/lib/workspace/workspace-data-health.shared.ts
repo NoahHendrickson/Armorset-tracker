@@ -44,6 +44,7 @@ const CLASS_LABELS: Record<number, string> = {
 
 export type InventoryTableEmptyKind =
   | "syncing-manifest"
+  | "manifest-not-ready"
   | "syncing-inventory"
   | "manifest-error"
   | "inventory-error"
@@ -96,7 +97,7 @@ export function inventoryTableEmptyState(opts: {
 
   if (!opts.health.manifestReady) {
     return {
-      kind: "syncing-manifest",
+      kind: "manifest-not-ready",
       title: "Manifest not ready",
       detail:
         "Armor names and tuning data come from the Bungie manifest. This loads automatically on first visit — usually under a minute.",
@@ -158,6 +159,7 @@ export function isWorkspaceSyncGateState(
   if (!state) return false;
   return (
     state.kind === "syncing-manifest" ||
+    state.kind === "manifest-not-ready" ||
     state.kind === "syncing-inventory" ||
     state.kind === "manifest-error" ||
     state.kind === "inventory-error" ||

@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -27,6 +28,8 @@ interface WorkspaceSyncContextValue {
   setReauthMessage: (message: string | null) => void;
   registerRetry: (fn: (() => void) | null) => void;
   retrySync: () => void;
+  /** Call after a successful manifest sync so the gate clears before RSC refresh lands. */
+  acknowledgeManifestSync: () => void;
 }
 
 const WorkspaceSyncContext = createContext<WorkspaceSyncContextValue | null>(
@@ -46,6 +49,7 @@ export function WorkspaceSyncProvider({
   const [inventoryWarnings, setInventoryWarnings] = useState<string[]>([]);
   const [reauthMessage, setReauthMessage] = useState<string | null>(null);
   const [retryFn, setRetryFn] = useState<(() => void) | null>(null);
+  const [manifestSyncAcknowledged, setManifestSyncAcknowledged] = useState(false);
 
   const registerRetry = useCallback((fn: (() => void) | null) => {
     setRetryFn(() => fn);
@@ -55,9 +59,30 @@ export function WorkspaceSyncProvider({
     retryFn?.();
   }, [retryFn]);
 
+  const acknowledgeManifestSync = useCallback(() => {
+    setManifestSyncAcknowledged(true);
+  }, []);
+
+  const effectiveHealth = useMemo((): WorkspaceDataHealth => {
+    if (!manifestSyncAcknowledged || health.manifestReady) {
+      return health;
+    }
+    return {
+      ...health,
+      manifestReady: true,
+      manifestNeedsSync: false,
+    };
+  }, [health, manifestSyncAcknowledged]);
+
+  useEffect(() => {
+    if (health.manifestReady) {
+      setManifestSyncAcknowledged(false);
+    }
+  }, [health.manifestReady]);
+
   const value = useMemo(
     () => ({
-      health,
+      health: effectiveHealth,
       phase,
       manifestError,
       inventoryError,
@@ -70,9 +95,10 @@ export function WorkspaceSyncProvider({
       setReauthMessage,
       registerRetry,
       retrySync,
+      acknowledgeManifestSync,
     }),
     [
-      health,
+      effectiveHealth,
       phase,
       manifestError,
       inventoryError,
@@ -80,6 +106,7 @@ export function WorkspaceSyncProvider({
       reauthMessage,
       registerRetry,
       retrySync,
+      acknowledgeManifestSync,
     ],
   );
 

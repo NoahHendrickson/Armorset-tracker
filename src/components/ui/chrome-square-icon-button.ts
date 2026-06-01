@@ -1,6 +1,6 @@
 /**
  * Bordered dark-chrome wrapper used by the canvas/table-mode segmented text-tab
- * compounds (`WorkspaceViewModeTabs`, inventory filter class tabs). Standalone
+ * compound (`WorkspaceViewModeTabs`). Standalone icon buttons now use
  * icon buttons now use `<Button variant="outline" size="icon">` instead — this
  * file only retains the shared shell wrapper.
  */

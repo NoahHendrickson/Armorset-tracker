@@ -319,4 +319,43 @@
   [data-sonner-toaster].toaster [data-sonner-toast][data-styled="true"] [data-button] {
     border-radius: 0;
   }
+
+  /* Loadout optimizer dual-thumb stat sliders */
+  .optimizer-range-thumb::-webkit-slider-runnable-track {
+    height: 0.5rem;
+    background: transparent;
+  }
+  .optimizer-range-thumb::-moz-range-track {
+    height: 0.5rem;
+    background: transparent;
+  }
+  .optimizer-range-thumb::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 0.875rem;
+    height: 1.25rem;
+    margin-top: -0.375rem;
+    border-radius: 0.125rem;
+    border: 1px solid var(--border);
+    background: var(--foreground);
+    box-shadow: 0 1px 2px oklch(0 0 0 / 25%);
+    cursor: grab;
+  }
+  .optimizer-range-thumb:active::-webkit-slider-thumb {
+    cursor: grabbing;
+  }
+  .optimizer-range-thumb::-moz-range-thumb {
+    width: 0.875rem;
+    height: 1.25rem;
+    border-radius: 0.125rem;
+    border: 1px solid var(--border);
+    background: var(--foreground);
+    box-shadow: 0 1px 2px oklch(0 0 0 / 25%);
+    cursor: grab;
+  }
+  .optimizer-range-thumb:disabled::-webkit-slider-thumb,
+  .optimizer-range-thumb:disabled::-moz-range-thumb {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 }

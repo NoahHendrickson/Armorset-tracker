@@ -1,4 +1,4 @@
-import type { DerivedArmorPieceJson } from "@/lib/db/types";
+import type { ArmorStatName, DerivedArmorPieceJson } from "@/lib/db/types";
 import { SLOT_ORDER } from "@/lib/bungie/constants";
 import {
   MOCK_ARCHETYPES,
@@ -12,6 +12,18 @@ const TUNE = MOCK_TUNINGS[0]!;
 
 const CHAR_TITAN = "char-titan-01";
 const CHAR_HUNTER = "char-hunter-01";
+
+/** Tier-5 style totals: +30 / +25 / +20 plugs plus +Weapons / -Grenade tuning. */
+function mockStatTotals(
+  tertiary: ArmorStatName,
+): Partial<Record<ArmorStatName, number>> {
+  return {
+    Weapons: 40,
+    Health: 25,
+    [tertiary]: 20,
+    Grenade: -10,
+  };
+}
 
 function basePiece(
   slot: DerivedArmorPieceJson["slot"],
@@ -29,6 +41,7 @@ function basePiece(
     archetypeName: ARCH.name,
     primaryStat: "Weapons",
     secondaryStat: "Health",
+    tier: 5,
   };
 }
 
@@ -44,6 +57,7 @@ function vaultPiece(
     tuningName: TUNE.name,
     tuningCommitted: true,
     tertiaryStat: tertiary,
+    statTotals: mockStatTotals(tertiary ?? "Class"),
     location: { kind: "vault" },
   };
 }
@@ -64,6 +78,7 @@ function characterPiece(
     tuningName: TUNE.name,
     tuningCommitted: false,
     tertiaryStat: tertiary,
+    statTotals: mockStatTotals(tertiary ?? "Class"),
     location: {
       kind: "character",
       characterId,
@@ -89,6 +104,11 @@ export const MOCK_INVENTORY: DerivedArmorPieceJson[] = [
 
 /** Empty inventory — for "loading" / "missing" coverage in stories. */
 export const EMPTY_INVENTORY: DerivedArmorPieceJson[] = [];
+
+/** One vault piece per slot — enough for optimizer bounds/search in stories. */
+export const MOCK_OPTIMIZER_INVENTORY: DerivedArmorPieceJson[] = SLOT_ORDER.map(
+  (slot, index) => vaultPiece(slot, 100 + index, "Class"),
+);
 
 /** Inventory with at least one match for every (slot × tertiary) cell. */
 export const FULL_COVERAGE_INVENTORY: DerivedArmorPieceJson[] = SLOT_ORDER.flatMap(

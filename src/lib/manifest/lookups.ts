@@ -4,6 +4,8 @@ import type { ArmorSlot } from "@/lib/bungie/constants";
 import { SLOT_ORDER } from "@/lib/bungie/constants";
 import { getServiceRoleClient } from "@/lib/db/server";
 import type { ArmorStatName } from "@/lib/db/types";
+import { mergeExoticStatTotals } from "@/lib/manifest/exotic-stat-budget";
+import { exoticPieceIdentityKey } from "@/lib/optimizer/exotic-lock";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface ManifestLookups {
@@ -24,13 +26,46 @@ export interface ManifestLookups {
     number,
     { slot: ArmorSlot; classType: number; name: string; iconPath: string }
   >;
+  /** Manifest investmentStats for exotics without Armor 3.0 intrinsic plugs. */
+  exoticStatBudgetByItemHash: Map<
+    number,
+    Partial<Record<ArmorStatName, number>>
+  >;
+  /** Slot + normalized display name → merged manifest budgets (reissued hashes). */
+  exoticStatBudgetByIdentity: Map<
+    string,
+    Partial<Record<ArmorStatName, number>>
+  >;
   archetypeStatPair: Map<
     number,
     { primary: ArmorStatName; secondary: ArmorStatName }
   >;
   statPlug: Map<number, { stat: ArmorStatName; value: number }>;
+  /** Tuning plug hash → stat deltas (+/-) from manifest investmentStats. */
+  tuningPlugStats: Map<number, Array<{ stat: ArmorStatName; value: number }>>;
+  /** Subclass fragment plug hash → display + armor stat deltas. */
+  fragmentPlugByHash: Map<
+    number,
+    {
+      name: string;
+      iconPath: string;
+      subclassKey: string;
+      deltas: Array<{ stat: ArmorStatName; value: number }>;
+    }
+  >;
+  armorSetPerks: Array<{
+    setHash: number;
+    setName: string;
+    requiredSetCount: number;
+    perkHash: number;
+    name: string;
+    description: string;
+    iconPath: string;
+  }>;
   /** Relative icon paths from DestinyStatDefinition (prefix with bungie.net). */
   statIconByName: Map<ArmorStatName, string>;
+  /** Bungie `statTypeHash` → Armor 3.0 stat (profile ItemStats component 304). */
+  destinyStatHashToArmorStat: Map<number, ArmorStatName>;
   /** `armor_items` thumbnails keyed `${set_hash}:${class_type}:${slot}`. */
   armorSlotIconPathBySetClassSlot: Map<string, string>;
   /** Weak fallback when no row matches `(set × class)` — first manifest icon seen per slot. */
@@ -148,6 +183,86 @@ async function paginatedSelect<T>(
   /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 
+function isMissingTableError(message: string): boolean {
+  return (
+    message.includes("Could not find the table") ||
+    /relation .+ does not exist/i.test(message)
+  );
+}
+
+function isMissingColumnError(message: string): boolean {
+  return /column .+ does not exist/i.test(message);
+}
+
+type ExoticArmorLookupRow = {
+  item_hash: number | string;
+  slot: string;
+  class_type: number;
+  name: string;
+  icon_path: string | null;
+  stat_totals?: Partial<Record<ArmorStatName, number>> | null;
+};
+
+type ArmorStatIconRow = {
+  stat: ArmorStatName;
+  icon_path: string;
+  destiny_stat_hash?: number | string | null;
+};
+
+/** Supports DBs before migration 0021 (`armor_stat_icons.destiny_stat_hash`). */
+async function paginatedSelectArmorStatIcons(
+  sb: SupabaseClient,
+): Promise<ArmorStatIconRow[]> {
+  try {
+    return await paginatedSelect<ArmorStatIconRow>(() =>
+      sb.from("armor_stat_icons").select("stat, icon_path, destiny_stat_hash"),
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!isMissingColumnError(message)) throw err;
+    return await paginatedSelect<Omit<ArmorStatIconRow, "destiny_stat_hash">>(
+      () => sb.from("armor_stat_icons").select("stat, icon_path"),
+    );
+  }
+}
+
+/** Supports DBs before migration 0020 (`exotic_armor.stat_totals`). */
+async function paginatedSelectExoticArmor(
+  sb: SupabaseClient,
+): Promise<ExoticArmorLookupRow[]> {
+  try {
+    return await paginatedSelect<ExoticArmorLookupRow>(() =>
+      sb
+        .from("exotic_armor")
+        .select("item_hash, slot, class_type, name, icon_path, stat_totals"),
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!isMissingColumnError(message)) throw err;
+    const rows = await paginatedSelect<
+      Omit<ExoticArmorLookupRow, "stat_totals">
+    >(() =>
+      sb
+        .from("exotic_armor")
+        .select("item_hash, slot, class_type, name, icon_path"),
+    );
+    return rows.map((row) => ({ ...row, stat_totals: null }));
+  }
+}
+
+/** Like `paginatedSelect`, but returns [] when the table is not migrated yet. */
+async function paginatedSelectOptional<T>(
+  builder: Parameters<typeof paginatedSelect<T>>[0],
+): Promise<T[]> {
+  try {
+    return await paginatedSelect(builder);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (isMissingTableError(message)) return [];
+    throw err;
+  }
+}
+
 export async function getManifestLookups(force = false): Promise<ManifestLookups> {
   const sb = getServiceRoleClient();
   const now = Date.now();
@@ -188,7 +303,11 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
     plugToTuning,
     archetypeStatPairs,
     armorStatPlugs,
+    tuningPlugStatRows,
+    subclassFragmentPlugs,
+    subclassFragmentPlugStatRows,
     armorStatIcons,
+    armorSetPerkRows,
   ] = await Promise.all([
     sb
       .from("manifest_versions")
@@ -214,15 +333,7 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
     }>(() =>
       sb.from("armor_items").select("item_hash, set_hash, slot, class_type, icon_path"),
     ),
-    paginatedSelect<{
-      item_hash: number | string;
-      slot: string;
-      class_type: number;
-      name: string;
-      icon_path: string | null;
-    }>(() =>
-      sb.from("exotic_armor").select("item_hash, slot, class_type, name, icon_path"),
-    ),
+    paginatedSelectExoticArmor(sb),
     paginatedSelect<{ archetype_hash: number | string; name: string }>(
       () => sb.from("archetypes").select("archetype_hash, name"),
     ),
@@ -247,8 +358,40 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
     paginatedSelect<{ plug_hash: number | string; stat: ArmorStatName; value: number }>(
       () => sb.from("armor_stat_plugs").select("plug_hash, stat, value"),
     ),
-    paginatedSelect<{ stat: ArmorStatName; icon_path: string }>(() =>
-      sb.from("armor_stat_icons").select("stat, icon_path"),
+    paginatedSelect<{ plug_hash: number | string; stat: ArmorStatName; value: number }>(
+      () => sb.from("tuning_plug_stats").select("plug_hash, stat, value"),
+    ),
+    paginatedSelectOptional<{
+      plug_hash: number | string;
+      name: string;
+      icon_path: string | null;
+      subclass_key?: string | null;
+    }>(() =>
+      sb.from("subclass_fragment_plugs").select("plug_hash, name, icon_path, subclass_key"),
+    ),
+    paginatedSelectOptional<{
+      plug_hash: number | string;
+      stat: ArmorStatName;
+      value: number;
+    }>(() =>
+      sb
+        .from("subclass_fragment_plug_stats")
+        .select("plug_hash, stat, value"),
+    ),
+    paginatedSelectArmorStatIcons(sb),
+    paginatedSelectOptional<{
+      set_hash: number | string;
+      required_set_count: number;
+      sandbox_perk_hash: number | string;
+      name: string;
+      description: string | null;
+      icon_path: string | null;
+    }>(() =>
+      sb
+        .from("armor_set_perks")
+        .select(
+          "set_hash, required_set_count, sandbox_perk_hash, name, description, icon_path",
+        ),
     ),
   ]);
 
@@ -316,6 +459,53 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
         },
       ]),
     ),
+    exoticStatBudgetByItemHash: new Map(
+      exoticArmor
+        .map((r) => {
+          const totals = r.stat_totals;
+          if (totals == null || typeof totals !== "object") return null;
+          if (Object.keys(totals).length === 0) return null;
+          return [Number(r.item_hash), totals] as const;
+        })
+        .filter((entry): entry is readonly [number, Partial<Record<ArmorStatName, number>>] =>
+          entry != null,
+        ),
+    ),
+    exoticStatBudgetByIdentity: (() => {
+      const byIdentity = new Map<
+        string,
+        Partial<Record<ArmorStatName, number>>
+      >();
+      for (const r of exoticArmor) {
+        const totals = r.stat_totals;
+        if (totals == null || typeof totals !== "object") continue;
+        if (Object.keys(totals).length === 0) continue;
+        const itemHash = Number(r.item_hash);
+        const identityKey = exoticPieceIdentityKey({
+          itemInstanceId: "",
+          itemHash,
+          slot: r.slot as ArmorSlot,
+          classType: Number(r.class_type),
+          setHash: null,
+          setName: null,
+          displayName: r.name,
+          isExotic: true,
+          archetypeHash: null,
+          archetypeName: null,
+          tuningHash: null,
+          tuningName: null,
+          primaryStat: null,
+          secondaryStat: null,
+          tertiaryStat: null,
+          location: { kind: "vault" },
+        });
+        byIdentity.set(
+          identityKey,
+          mergeExoticStatTotals(byIdentity.get(identityKey) ?? {}, totals),
+        );
+      }
+      return byIdentity;
+    })(),
     archetypeNameByHash: new Map(
       archetypes.map((r) => [Number(r.archetype_hash), r.name]),
     ),
@@ -343,6 +533,61 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
         { stat: r.stat, value: r.value },
       ]),
     ),
+    tuningPlugStats: (() => {
+      const map = new Map<
+        number,
+        Array<{ stat: ArmorStatName; value: number }>
+      >();
+      for (const r of tuningPlugStatRows) {
+        const plugHash = Number(r.plug_hash);
+        const list = map.get(plugHash) ?? [];
+        list.push({ stat: r.stat, value: r.value });
+        map.set(plugHash, list);
+      }
+      return map;
+    })(),
+    fragmentPlugByHash: (() => {
+      const deltasByPlug = new Map<
+        number,
+        Array<{ stat: ArmorStatName; value: number }>
+      >();
+      for (const r of subclassFragmentPlugStatRows) {
+        const plugHash = Number(r.plug_hash);
+        const list = deltasByPlug.get(plugHash) ?? [];
+        list.push({ stat: r.stat, value: r.value });
+        deltasByPlug.set(plugHash, list);
+      }
+      const map = new Map<
+        number,
+        {
+          name: string;
+          iconPath: string;
+          subclassKey: string;
+          deltas: Array<{ stat: ArmorStatName; value: number }>;
+        }
+      >();
+      for (const r of subclassFragmentPlugs) {
+        const plugHash = Number(r.plug_hash);
+        map.set(plugHash, {
+          name: r.name,
+          iconPath: String(r.icon_path ?? "").trim(),
+          subclassKey: String(r.subclass_key ?? "unknown"),
+          deltas: deltasByPlug.get(plugHash) ?? [],
+        });
+      }
+      return map;
+    })(),
+    armorSetPerks: (armorSetPerkRows ?? []).map((r) => ({
+      setHash: Number(r.set_hash),
+      setName:
+        armorSets.find((s) => Number(s.set_hash) === Number(r.set_hash))?.name ??
+        "Unknown set",
+      requiredSetCount: Number(r.required_set_count),
+      perkHash: Number(r.sandbox_perk_hash),
+      name: r.name,
+      description: String(r.description ?? "").trim(),
+      iconPath: String(r.icon_path ?? "").trim(),
+    })),
     statIconByName: new Map(
       armorStatIcons
         .map((r) => {
@@ -351,6 +596,19 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
           return path ? ([stat, path] as const) : null;
         })
         .filter((e): e is readonly [ArmorStatName, string] => e !== null),
+    ),
+    destinyStatHashToArmorStat: new Map(
+      armorStatIcons
+        .map((r) => {
+          const hash = r.destiny_stat_hash;
+          if (hash == null || hash === "") return null;
+          const stat = String(r.stat).trim() as ArmorStatName;
+          return [Number(hash), stat] as const;
+        })
+        .filter(
+          (entry): entry is readonly [number, ArmorStatName] =>
+            entry != null && Number.isFinite(entry[0]),
+        ),
     ),
     armorSlotIconPathBySetClassSlot,
     slotFallbackIconPathBySlot,

@@ -334,10 +334,82 @@ export type Database = {
         Update: { plug_hash?: number; stat?: ArmorStatName; value?: number };
         Relationships: [];
       };
+      tuning_plug_stats: {
+        Row: { plug_hash: number; stat: ArmorStatName; value: number };
+        Insert: { plug_hash: number; stat: ArmorStatName; value: number };
+        Update: { plug_hash?: number; stat?: ArmorStatName; value?: number };
+        Relationships: [];
+      };
+      subclass_fragment_plugs: {
+        Row: {
+          plug_hash: number;
+          name: string;
+          icon_path: string;
+          subclass_key: string;
+        };
+        Insert: {
+          plug_hash: number;
+          name: string;
+          icon_path?: string;
+          subclass_key?: string;
+        };
+        Update: {
+          plug_hash?: number;
+          name?: string;
+          icon_path?: string;
+          subclass_key?: string;
+        };
+        Relationships: [];
+      };
+      subclass_fragment_plug_stats: {
+        Row: { plug_hash: number; stat: ArmorStatName; value: number };
+        Insert: { plug_hash: number; stat: ArmorStatName; value: number };
+        Update: { plug_hash?: number; stat?: ArmorStatName; value?: number };
+        Relationships: [];
+      };
       armor_stat_icons: {
-        Row: { stat: ArmorStatName; icon_path: string };
-        Insert: { stat: ArmorStatName; icon_path: string };
-        Update: { stat?: ArmorStatName; icon_path?: string };
+        Row: {
+          stat: ArmorStatName;
+          icon_path: string;
+          destiny_stat_hash: number | null;
+        };
+        Insert: {
+          stat: ArmorStatName;
+          icon_path: string;
+          destiny_stat_hash?: number | null;
+        };
+        Update: {
+          stat?: ArmorStatName;
+          icon_path?: string;
+          destiny_stat_hash?: number | null;
+        };
+        Relationships: [];
+      };
+      armor_set_perks: {
+        Row: {
+          set_hash: number;
+          required_set_count: number;
+          sandbox_perk_hash: number;
+          name: string;
+          description: string;
+          icon_path: string;
+        };
+        Insert: {
+          set_hash: number;
+          required_set_count: number;
+          sandbox_perk_hash: number;
+          name: string;
+          description?: string;
+          icon_path?: string;
+        };
+        Update: {
+          set_hash?: number;
+          required_set_count?: number;
+          sandbox_perk_hash?: number;
+          name?: string;
+          description?: string;
+          icon_path?: string;
+        };
         Relationships: [];
       };
       exotic_armor: {
@@ -347,6 +419,7 @@ export type Database = {
           class_type: number;
           name: string;
           icon_path: string;
+          stat_totals: Json | null;
         };
         Insert: {
           item_hash: number;
@@ -354,6 +427,7 @@ export type Database = {
           class_type: number;
           name: string;
           icon_path?: string;
+          stat_totals?: Json | null;
         };
         Update: {
           item_hash?: number;
@@ -361,6 +435,7 @@ export type Database = {
           class_type?: number;
           name?: string;
           icon_path?: string;
+          stat_totals?: Json | null;
         };
         Relationships: [];
       };
@@ -443,6 +518,22 @@ export interface DerivedArmorPieceJson {
   primaryStat: ArmorStatName | null;
   secondaryStat: ArmorStatName | null;
   tertiaryStat: ArmorStatName | null;
+  /**
+   * Armor 3.0 gear tier (1–5), inferred per-instance from intrinsic stat-plug
+   * magnitudes. Tier 5 is the only tier with a guaranteed 30/25/20 roll and a
+   * tuning slot. `null`/absent for exotics (no tier) and older cached rows.
+   */
+  tier?: number | null;
+  /**
+   * Numeric stat totals for this piece (intrinsic plugs + committed tuning).
+   * Optional on older cached inventory rows until the next sync.
+   */
+  statTotals?: Partial<Record<ArmorStatName, number>>;
+  /**
+   * When `tuningCommitted === false`, debuff variants share the same +stat but
+   * differ on which stat is reduced. Optimizer may branch over these later.
+   */
+  tuningVariants?: Partial<Record<ArmorStatName, number>>[];
   location: ItemLocationJson;
 }
 

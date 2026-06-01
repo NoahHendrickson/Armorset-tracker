@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { toast } from "sonner";
 import type { DerivedArmorPieceJson, SavedFilterViewRow } from "@/lib/db/types";
 import type { GridLookupPayload } from "@/lib/views/grid-lookup-payload";
+import type { OptimizerLookupPayload } from "@/lib/views/optimizer-lookup-payload";
 import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
 import { useGridFiltersPersistence } from "@/lib/workspace/use-grid-filters-persistence";
 import {
@@ -16,6 +17,7 @@ import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import { AppHeader } from "@/components/app-header";
 import { GridWorkspace } from "@/components/workspace/grid-workspace";
 import { InventoryTableView } from "@/components/dashboard/inventory-table-view";
+import { LoadoutOptimizerView } from "@/components/dashboard/loadout-optimizer-view";
 import {
   WorkspaceViewModeTabs,
   type WorkspaceViewMode,
@@ -38,6 +40,7 @@ export interface DashboardWorkspaceProps {
   selectors: TrackerFormSelectors;
   inventory: DerivedArmorPieceJson[];
   lookupPayload: GridLookupPayload;
+  optimizerLookup: OptimizerLookupPayload;
   initialGridFilters: GridFiltersJson;
   initialSavedViews: SavedFilterViewRow[];
   appliedFromShare?: boolean;
@@ -55,6 +58,7 @@ export function DashboardWorkspace({
   selectors,
   inventory,
   lookupPayload,
+  optimizerLookup,
   initialGridFilters,
   initialSavedViews,
   appliedFromShare = false,
@@ -151,7 +155,7 @@ export function DashboardWorkspace({
     <InventoryEquipmentOnlyProvider>
       <WorkspaceSyncProvider health={dataHealth}>
         <div className="flex h-full min-h-0 flex-col">
-          <WorkspaceAutoSync health={dataHealth} />
+          <WorkspaceAutoSync />
           <InventoryEquipmentOnlyBanner />
         <AppHeader
           displayName={displayName}
@@ -169,7 +173,7 @@ export function DashboardWorkspace({
             onFiltersChange={onFiltersChange}
             savedViews={savedViewsMenuProps}
           />
-        ) : (
+        ) : mode === "grid" ? (
           <GridWorkspace
             banners={banners}
             syncWarning={syncWarning}
@@ -180,6 +184,17 @@ export function DashboardWorkspace({
             filters={filters}
             onFiltersChange={onFiltersChange}
             savedViews={savedViewsMenuProps}
+          />
+        ) : (
+          <LoadoutOptimizerView
+            banners={banners}
+            syncWarning={syncWarning}
+            hasInventory={hasInventory}
+            inventory={inventory}
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            optimizerLookup={optimizerLookup}
+            statIconByName={lookupPayload.statIconByName}
           />
         )}
         </div>

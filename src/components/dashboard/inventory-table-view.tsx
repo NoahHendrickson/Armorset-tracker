@@ -224,6 +224,7 @@ export function InventoryTableView({
                           showRarityFilter
                           searchPlacement="start"
                           searchDefaultExpanded
+                          embedClassInSearch
                           savedViews={savedViews}
                         />
                       </TableHead>

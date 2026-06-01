@@ -43,7 +43,9 @@ export function WorkspaceSyncGatePanel({
         state.kind === "empty-inventory" ? (
           <RefreshButton variant="button" />
         ) : null}
-        {state.kind === "manifest-error" || state.kind === "inventory-error" ? (
+        {state.kind === "manifest-error" ||
+        state.kind === "inventory-error" ||
+        state.kind === "manifest-not-ready" ? (
           <Button variant="outline" size="sm" onClick={onRetry}>
             Retry sync
           </Button>
