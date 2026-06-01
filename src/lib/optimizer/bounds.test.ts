@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { ARMOR_STAT_NAMES } from "@/lib/db/types";
-import { computeStatBounds, estimateOptimizerComboCount } from "@/lib/optimizer/bounds";
+import {
+  computeStatBounds,
+  SEARCH_AUTO_RUN_COMBO_LIMIT,
+} from "@/lib/optimizer/bounds";
+import { estimateOptimizerComboCount } from "@/lib/optimizer/combo-count";
 import { maxFeasibleStatTarget } from "@/lib/optimizer/combo-count";
 import { defaultStatConstraints } from "@/lib/optimizer/constraints";
 import { filterOptimizerPool } from "@/lib/optimizer/pool";

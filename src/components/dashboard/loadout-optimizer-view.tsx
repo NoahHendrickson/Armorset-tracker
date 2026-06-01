@@ -24,11 +24,11 @@ import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { ClassSwitcher } from "@/components/workspace/class-switcher";
 import {
   computeStatBounds,
-  estimateOptimizerComboCount,
   SEARCH_AUTO_RUN_COMBO_LIMIT,
 } from "@/lib/optimizer/bounds";
 import {
   estimateFilteredComboCount,
+  estimateOptimizerComboCount,
 } from "@/lib/optimizer/combo-count";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { useStatBoundsForSliders } from "@/lib/optimizer/use-stat-bounds-for-sliders";
@@ -117,6 +117,8 @@ export function LoadoutOptimizerView({
   );
   /** Debounced so dragging stat sliders does not restart vault search every tick. */
   const searchConstraints = useDebouncedValue(constraints, 400);
+  /** Debounced separately — bounds recompute is expensive on large vaults. */
+  const boundsConstraints = useDebouncedValue(constraints, 150);
   const targetsPending = useMemo(
     () => !statConstraintsEqual(constraints, searchConstraints),
     [constraints, searchConstraints],
@@ -216,7 +218,7 @@ export function LoadoutOptimizerView({
     statOffset,
     assumedStatMods,
     exoticLock,
-    constraints,
+    constraints: boundsConstraints,
     setBonusSelections: selectedSetBonuses,
   });
   const rawComboCount = useMemo(

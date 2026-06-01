@@ -1,8 +1,5 @@
-import {
-  computeStatBounds,
-  estimateOptimizerComboCount,
-  SEARCH_AUTO_RUN_COMBO_LIMIT,
-} from "@/lib/optimizer/bounds";
+import { computeStatBounds, SEARCH_AUTO_RUN_COMBO_LIMIT } from "@/lib/optimizer/bounds";
+import { estimateOptimizerComboCount } from "@/lib/optimizer/combo-count";
 import { DEFAULT_EXOTIC_LOCK } from "@/lib/optimizer/exotic-lock";
 import { searchLoadouts } from "@/lib/optimizer/search";
 import type {

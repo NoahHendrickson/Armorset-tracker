@@ -1,26 +1,20 @@
 /// <reference lib="webworker" />
 
-import {
-  computeStatBounds,
-  estimateOptimizerComboCount,
-  SEARCH_AUTO_RUN_COMBO_LIMIT,
-} from "@/lib/optimizer/bounds";
+import { computeStatBounds, SEARCH_AUTO_RUN_COMBO_LIMIT } from "@/lib/optimizer/bounds";
+import { estimateOptimizerComboCount } from "@/lib/optimizer/combo-count";
 import { DEFAULT_EXOTIC_LOCK } from "@/lib/optimizer/exotic-lock";
 import { searchLoadouts } from "@/lib/optimizer/search";
 import type { WorkerRequest, WorkerResponse } from "@/lib/optimizer/types";
 
-let cancelled = false;
 let currentRunId: string | null = null;
 
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const message = event.data;
-  if (message.type === "cancel") {
-    if (message.id === currentRunId) cancelled = true;
+  if (message.type !== "run") {
     return;
   }
 
   currentRunId = message.id;
-  cancelled = false;
 
   try {
     const progressMsg = (percent: number): WorkerResponse => ({
@@ -55,13 +49,13 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
     const solutions = searchLoadouts(
       message.payload,
       (percent) => {
-        if (cancelled) return;
+        if (message.id !== currentRunId) return;
         self.postMessage(progressMsg(percent));
       },
-      () => cancelled,
+      () => message.id !== currentRunId,
     );
 
-    if (cancelled) return;
+    if (message.id !== currentRunId) return;
 
     const resultMsg: WorkerResponse = {
       type: "result",

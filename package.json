@@ -14,7 +14,8 @@
     "manifest:sync": "NODE_OPTIONS='--require ./scripts/stub-server-only.cjs' tsx --tsconfig tsconfig.json scripts/sync-manifest.ts --force",
     "storybook": "storybook dev -p 6066",
     "build-storybook": "storybook build",
-    "test-storybook": "vitest --project=storybook --run"
+    "test-storybook": "vitest --project=storybook --run",
+    "test:unit": "vitest run --project=unit"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

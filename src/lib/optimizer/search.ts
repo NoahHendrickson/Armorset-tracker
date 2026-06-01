@@ -1,61 +1,20 @@
 import { SLOT_ORDER } from "@/lib/bungie/constants";
-import { ARMOR_STAT_NAMES, type DerivedArmorPieceJson } from "@/lib/db/types";
-import { getPieceStatCeiling } from "@/lib/inventory/compute-stat-totals";
-import { areConstraintsAchievable } from "@/lib/optimizer/bounds";
+import { ARMOR_STAT_NAMES } from "@/lib/db/types";
 import { estimateFilteredComboCount } from "@/lib/optimizer/combo-count";
 import {
-  partialCanReachMins,
+  hasStatTargets,
   scoreSolution,
   totalsFromPieces,
-  hasStatTargets,
 } from "@/lib/optimizer/constraints";
-import { dedupeSlotPieces } from "@/lib/optimizer/dedupe";
-import {
-  applyExoticLockToSlotGroups,
-  countExoticsInPieces,
-  DEFAULT_EXOTIC_LOCK,
-  exoticAllowedInPartialCombo,
-  resolveLockedExoticIdentityKey,
-} from "@/lib/optimizer/exotic-lock";
+import { enumerateLoadouts } from "@/lib/optimizer/enumeration/enumerate-loadouts";
+import { prepareDedupedSlotPool } from "@/lib/optimizer/enumeration/prepare-slot-pool";
+import { DEFAULT_EXOTIC_LOCK } from "@/lib/optimizer/exotic-lock";
 import { addStatOffsets } from "@/lib/optimizer/fragment-offset";
 import { DEFAULT_ASSUMED_STAT_MODS } from "@/lib/optimizer/mod-offset";
 import { resolveLoadoutTotals } from "@/lib/optimizer/resolve-loadout-totals";
-import {
-  partialCanSatisfySetBonuses,
-  satisfiesSetBonuses,
-} from "@/lib/optimizer/set-bonus";
+import { satisfiesSetBonuses } from "@/lib/optimizer/set-bonus";
 import { solutionSignature } from "@/lib/optimizer/signature";
 import type { OptimizerRequest, OptimizerSolution } from "@/lib/optimizer/types";
-
-function groupPoolBySlot(pool: DerivedArmorPieceJson[]) {
-  const bySlot = new Map<
-    DerivedArmorPieceJson["slot"],
-    DerivedArmorPieceJson[]
-  >();
-  for (const slot of SLOT_ORDER) {
-    bySlot.set(slot, []);
-  }
-  for (const piece of pool) {
-    bySlot.get(piece.slot)?.push(piece);
-  }
-  return bySlot;
-}
-
-function perSlotMaxima(
-  bySlot: Map<DerivedArmorPieceJson["slot"], DerivedArmorPieceJson[]>,
-): Record<(typeof ARMOR_STAT_NAMES)[number], number> {
-  const maxima = Object.fromEntries(
-    ARMOR_STAT_NAMES.map((stat) => [stat, 0]),
-  ) as Record<(typeof ARMOR_STAT_NAMES)[number], number>;
-  for (const slot of SLOT_ORDER) {
-    for (const piece of bySlot.get(slot) ?? []) {
-      for (const stat of ARMOR_STAT_NAMES) {
-        maxima[stat] = Math.max(maxima[stat], getPieceStatCeiling(piece, stat));
-      }
-    }
-  }
-  return maxima;
-}
 
 export function searchLoadouts(
   request: OptimizerRequest,
@@ -67,6 +26,14 @@ export function searchLoadouts(
   const setBonusSelections = request.setBonusSelections ?? [];
   const assumedMods = request.assumedStatMods ?? DEFAULT_ASSUMED_STAT_MODS;
   const fragmentOffset = request.statOffset ?? {};
+
+  if (
+    !hasStatTargets(request.constraints) &&
+    setBonusSelections.length === 0
+  ) {
+    onProgress?.(100);
+    return [];
+  }
 
   if (
     hasStatTargets(request.constraints) ||
@@ -87,87 +54,45 @@ export function searchLoadouts(
       onProgress?.(100);
       return [];
     }
-  } else if (
-    !areConstraintsAchievable(
-      request.pool,
-      request.constraints,
-      fragmentOffset,
-      exoticLock,
-      assumedMods,
-      setBonusSelections,
-    )
-  ) {
-    onProgress?.(100);
+  }
+
+  const prepared = prepareDedupedSlotPool({
+    pool: request.pool,
+    exoticLock,
+    pinnedInstanceIds: new Set(request.pinnedInstanceIds ?? []),
+    excludedInstanceIds: new Set(request.excludedInstanceIds ?? []),
+  });
+  if (prepared == null) {
     return [];
   }
 
-  const bySlot = groupPoolBySlot(request.pool);
-  const lockedIdentityKey = resolveLockedExoticIdentityKey(
-    exoticLock,
-    request.pool,
-  );
-  applyExoticLockToSlotGroups(bySlot, exoticLock, request.pool);
-  for (const slot of SLOT_ORDER) {
-    if ((bySlot.get(slot)?.length ?? 0) === 0) return [];
-  }
-
-  const pinned = new Set(request.pinnedInstanceIds ?? []);
-  const excluded = new Set(request.excludedInstanceIds ?? []);
-  for (const slot of SLOT_ORDER) {
-    bySlot.set(
-      slot,
-      (bySlot.get(slot) ?? []).filter(
-        (p) => !excluded.has(p.itemInstanceId),
-      ),
-    );
-    if (pinned.size > 0) {
-      const pinnedForSlot = (bySlot.get(slot) ?? []).filter((p) =>
-        pinned.has(p.itemInstanceId),
-      );
-      if (pinnedForSlot.length > 1) return [];
-      if (pinnedForSlot.length === 1) {
-        bySlot.set(slot, pinnedForSlot);
-      }
-    }
-  }
-
-  // Collapse interchangeable pieces (same stats + set + rarity) to one
-  // representative per slot before enumerating — the main large-vault speedup.
-  const membersByInstanceId = new Map<string, string[]>();
-  for (const slot of SLOT_ORDER) {
-    const { representatives, membersByRepresentative } = dedupeSlotPieces(
-      bySlot.get(slot) ?? [],
-    );
-    bySlot.set(slot, representatives);
-    for (const [repId, members] of membersByRepresentative) {
-      membersByInstanceId.set(repId, members);
-    }
-  }
-
-  const perSlotMax = perSlotMaxima(bySlot);
-  const slotPieces = SLOT_ORDER.map((slot) => bySlot.get(slot) ?? []);
-  const totalCombos =
-    slotPieces[0]!.length *
-    slotPieces[1]!.length *
-    slotPieces[2]!.length *
-    slotPieces[3]!.length *
-    slotPieces[4]!.length;
-  let visited = 0;
+  const zeroTotals = totalsFromPieces([]);
+  const startTotals =
+    Object.keys(fragmentOffset).length > 0
+      ? addStatOffsets(
+          zeroTotals,
+          fragmentOffset as Record<(typeof ARMOR_STAT_NAMES)[number], number>,
+        )
+      : zeroTotals;
 
   const candidates: OptimizerSolution[] = [];
 
-  const visit = (
-    slotIndex: number,
-    chosen: DerivedArmorPieceJson[],
-    partialTotals: ReturnType<typeof totalsFromPieces>,
-  ) => {
-    if (isCancelled?.()) return;
-    if (slotIndex >= SLOT_ORDER.length) {
-      if (exoticLock.mode === "any" && countExoticsInPieces(chosen) > 1) {
-        return;
-      }
+  enumerateLoadouts({
+    prepared,
+    exoticLock,
+    startTotals,
+    constraints: request.constraints,
+    assumedMods,
+    setBonusSelections,
+    isCancelled,
+    onVisitBatch: (visited, totalCombos) => {
+      onProgress?.(
+        totalCombos > 0 ? Math.min(99, (visited / totalCombos) * 100) : 0,
+      );
+    },
+    onLeaf: (chosen) => {
       if (!satisfiesSetBonuses(chosen, setBonusSelections)) {
-        return;
+        return "reject";
       }
       const resolved = resolveLoadoutTotals(
         chosen,
@@ -176,15 +101,15 @@ export function searchLoadouts(
         assumedMods,
       );
       if (resolved == null) {
-        return;
+        return "reject";
       }
       const slots = Object.fromEntries(
-        chosen.map((piece, i) => [SLOT_ORDER[i]!, piece.itemInstanceId]),
+        chosen.map((piece, index) => [SLOT_ORDER[index]!, piece.itemInstanceId]),
       ) as OptimizerSolution["slots"];
       const interchangeable = Object.fromEntries(
-        chosen.map((piece, i) => [
-          SLOT_ORDER[i]!,
-          membersByInstanceId.get(piece.itemInstanceId) ?? [
+        chosen.map((piece, index) => [
+          SLOT_ORDER[index]!,
+          prepared.membersByInstanceId.get(piece.itemInstanceId) ?? [
             piece.itemInstanceId,
           ],
         ]),
@@ -196,66 +121,10 @@ export function searchLoadouts(
         interchangeable,
         resolved,
       });
-      return;
-    }
+      return "accept";
+    },
+  });
 
-    const remaining = SLOT_ORDER.length - slotIndex;
-    const remainingSlots = SLOT_ORDER.slice(slotIndex);
-    for (const piece of slotPieces[slotIndex] ?? []) {
-      if (
-        !exoticAllowedInPartialCombo(
-          piece,
-          chosen,
-          exoticLock,
-          lockedIdentityKey,
-        )
-      ) {
-        continue;
-      }
-      visited += 1;
-      if (visited % 5000 === 0) {
-        onProgress?.(
-          totalCombos > 0 ? Math.min(99, (visited / totalCombos) * 100) : 0,
-        );
-      }
-      const nextTotals = { ...partialTotals };
-      for (const stat of ARMOR_STAT_NAMES) {
-        nextTotals[stat] += getPieceStatCeiling(piece, stat);
-      }
-      if (
-        !partialCanReachMins(
-          nextTotals,
-          remaining - 1,
-          perSlotMax,
-          request.constraints,
-          assumedMods,
-        )
-      ) {
-        continue;
-      }
-      if (
-        !partialCanSatisfySetBonuses(
-          [...chosen, piece],
-          remainingSlots.slice(1),
-          bySlot,
-          setBonusSelections,
-        )
-      ) {
-        continue;
-      }
-      visit(slotIndex + 1, [...chosen, piece], nextTotals);
-    }
-  };
-
-  const zeroTotals = totalsFromPieces([]);
-  const startTotals =
-    Object.keys(fragmentOffset).length > 0
-      ? addStatOffsets(
-          zeroTotals,
-          fragmentOffset as Record<(typeof ARMOR_STAT_NAMES)[number], number>,
-        )
-      : zeroTotals;
-  visit(0, [], startTotals);
   onProgress?.(100);
 
   candidates.sort(

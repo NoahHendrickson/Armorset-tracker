@@ -49,7 +49,7 @@ describe("searchLoadouts", () => {
       pool,
       constraints: ARMOR_STAT_NAMES.map((stat) => ({
         stat,
-        min: 0,
+        min: stat === "Weapons" ? 100 : 0,
       })),
     });
     expect(solutions.length).toBeGreaterThan(0);
