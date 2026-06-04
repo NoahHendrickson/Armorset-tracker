@@ -4,9 +4,11 @@ import {
   type DerivedArmorPieceJson,
 } from "@/lib/db/types";
 import {
-  getPieceStatTotals,
-  resolvePieceStatTotals,
-} from "@/lib/inventory/compute-stat-totals";
+  legacyTuningVariantDisplays,
+  pieceDisplayStatTotals,
+  sumArmorTuningOffset,
+  tuningDeltasForPieceBranch,
+} from "@/lib/inventory/armor-tuning-stats";
 import {
   isActiveStatConstraint,
   maxAllowedStatTotalForRow,
@@ -54,7 +56,7 @@ function sumStatMaps(
   return totals;
 }
 
-/** Candidate stat maps for one piece — exactly one branch must be chosen. */
+/** Display-stat candidates per piece — debuff branch differs when uncommitted. */
 function pieceTuningCandidates(
   piece: DerivedArmorPieceJson,
 ): Partial<Record<ArmorStatName, number>>[] {
@@ -63,9 +65,9 @@ function pieceTuningCandidates(
     piece.tuningVariants != null &&
     piece.tuningVariants.length > 0
   ) {
-    return piece.tuningVariants;
+    return legacyTuningVariantDisplays(piece);
   }
-  return [resolvePieceStatTotals(piece)];
+  return [pieceDisplayStatTotals(piece)];
 }
 
 function activeConstraintRows(
@@ -197,23 +199,32 @@ function resolveWithTuningChoices(
   assumedMods: AssumedStatMods,
 ): ResolvedLoadout | null {
   const branchMaps: Partial<Record<ArmorStatName, number>>[] = [];
+  const tuningDeltasList: ReturnType<typeof tuningDeltasForPieceBranch>[] = [];
   const tuningBySlot: Partial<Record<OptimizerSlotKey, TuningAssignment>> = {};
 
   for (let i = 0; i < pieces.length; i++) {
     const piece = pieces[i]!;
     const candidates = pieceTuningCandidates(piece);
     const branch = candidates[variantIndices[i]!] ?? candidates[0]!;
-    branchMaps.push(branch);
-    if (
+    const legacyBranch =
       piece.tuningCommitted === false &&
       piece.tuningVariants != null &&
       piece.tuningVariants.length > 0
-    ) {
-      tuningBySlot[SLOT_ORDER[i]! as OptimizerSlotKey] = branch;
+        ? piece.tuningVariants[variantIndices[i]!] ?? piece.tuningVariants[0]
+        : undefined;
+    branchMaps.push(branch);
+    tuningDeltasList.push(tuningDeltasForPieceBranch(piece, legacyBranch));
+    if (legacyBranch) {
+      tuningBySlot[SLOT_ORDER[i]! as OptimizerSlotKey] = legacyBranch;
     }
   }
 
-  const armorTotals = sumStatMaps(branchMaps);
+  const displayTotals = sumStatMaps(branchMaps);
+  const armorTuningRow = sumArmorTuningOffset(tuningDeltasList);
+  const armorTotals = addStatOffsets(
+    displayTotals,
+    armorTuningRow as Record<ArmorStatName, number>,
+  );
   const withFragments = addStatOffsets(
     armorTotals,
     fragmentOffset as Record<ArmorStatName, number>,
@@ -336,13 +347,13 @@ export function resolveLoadoutStatExtremum(
   return best;
 }
 
-/** Sum of raw armor stats from committed rolls (ignores tuning variants). */
+/** Sum of display armor stats (tuning row and mods excluded). */
 export function armorStatSumFromPieces(
   pieces: DerivedArmorPieceJson[],
 ): number {
   let sum = 0;
   for (const piece of pieces) {
-    const totals = getPieceStatTotals(piece);
+    const totals = pieceDisplayStatTotals(piece);
     for (const stat of ARMOR_STAT_NAMES) {
       sum += totals[stat] ?? 0;
     }

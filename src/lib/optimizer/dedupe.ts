@@ -1,18 +1,29 @@
 import { ARMOR_STAT_NAMES, type DerivedArmorPieceJson } from "@/lib/db/types";
 import { getPieceStatValue } from "@/lib/inventory/compute-stat-totals";
+import { resolvePieceTuningDeltas } from "@/lib/inventory/armor-tuning-stats";
+
+function tuningDuplicateKey(piece: DerivedArmorPieceJson): string {
+  const deltas =
+    piece.tuningDeltas != null && piece.tuningDeltas.length > 0
+      ? piece.tuningDeltas
+      : resolvePieceTuningDeltas(piece);
+  if (deltas.length === 0) {
+    return piece.tuningCommitted === false ? "uncommitted" : "none";
+  }
+  return deltas.map((d) => `${d.stat}:${d.value}`).join(";");
+}
 
 /**
  * Two pieces in the same slot are interchangeable for the search when they have
- * identical stat contributions, the same set membership (set-bonus counting),
- * and the same exotic-ness. Collapsing these before enumeration is the single
- * biggest lever on large-vault search time — a slot with 40 pieces often has
- * only a handful of distinct stat rolls.
+ * identical display stats, the same tuning row, set membership, and exotic-ness.
+ * Display-only dedupe was collapsing +Weapons vs +Grenade Ferropotent arms with
+ * the same intrinsic roll — verify then picked the wrong tuning branch.
  */
 export function pieceDuplicateKey(piece: DerivedArmorPieceJson): string {
   const stats = ARMOR_STAT_NAMES.map((stat) =>
     getPieceStatValue(piece, stat),
   ).join(",");
-  return `${piece.isExotic ? "E" : "L"}|${piece.setHash ?? "none"}|${stats}`;
+  return `${piece.isExotic ? "E" : "L"}|${piece.setHash ?? "none"}|${stats}|${tuningDuplicateKey(piece)}`;
 }
 
 export interface DedupedSlotPieces {

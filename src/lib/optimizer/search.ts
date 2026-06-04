@@ -14,6 +14,7 @@ import { DEFAULT_ASSUMED_STAT_MODS } from "@/lib/optimizer/mod-offset";
 import { resolveLoadoutTotals } from "@/lib/optimizer/resolve-loadout-totals";
 import { satisfiesSetBonuses } from "@/lib/optimizer/set-bonus";
 import { solutionSignature } from "@/lib/optimizer/signature";
+import { SolutionHeap } from "@/lib/optimizer/solution-heap";
 import type { OptimizerRequest, OptimizerSolution } from "@/lib/optimizer/types";
 
 export function searchLoadouts(
@@ -75,7 +76,9 @@ export function searchLoadouts(
         )
       : zeroTotals;
 
-  const candidates: OptimizerSolution[] = [];
+  const heap = new SolutionHeap(topN * 4, (solution) =>
+    scoreSolution(solution.totals, request.constraints),
+  );
 
   enumerateLoadouts({
     prepared,
@@ -84,6 +87,7 @@ export function searchLoadouts(
     constraints: request.constraints,
     assumedMods,
     setBonusSelections,
+    shard: request.shard,
     isCancelled,
     onVisitBatch: (visited, totalCombos) => {
       onProgress?.(
@@ -103,6 +107,13 @@ export function searchLoadouts(
       if (resolved == null) {
         return "reject";
       }
+      const solutionScore = scoreSolution(
+        resolved.totals,
+        request.constraints,
+      );
+      if (!heap.couldInsert(solutionScore)) {
+        return "reject";
+      }
       const slots = Object.fromEntries(
         chosen.map((piece, index) => [SLOT_ORDER[index]!, piece.itemInstanceId]),
       ) as OptimizerSolution["slots"];
@@ -114,7 +125,7 @@ export function searchLoadouts(
           ],
         ]),
       ) as NonNullable<OptimizerSolution["interchangeable"]>;
-      candidates.push({
+      heap.insert({
         slots,
         totals: resolved.totals,
         signature: solutionSignature(resolved.totals),
@@ -127,11 +138,7 @@ export function searchLoadouts(
 
   onProgress?.(100);
 
-  candidates.sort(
-    (a, b) =>
-      scoreSolution(a.totals, request.constraints) -
-      scoreSolution(b.totals, request.constraints),
-  );
+  const candidates = heap.toSortedArray();
 
   const seen = new Set<string>();
   const out: OptimizerSolution[] = [];

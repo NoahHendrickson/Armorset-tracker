@@ -20,12 +20,26 @@ import { bungieIconUrl } from "@/lib/bungie/constants";
 
 export const dynamic = "force-dynamic";
 
+function parseWorkspaceViewMode(
+  value: string | undefined,
+): "grid" | "table" | "optimizer" | null {
+  if (value === "grid" || value === "table" || value === "optimizer") {
+    return value;
+  }
+  return null;
+}
+
 interface DashboardPageProps {
-  searchParams: Promise<{ f?: string; savedViewImported?: string }>;
+  searchParams: Promise<{
+    f?: string;
+    savedViewImported?: string;
+    mode?: string;
+  }>;
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const { f, savedViewImported } = await searchParams;
+  const { f, savedViewImported, mode: modeParam } = await searchParams;
+  const initialMode = parseWorkspaceViewMode(modeParam) ?? "table";
   const dashboardPath = f
     ? `/dashboard?${GRID_FILTERS_SHARE_PARAM}=${encodeURIComponent(f)}`
     : "/dashboard";
@@ -106,6 +120,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       appliedFromShare={appliedFromShare}
       invalidShareLink={invalidShareLink}
       savedViewImportedId={savedViewImported ?? null}
+      initialMode={initialMode}
     />
   );
 }

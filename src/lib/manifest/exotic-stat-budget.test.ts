@@ -112,9 +112,12 @@ describe("exotic stat budget", () => {
     expect(totals.Weapons).toBe(5);
   });
 
-  it("mergeExoticStatTotals keeps the higher value per stat", () => {
+  it("mergeExoticStatTotals keeps higher Weapons and lower other stats", () => {
     expect(
       mergeExoticStatTotals({ Weapons: 10 }, { Weapons: 40 }),
     ).toEqual({ Weapons: 40 });
+    expect(
+      mergeExoticStatTotals({ Grenade: 12 }, { Grenade: 4 }),
+    ).toEqual({ Grenade: 4 });
   });
 });

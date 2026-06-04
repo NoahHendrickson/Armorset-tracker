@@ -13,6 +13,7 @@ import { AssumedStatModsPanel } from "@/components/optimizer/assumed-stat-mods-p
 import { ExoticArmorPicker } from "@/components/optimizer/exotic-armor-picker";
 import { OptimizerResultCard } from "@/components/optimizer/optimizer-result-card";
 import { OptimizerSettingsSection } from "@/components/optimizer/optimizer-settings-section";
+import { OptimizerStatTargetsNotice } from "@/components/optimizer/optimizer-stat-targets-notice";
 import { SetBonusPicker } from "@/components/optimizer/set-bonus-picker";
 import { StatRangeSlider } from "@/components/optimizer/stat-range-slider";
 import { SubclassFragmentPanel } from "@/components/optimizer/subclass-fragment-panel";
@@ -38,7 +39,6 @@ import {
   type AssumedStatMods,
 } from "@/lib/optimizer/mod-offset";
 import { setBonusSelectionConflict, type SetBonusSelection } from "@/lib/optimizer/set-bonus";
-import { useExoticBoundsHint } from "@/lib/optimizer/use-exotic-bounds-hint";
 import {
   formatSearchComboCount,
   useOptimizerComboEstimates,
@@ -140,7 +140,6 @@ export function LoadoutOptimizerView({
   const {
     inventoryWithExoticBudget,
     optimizerPool,
-    ownedExotics,
     classPieceCount,
     canRunOptimizer,
     missingSlotCoverage,
@@ -175,18 +174,6 @@ export function LoadoutOptimizerView({
     searchConstraints,
     selectedSetBonuses,
     fragmentStatOffset,
-    assumedStatMods,
-  });
-
-  const exoticBoundsHint = useExoticBoundsHint({
-    exoticLockMode: exoticLock.mode,
-    ownedExoticCount: ownedExotics.length,
-    inventoryWithExoticBudget,
-    classType,
-    statOffset: fragmentStatOffset,
-    exoticStatBudget: optimizerLookup.exoticStatBudget,
-    bounds,
-    constraints,
     assumedStatMods,
   });
 
@@ -340,7 +327,7 @@ export function LoadoutOptimizerView({
                         value={classType}
                         onChange={setClassType}
                       />
-                      <p className="mt-2 text-xs text-muted-foreground">
+                      <p className="mt-2 min-h-5 text-xs text-muted-foreground">
                         {optimizerPool.length.toLocaleString()} Tier&nbsp;5
                         piece{optimizerPool.length === 1 ? "" : "s"}
                         {searchComboCount > 0 ? (
@@ -369,48 +356,27 @@ export function LoadoutOptimizerView({
                       </p>
                     </OptimizerSettingsSection>
 
-                    <div className="border-b border-border py-4">
-                      <div className="grid grid-cols-1 items-start gap-x-5 gap-y-4 md:grid-cols-2">
-                        <OptimizerSettingsSection
-                          id="optimizer-stat-priorities-heading"
-                          title="Stat targets"
-                          compact
-                          description="Minimums on the 0–200 track. Double-click the shaded band to snap to max."
-                          className="border-b-0"
-                        >
-                          <div className="space-y-3">
-                          {noTier5 ? (
-                            <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
-                              No Tier&nbsp;5 armor found for this class. Refresh
-                              inventory or pick a class with Tier&nbsp;5 pieces.
-                            </p>
-                          ) : null}
-                          {!noTier5 &&
-                          classPieceCount > 0 &&
-                          optimizerPool.length === 0 ? (
-                            <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
-                              Tier&nbsp;5 pieces are missing stat data. Refresh
-                              inventory from the header.
-                            </p>
-                          ) : null}
-                          {missingSlotCoverage ? (
-                            <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
-                              Your Tier&nbsp;5 pool doesn&apos;t cover every slot
-                              — you need helmet, arms, chest, legs, and a class
-                              item.
-                            </p>
-                          ) : null}
-                          {searchTooLarge && canGenerateBuilds ? (
-                            <p className="text-xs text-amber-600 dark:text-amber-500">
-                              {formatSearchComboCount(
-                                searchComboCount,
-                                searchComboCapped,
-                              )}{" "}
-                              matching loadouts — shaded bands are estimates.
-                              Click Generate builds in Results.
-                            </p>
-                          ) : null}
-                          <ul className="space-y-1">
+                    <div className="space-y-4 border-b border-border py-4">
+                      <OptimizerSettingsSection
+                        id="optimizer-stat-priorities-heading"
+                        title="Stat targets"
+                        compact
+                        description="Minimums on the 0–200 track. Double-click the shaded band to snap to max."
+                        className="border-b-0"
+                      >
+                        <div className="space-y-3">
+                          <OptimizerStatTargetsNotice
+                            noTier5={noTier5}
+                            missingStatData={
+                              !noTier5 &&
+                              classPieceCount > 0 &&
+                              optimizerPool.length === 0
+                            }
+                            missingSlotCoverage={missingSlotCoverage}
+                            searchTooLarge={searchTooLarge}
+                            canGenerateBuilds={canGenerateBuilds}
+                          />
+                          <ul className="space-y-2.5">
                             {ARMOR_STAT_NAMES.map((stat) => {
                               const row = constraints.find((r) => r.stat === stat)!;
                               const range = bounds[stat];
@@ -433,31 +399,29 @@ export function LoadoutOptimizerView({
                             value={assumedStatMods}
                             onChange={setAssumedStatMods}
                           />
-                          </div>
-                        </OptimizerSettingsSection>
+                        </div>
+                      </OptimizerSettingsSection>
 
-                        <OptimizerSettingsSection
-                          id="optimizer-set-bonus-heading"
-                          title="Armor set"
+                      <OptimizerSettingsSection
+                        id="optimizer-set-bonus-heading"
+                        title="Armor set"
+                        compact
+                        description="Require set bonuses from pieces in your pool."
+                        className="border-b-0"
+                      >
+                        <SetBonusPicker
+                          pool={optimizerPool}
+                          setPerks={optimizerLookup.setPerks}
+                          selected={selectedSetBonuses}
+                          onChange={setSelectedSetBonuses}
                           compact
-                          description="Require set bonuses from pieces in your pool."
-                          className="border-b-0"
-                        >
-                          <SetBonusPicker
-                            pool={optimizerPool}
-                            setPerks={optimizerLookup.setPerks}
-                            selected={selectedSetBonuses}
-                            onChange={setSelectedSetBonuses}
-                            compact
-                          />
-                        </OptimizerSettingsSection>
-                      </div>
+                        />
+                      </OptimizerSettingsSection>
                     </div>
 
                     <OptimizerSettingsSection
                       id="optimizer-exotic-heading"
                       title="Exotic armor"
-                      description="Pick all-legendary, any one exotic, or lock a specific piece. Each exotic name appears once per slot."
                     >
                       <ExoticArmorPicker
                         inventory={inventory}
@@ -465,13 +429,6 @@ export function LoadoutOptimizerView({
                         exoticLock={exoticLock}
                         onExoticLockChange={setExoticLock}
                       />
-                      {exoticBoundsHint ? (
-                        <p className="mt-2 text-sm text-amber-600 dark:text-amber-500">
-                          Achievable stat ranges exclude exotics while &ldquo;No
-                          exotic&rdquo; is selected. Use &ldquo;Any exotic&rdquo;
-                          or lock a piece if your build uses one.
-                        </p>
-                      ) : null}
                     </OptimizerSettingsSection>
 
                     <OptimizerSettingsSection
@@ -585,7 +542,7 @@ export function LoadoutOptimizerView({
                             ? `Generating builds… ${Math.round(workerState.progress)}%`
                           : workerState.hasCompletedRun
                             ? exoticAnyFeasible
-                              ? "No all-legendary builds match. Lock your exotic helmet (e.g. Speaker's Sight) or choose Any exotic below."
+                              ? "No all-legendary builds match. Select an exotic below (e.g. Speaker's Sight)."
                               : "No builds match your targets. Lower a stat minimum, adjust set bonuses, or change the exotic."
                           : targetsPending
                             ? "Updating targets…"

@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { buildSearchShards } from "@/lib/optimizer/build-search-shards";
+import { mergeOptimizerSolutions } from "@/lib/optimizer/merge-solutions";
 import { runOptimizerSearch } from "@/lib/optimizer/run-search";
+import { DEFAULT_EXOTIC_LOCK } from "@/lib/optimizer/exotic-lock";
 import type {
   OptimizerRequest,
   OptimizerSolution,
@@ -28,20 +31,33 @@ const INITIAL_STATE: OptimizerWorkerState = {
   hasCompletedRun: false,
 };
 
+function requestCacheKey(payload: OptimizerRequest): string {
+  const lock = payload.exoticLock ?? DEFAULT_EXOTIC_LOCK;
+  const mins = payload.constraints.map((r) => `${r.stat}:${r.min}`).join(",");
+  return JSON.stringify({
+    poolIds: payload.pool.map((p) => p.itemInstanceId).sort(),
+    mins,
+    lock,
+    mods: payload.assumedStatMods,
+    sets: payload.setBonusSelections,
+    offset: payload.statOffset,
+    pinned: payload.pinnedInstanceIds,
+    excluded: payload.excludedInstanceIds,
+  });
+}
+
 /**
  * Runs the loadout search off the main thread in a Web Worker so the UI stays
  * responsive (progress, cancel, slider edits) during large-vault searches.
  *
- * A synchronous worker search can't be interrupted by a message mid-loop, so
- * cancel and each new run *terminate* the in-flight worker and start fresh —
- * this is what makes Cancel actually free the CPU. Falls back to a yielding
- * main-thread search when workers are unavailable (SSR, or a bundler that
- * can't construct the worker).
+ * Large vaults shard the longest armor slot across multiple workers (DIM-style).
+ * Cancel terminates all in-flight workers.
  */
 export function useOptimizerWorker() {
   const runIdRef = useRef(0);
-  const workerRef = useRef<Worker | null>(null);
+  const workerRefs = useRef<Worker[]>([]);
   const workerBrokenRef = useRef(false);
+  const lastCompletedKeyRef = useRef<string | null>(null);
   const [state, setState] = useState<OptimizerWorkerState>(INITIAL_STATE);
 
   const createWorker = useCallback((): Worker | null => {
@@ -57,23 +73,24 @@ export function useOptimizerWorker() {
     }
   }, []);
 
-  const terminateWorker = useCallback(() => {
-    workerRef.current?.terminate();
-    workerRef.current = null;
+  const terminateWorkers = useCallback(() => {
+    for (const worker of workerRefs.current) {
+      worker.terminate();
+    }
+    workerRefs.current = [];
   }, []);
 
   useEffect(() => {
     return () => {
-      workerRef.current?.terminate();
-      workerRef.current = null;
+      terminateWorkers();
     };
-  }, []);
+  }, [terminateWorkers]);
 
   const cancel = useCallback(() => {
     runIdRef.current += 1;
-    terminateWorker();
+    terminateWorkers();
     setState((prev) => ({ ...prev, running: false }));
-  }, [terminateWorker]);
+  }, [terminateWorkers]);
 
   const runOnMainThread = useCallback(
     (payload: OptimizerRequest, runId: number) => {
@@ -87,6 +104,7 @@ export function useOptimizerWorker() {
       )
         .then(({ bounds, solutions }) => {
           if (runId !== runIdRef.current) return;
+          lastCompletedKeyRef.current = requestCacheKey(payload);
           setState({
             running: false,
             progress: 100,
@@ -111,28 +129,14 @@ export function useOptimizerWorker() {
     [],
   );
 
-  const run = useCallback(
-    (payload: OptimizerRequest) => {
-      runIdRef.current += 1;
-      const runId = runIdRef.current;
-
-      setState({
-        running: true,
-        progress: 0,
-        bounds: null,
-        solutions: [],
-        error: null,
-        hasCompletedRun: false,
-      });
-
-      // Stop any in-flight search immediately, then start a fresh worker.
-      terminateWorker();
+  const runSingleWorker = useCallback(
+    (payload: OptimizerRequest, runId: number) => {
       const worker = createWorker();
       if (!worker) {
         runOnMainThread(payload, runId);
         return;
       }
-      workerRef.current = worker;
+      workerRefs.current = [worker];
 
       worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
         const message = event.data;
@@ -145,6 +149,7 @@ export function useOptimizerWorker() {
             setState((prev) => ({ ...prev, progress: message.percent }));
             return;
           case "result":
+            lastCompletedKeyRef.current = requestCacheKey(payload);
             setState((prev) => ({
               ...prev,
               running: false,
@@ -168,15 +173,141 @@ export function useOptimizerWorker() {
       };
       worker.onerror = () => {
         if (runId !== runIdRef.current) return;
-        // Worker failed to load/run — drop it and fall back to the main thread.
         workerBrokenRef.current = true;
-        terminateWorker();
+        terminateWorkers();
         runOnMainThread(payload, runId);
       };
 
       worker.postMessage({ type: "run", id: String(runId), payload });
     },
-    [createWorker, runOnMainThread, terminateWorker],
+    [createWorker, runOnMainThread, terminateWorkers],
+  );
+
+  const runShardedWorkers = useCallback(
+    (payload: OptimizerRequest, runId: number, shards: ReturnType<typeof buildSearchShards>) => {
+      const topN = payload.topN ?? 20;
+      const shardSolutions: OptimizerSolution[][] = new Array(shards.length);
+      const shardProgress = new Array<number>(shards.length).fill(0);
+      let boundsReceived: StatBounds | null = null;
+      let finished = 0;
+      let errored = false;
+
+      const maybeFinish = () => {
+        if (errored || finished < shards.length) return;
+        if (runId !== runIdRef.current) return;
+        const solutions = mergeOptimizerSolutions(
+          shardSolutions,
+          payload.constraints,
+          topN,
+        );
+        lastCompletedKeyRef.current = requestCacheKey(payload);
+        setState({
+          running: false,
+          progress: 100,
+          bounds: boundsReceived,
+          solutions,
+          error: null,
+          hasCompletedRun: true,
+        });
+        terminateWorkers();
+      };
+
+      const workers: Worker[] = [];
+      for (let i = 0; i < shards.length; i++) {
+        const worker = createWorker();
+        if (!worker) {
+          terminateWorkers();
+          runOnMainThread(payload, runId);
+          return;
+        }
+        workers.push(worker);
+
+        const shardId = `${runId}:${i}`;
+        worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+          const message = event.data;
+          if (message.id !== shardId || runId !== runIdRef.current) return;
+          switch (message.type) {
+            case "bounds":
+              if (boundsReceived == null) {
+                boundsReceived = message.bounds;
+                setState((prev) => ({ ...prev, bounds: message.bounds }));
+              }
+              return;
+            case "progress":
+              shardProgress[i] = message.percent;
+              setState((prev) => ({
+                ...prev,
+                progress:
+                  shardProgress.reduce((a, b) => a + b, 0) / shards.length,
+              }));
+              return;
+            case "result":
+              shardSolutions[i] = message.solutions;
+              finished += 1;
+              maybeFinish();
+              return;
+            case "error":
+              errored = true;
+              setState({
+                running: false,
+                progress: 0,
+                bounds: null,
+                solutions: [],
+                error: message.message,
+                hasCompletedRun: true,
+              });
+              terminateWorkers();
+              return;
+          }
+        };
+        worker.onerror = () => {
+          if (runId !== runIdRef.current) return;
+          workerBrokenRef.current = true;
+          terminateWorkers();
+          runOnMainThread(payload, runId);
+        };
+
+        worker.postMessage({
+          type: "run",
+          id: shardId,
+          payload: { ...payload, shard: shards[i], topN: topN * 2 },
+        });
+      }
+      workerRefs.current = workers;
+    },
+    [createWorker, runOnMainThread, terminateWorkers],
+  );
+
+  const run = useCallback(
+    (payload: OptimizerRequest) => {
+      const cacheKey = requestCacheKey(payload);
+      if (lastCompletedKeyRef.current === cacheKey) {
+        return;
+      }
+
+      runIdRef.current += 1;
+      const runId = runIdRef.current;
+
+      setState({
+        running: true,
+        progress: 0,
+        bounds: null,
+        solutions: [],
+        error: null,
+        hasCompletedRun: false,
+      });
+
+      terminateWorkers();
+
+      const exoticLock = payload.exoticLock ?? DEFAULT_EXOTIC_LOCK;
+      const shards = buildSearchShards(payload.pool, exoticLock);
+      if (shards.length > 1) {
+        runShardedWorkers(payload, runId, shards);
+      } else {
+        runSingleWorker(payload, runId);
+      }
+    },
+    [runShardedWorkers, runSingleWorker, terminateWorkers],
   );
 
   return { state, run, cancel };

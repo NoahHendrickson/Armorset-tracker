@@ -17,6 +17,16 @@ export const ARMOR_STAT_DESTINY_HASH: Record<ArmorStatName, number> = {
   Super: 144_602_215,
 };
 
+/**
+ * Extra Bungie statTypeHashes seen on profile ItemStats (304) for Armor 3.0
+ * exotics — the canonical six hashes do not cover every instance block.
+ */
+export const ADDITIONAL_ARMOR_STAT_DESTINY_HASH: ReadonlyArray<
+  readonly [number, ArmorStatName]
+> = [
+  [1_943_323_491, "Class"],
+];
+
 /** Build hash → stat map, optionally overridden by manifest-synced rows. */
 export function buildDestinyStatHashToArmorStat(
   fromDb?: Iterable<readonly [number, ArmorStatName]>,
@@ -24,6 +34,9 @@ export function buildDestinyStatHashToArmorStat(
   const map = new Map<number, ArmorStatName>();
   for (const stat of ARMOR_STAT_NAMES) {
     map.set(ARMOR_STAT_DESTINY_HASH[stat], stat);
+  }
+  for (const [hash, stat] of ADDITIONAL_ARMOR_STAT_DESTINY_HASH) {
+    map.set(hash, stat);
   }
   if (fromDb) {
     for (const [hash, stat] of fromDb) {

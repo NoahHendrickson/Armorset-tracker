@@ -2,7 +2,7 @@ import { SLOT_ORDER } from "@/lib/bungie/constants";
 import { ARMOR_STAT_NAMES, type ArmorStatName, type DerivedArmorPieceJson } from "@/lib/db/types";
 import {
   getPieceStatCeiling,
-  getPieceStatValue,
+  getPieceStatFloor,
 } from "@/lib/inventory/compute-stat-totals";
 import { addStatOffsets } from "@/lib/optimizer/fragment-offset";
 import {
@@ -35,7 +35,7 @@ function slotStatExtremum(
   for (const piece of candidates) {
     const value =
       mode === "min"
-        ? getPieceStatValue(piece, stat)
+        ? getPieceStatFloor(piece, stat)
         : getPieceStatCeiling(piece, stat);
     result = mode === "min" ? Math.min(result, value) : Math.max(result, value);
   }
@@ -122,7 +122,7 @@ function minTotalForStat(
     if (lockedPieces.length === 0) return null;
 
     let total = Math.min(
-      ...lockedPieces.map((piece) => getPieceStatValue(piece, stat)),
+      ...lockedPieces.map((piece) => getPieceStatFloor(piece, stat)),
     );
     for (const slot of SLOT_ORDER) {
       if (slot === exoticLock.slot) continue;

@@ -4,7 +4,10 @@ import {
   hasStatTargets,
   isActiveStatConstraint,
 } from "@/lib/optimizer/constraints";
-import { JOINT_BOUNDS_COMBO_LIMIT } from "@/lib/optimizer/constants";
+import {
+  JOINT_BOUNDS_COMBO_LIMIT,
+  SYNC_UI_ENUMERATION_COMBO_LIMIT,
+} from "@/lib/optimizer/constants";
 import {
   estimateOptimizerComboCount,
 } from "@/lib/optimizer/combo-count";
@@ -31,6 +34,7 @@ import type { StatBounds, StatConstraintRow } from "@/lib/optimizer/types";
 export {
   JOINT_BOUNDS_COMBO_LIMIT,
   SEARCH_AUTO_RUN_COMBO_LIMIT,
+  SYNC_UI_ENUMERATION_COMBO_LIMIT,
 } from "@/lib/optimizer/constants";
 export { computeConstrainedStatBounds } from "@/lib/optimizer/bounds-joint";
 export { computeHeuristicConstrainedStatBounds } from "@/lib/optimizer/bounds-heuristic";
@@ -75,6 +79,9 @@ export function computeStatBounds(
         exoticLock,
         assumedMods,
         setBonusSelections,
+        {
+          greedyOnly: comboCount > SYNC_UI_ENUMERATION_COMBO_LIMIT,
+        },
       );
     }
   }

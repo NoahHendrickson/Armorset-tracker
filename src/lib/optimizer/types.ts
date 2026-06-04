@@ -10,6 +10,13 @@ export type StatConstraintRow = {
   min: number;
 };
 
+/** Restrict enumeration to a slice of one slot's deduped representatives (worker shard). */
+export type OptimizerSearchShard = {
+  slotIndex: number;
+  pieceStart: number;
+  pieceEnd: number;
+};
+
 export type OptimizerRequest = {
   pool: DerivedArmorPieceJson[];
   constraints: StatConstraintRow[];
@@ -22,6 +29,16 @@ export type OptimizerRequest = {
   pinnedInstanceIds?: string[];
   excludedInstanceIds?: string[];
   topN?: number;
+  shard?: OptimizerSearchShard;
+};
+
+export type OptimizerBoundsRequest = {
+  pool: DerivedArmorPieceJson[];
+  statOffset?: Partial<Record<ArmorStatName, number>>;
+  assumedStatMods?: AssumedStatMods;
+  exoticLock?: ExoticLock;
+  constraints?: StatConstraintRow[];
+  setBonusSelections?: SetBonusSelection[];
 };
 
 export type StatBounds = Record<ArmorStatName, { min: number; max: number }>;
@@ -52,7 +69,13 @@ export type WorkerRunMessage = {
   payload: OptimizerRequest;
 };
 
-export type WorkerRequest = WorkerRunMessage;
+export type WorkerComputeBoundsMessage = {
+  type: "computeBounds";
+  id: string;
+  payload: OptimizerBoundsRequest;
+};
+
+export type WorkerRequest = WorkerRunMessage | WorkerComputeBoundsMessage;
 
 export type WorkerBoundsMessage = {
   type: "bounds";

@@ -2,16 +2,21 @@ import { SLOT_ORDER } from "@/lib/bungie/constants";
 import { ARMOR_STAT_NAMES, type ArmorStatName, type DerivedArmorPieceJson } from "@/lib/db/types";
 import {
   getPieceStatCeiling,
-  getPieceStatValue,
+  getPieceStatFloor,
 } from "@/lib/inventory/compute-stat-totals";
 import {
+  isActiveStatConstraint,
   otherActiveStatConstraints,
   partialCanReachMins,
   totalsFromPieces,
 } from "@/lib/optimizer/constraints";
-import { SEARCH_AUTO_RUN_COMBO_LIMIT } from "@/lib/optimizer/constants";
+import { OPTIMIZER_STAT_MIN } from "@/lib/optimizer/stat-range";
+import { SYNC_UI_ENUMERATION_COMBO_LIMIT } from "@/lib/optimizer/constants";
 import {
   estimateFilteredComboCount,
+  estimateOptimizerComboCount,
+  maxAchievableUntargetedStat,
+  maxAchievableUntargetedStatBounded,
   maxFeasibleStatTarget,
 } from "@/lib/optimizer/combo-count";
 import { prepareDedupedSlotPool } from "@/lib/optimizer/enumeration/prepare-slot-pool";
@@ -86,7 +91,7 @@ function totalsAfterPiece(
     next[stat] +=
       mode === "max"
         ? getPieceStatCeiling(piece, stat)
-        : getPieceStatValue(piece, stat);
+        : getPieceStatFloor(piece, stat);
   }
   return next;
 }
@@ -161,7 +166,7 @@ function greedyLoadoutStatExtremum(
       const focusValue =
         mode === "max"
           ? getPieceStatCeiling(piece, focusStat)
-          : getPieceStatValue(piece, focusStat);
+          : getPieceStatFloor(piece, focusStat);
       if (mode === "max" ? focusValue > bestFocus : focusValue < bestFocus) {
         bestFocus = focusValue;
         bestPiece = piece;
@@ -199,6 +204,14 @@ function greedyLoadoutStatExtremum(
  * Fast cross-stat achievable bands (greedy, not exact). Used for slider gray
  * bars on large vaults where joint enumeration is impractical.
  */
+export type HeuristicConstrainedStatBoundsOptions = {
+  /**
+   * Skip full filtered enumeration for untargeted stats — use bounded DFS instead.
+   * Targeted stats always use `maxFeasibleStatTarget` (binary search, fast).
+   */
+  greedyOnly?: boolean;
+};
+
 export function computeHeuristicConstrainedStatBounds(
   pool: DerivedArmorPieceJson[],
   constraints: StatConstraintRow[],
@@ -206,7 +219,9 @@ export function computeHeuristicConstrainedStatBounds(
   exoticLock: ExoticLock = DEFAULT_EXOTIC_LOCK,
   assumedMods: AssumedStatMods = DEFAULT_ASSUMED_STAT_MODS,
   setBonusSelections: SetBonusSelection[] = [],
+  options: HeuristicConstrainedStatBoundsOptions = {},
 ): StatBounds | null {
+  const greedyOnly = options.greedyOnly === true;
   const prepared = prepareSlotPool(pool, statOffset, exoticLock, assumedMods);
   if (prepared == null) {
     return null;
@@ -224,6 +239,12 @@ export function computeHeuristicConstrainedStatBounds(
     ]),
   ) as StatBounds;
   let bounds = applyFragmentOffsetToBounds(cloned, statOffset);
+  const armorOnlyBounds = Object.fromEntries(
+    ARMOR_STAT_NAMES.map((stat) => [
+      stat,
+      { min: bounds[stat].min, max: bounds[stat].max },
+    ]),
+  ) as StatBounds;
   bounds = applyModBudgetToBounds(bounds, assumedMods);
   const independentBounds = Object.fromEntries(
     ARMOR_STAT_NAMES.map((stat) => [
@@ -232,7 +253,32 @@ export function computeHeuristicConstrainedStatBounds(
     ]),
   ) as StatBounds;
 
+  const needsCrossStatTightening =
+    constraints.some((row) => isActiveStatConstraint(row)) &&
+    ARMOR_STAT_NAMES.some(
+      (stat) => otherActiveStatConstraints(constraints, stat).length > 0,
+    );
+
+  const filteredCombo =
+    greedyOnly || !needsCrossStatTightening
+      ? null
+      : (() => {
+          const rawCombo = estimateOptimizerComboCount(pool, exoticLock);
+          if (rawCombo > SYNC_UI_ENUMERATION_COMBO_LIMIT) {
+            return { count: rawCombo, capped: true };
+          }
+          return estimateFilteredComboCount(pool, exoticLock, {
+            constraints,
+            setBonusSelections,
+            statOffset,
+            assumedMods,
+            cap: SYNC_UI_ENUMERATION_COMBO_LIMIT + 1,
+          });
+        })();
+
   for (const stat of ARMOR_STAT_NAMES) {
+    const row = constraints.find((r) => r.stat === stat);
+    const isTargeted = row != null && isActiveStatConstraint(row);
     const othersActive = otherActiveStatConstraints(constraints, stat);
     const maxVal = greedyLoadoutStatExtremum(
       prepared,
@@ -253,33 +299,66 @@ export function computeHeuristicConstrainedStatBounds(
       setBonusSelections,
     );
 
-    let tightenedMax = bounds[stat].max;
-    if (maxVal != null) {
-      tightenedMax = Math.min(tightenedMax, maxVal);
-    }
-    if (othersActive.length > 0) {
-      const { count: filteredComboCount, capped: filteredComboCapped } =
-        estimateFilteredComboCount(pool, exoticLock, {
-          constraints,
-          setBonusSelections,
-          statOffset,
-          assumedMods,
-          cap: SEARCH_AUTO_RUN_COMBO_LIMIT + 1,
-        });
-      if (
-        !filteredComboCapped &&
-        filteredComboCount <= SEARCH_AUTO_RUN_COMBO_LIMIT
-      ) {
-        tightenedMax = Math.min(
-          tightenedMax,
-          maxFeasibleStatTarget(pool, exoticLock, constraints, stat, {
-            setBonusSelections,
-            statOffset,
-            assumedMods,
-            hi: tightenedMax,
-          }),
-        );
+    let tightenedMax = isTargeted
+      ? bounds[stat].max
+      : armorOnlyBounds[stat].max;
+    let verifiedCap: number | null = null;
+
+    const capOptions = {
+      setBonusSelections,
+      statOffset,
+      assumedMods,
+    };
+
+    if (isTargeted) {
+      const cappedTarget = maxFeasibleStatTarget(
+        pool,
+        exoticLock,
+        constraints,
+        stat,
+        {
+          ...capOptions,
+          hi: independentBounds[stat].max,
+        },
+      );
+      if (cappedTarget > OPTIMIZER_STAT_MIN) {
+        verifiedCap = cappedTarget;
+        tightenedMax = Math.min(tightenedMax, cappedTarget);
       }
+    } else if (othersActive.length > 0) {
+      const canRunFullUntargetedEnumeration =
+        !greedyOnly &&
+        filteredCombo != null &&
+        !filteredCombo.capped &&
+        filteredCombo.count <= SYNC_UI_ENUMERATION_COMBO_LIMIT;
+
+      const achievableMax = canRunFullUntargetedEnumeration
+        ? maxAchievableUntargetedStat(
+            pool,
+            exoticLock,
+            constraints,
+            stat,
+            capOptions,
+          )
+        : maxAchievableUntargetedStatBounded(
+            pool,
+            exoticLock,
+            constraints,
+            stat,
+            capOptions,
+          );
+      if (achievableMax > OPTIMIZER_STAT_MIN) {
+        verifiedCap = achievableMax;
+        tightenedMax = Math.min(tightenedMax, achievableMax);
+      }
+    }
+    // Greedy max can underestimate when tuning branches interact. Prefer the
+    // verified cap when present; only fall back to greedy when enumeration or
+    // binary search did not run.
+    if (isTargeted && maxVal != null && verifiedCap == null) {
+      tightenedMax = Math.min(tightenedMax, maxVal);
+    } else if (!isTargeted && verifiedCap == null && maxVal != null) {
+      tightenedMax = Math.min(tightenedMax, maxVal);
     }
     bounds[stat].max = tightenedMax;
 

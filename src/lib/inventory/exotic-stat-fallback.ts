@@ -1,4 +1,5 @@
 import type { ArmorStatName, DerivedArmorPieceJson } from "@/lib/db/types";
+import { ARMOR_STAT_NAMES } from "@/lib/db/types";
 import { pieceHasStatTotals } from "@/lib/inventory/compute-stat-totals";
 import { exoticPieceIdentityKey } from "@/lib/optimizer/exotic-lock";
 
@@ -49,20 +50,86 @@ export function resolveExoticManifestBudget(
   return null;
 }
 
+/** Lower inflated non-Weapons stats to manifest socket budget (D2AP piece rows). */
+export function clampExoticStatTotalsToBudget(
+  totals: Partial<Record<ArmorStatName, number>>,
+  budget: Partial<Record<ArmorStatName, number>>,
+): Partial<Record<ArmorStatName, number>> {
+  const out = { ...totals };
+  for (const stat of ARMOR_STAT_NAMES) {
+    if (stat === "Weapons") continue;
+    const cap = budget[stat];
+    const current = out[stat];
+    if (cap === undefined || current === undefined) continue;
+    if (current > cap) {
+      out[stat] = cap;
+    }
+  }
+  return out;
+}
+
+/**
+ * Bungie ItemStats sometimes reports Grenade 12 on exotics whose D2AP piece row
+ * shows 4 (tertiary matches Class/Melee). Pull inflated values back to peers.
+ */
+export function capInflatedExoticGrenade(
+  totals: Partial<Record<ArmorStatName, number>>,
+): Partial<Record<ArmorStatName, number>> {
+  const grenade = totals.Grenade;
+  if (grenade === undefined) {
+    return totals;
+  }
+  const peer = Math.max(totals.Class ?? 0, totals.Melee ?? 0);
+  if (
+    peer > 0 &&
+    grenade > peer &&
+    grenade >= 10 &&
+    grenade <= peer + 8
+  ) {
+    return { ...totals, Grenade: peer };
+  }
+  return totals;
+}
+
+function normalizeExoticStatTotals(
+  totals: Partial<Record<ArmorStatName, number>>,
+  budget: Partial<Record<ArmorStatName, number>> | null,
+): Partial<Record<ArmorStatName, number>> {
+  let next = budget ? clampExoticStatTotalsToBudget(totals, budget) : totals;
+  next = capInflatedExoticGrenade(next);
+  return next;
+}
+
 /** Fill missing exotic `statTotals` from manifest budgets (optimizer + bounds). */
 export function enrichPieceWithExoticBudget(
   piece: DerivedArmorPieceJson,
   lookup?: ExoticStatBudgetLookup | null,
 ): DerivedArmorPieceJson {
-  if (!piece.isExotic || pieceHasStatTotals(piece)) return piece;
+  if (!piece.isExotic) return piece;
 
   const budget = resolveExoticManifestBudget(piece, lookup);
-  if (budget == null) return piece;
+
+  if (!pieceHasStatTotals(piece)) {
+    if (budget == null) return piece;
+    const totals = normalizeExoticStatTotals(budget, budget);
+    return {
+      ...piece,
+      statTotals: totals,
+      ...rankedStatLabels(totals),
+    };
+  }
+
+  const clamped = normalizeExoticStatTotals(piece.statTotals ?? {}, budget);
+  const unchanged =
+    JSON.stringify(clamped) === JSON.stringify(piece.statTotals ?? {});
+  if (unchanged) {
+    return piece;
+  }
 
   return {
     ...piece,
-    statTotals: budget,
-    ...rankedStatLabels(budget),
+    statTotals: clamped,
+    ...rankedStatLabels(clamped),
   };
 }
 

@@ -1,33 +1,66 @@
 /**
  * Verify a DIM loadout by instance id against cached inventory (no browser cookie).
- * Run: npx tsx --tsconfig tsconfig.json scripts/verify-dim-loadout.ts
+ * Run:
+ *   NODE_OPTIONS='--require ./scripts/stub-server-only.cjs' \
+ *   npx tsx --tsconfig tsconfig.json scripts/verify-dim-loadout.ts [instanceIds...]
  */
 import { loadEnvConfig } from "@next/env";
 import type { DerivedArmorPieceJson } from "../src/lib/db/types";
 
 loadEnvConfig(process.cwd());
 
-const DIM_IDS = [
-  "6917530125283917710",
+/** Default: Speaker's Sight + Ferropotent / Smoke Jumper (user-reported D2ArmorPicker ids). */
+const DEFAULT_DIM_IDS = [
+  "6917530125298828509",
   "6917530167771126356",
-  "6917530146795020473",
-  "6917530159911796935",
+  "6917530146665347396",
+  "6917530160150786116",
   "6917530147186685296",
 ];
 
-/** Screenshot targets: Weapons 200, Class 50, Grenade 100, Super 70; Health/Melee unset. */
-const SCREENSHOT_CONSTRAINTS = [
+/** D2ArmorPicker reference build (Ferropotent + Smoke Jumper, 3 majors). */
+export const D2ARMORPICKER_BUILD_IDS = [
+  "6917530147055270152",
+  "6917530167771126356",
+  "6917530146665347396",
+  "6917530158828866218",
+  "6917530159155527574",
+] as const;
+
+const DIM_IDS =
+  process.argv.length > 2
+    ? process.argv.slice(2)
+    : process.env.DIM_IDS?.split(/[\s,]+/).filter(Boolean) ??
+      DEFAULT_DIM_IDS;
+
+const useD2ArmorPickerTargets =
+  process.env.D2ARMORPICKER === "1" ||
+  (DIM_IDS.length === D2ARMORPICKER_BUILD_IDS.length &&
+    DIM_IDS.every((id) =>
+      (D2ARMORPICKER_BUILD_IDS as readonly string[]).includes(id),
+    ));
+
+/** D2ArmorPicker: Weapons 200, Grenade 100, Super 100; Health/Melee/Class unset (0/25 bands). */
+const D2ARMORPICKER_CONSTRAINTS = [
+  { stat: "Weapons" as const, min: 200 },
+  { stat: "Grenade" as const, min: 100 },
+  { stat: "Super" as const, min: 100 },
+];
+
+const LEGACY_SCREENSHOT_CONSTRAINTS = [
   { stat: "Weapons" as const, min: 200 },
   { stat: "Class" as const, min: 50 },
   { stat: "Grenade" as const, min: 100 },
   { stat: "Super" as const, min: 70 },
 ];
 
-const ASSUMED_MODS_SCREENSHOT = {
-  majorCount: 5,
-  slotFill: true,
-  artifice: true,
-};
+const SCREENSHOT_CONSTRAINTS = useD2ArmorPickerTargets
+  ? D2ARMORPICKER_CONSTRAINTS
+  : LEGACY_SCREENSHOT_CONSTRAINTS;
+
+const ASSUMED_MODS_SCREENSHOT = useD2ArmorPickerTargets
+  ? { majorCount: 3, slotFill: true, artifice: true }
+  : { majorCount: 5, slotFill: true, artifice: true };
 
 async function main(): Promise<void> {
   const { getServiceRoleClient } = await import("../src/lib/db/server");
@@ -207,6 +240,32 @@ async function main(): Promise<void> {
     );
     report.resolveTotalsEnriched = resolved?.totals ?? null;
     report.modAllocationEnriched = resolved?.modAllocation ?? null;
+
+    if (useD2ArmorPickerTargets) {
+      const { defaultStatConstraints } = await import(
+        "../src/lib/optimizer/constraints"
+      );
+      const sliderConstraints = defaultStatConstraints().map((row) => {
+        const target = SCREENSHOT_CONSTRAINTS.find((t) => t.stat === row.stat);
+        return target ? { ...row, min: target.min } : row;
+      });
+      const exoticLock =
+        exotic != null
+          ? {
+              mode: "locked" as const,
+              itemInstanceId: exotic.itemInstanceId,
+              slot: exotic.slot,
+            }
+          : ({ mode: "none" as const } as const);
+      report.boundsFivePiece = computeStatBounds(
+        enrichedPieces,
+        {},
+        exoticLock,
+        sliderConstraints,
+        ASSUMED_MODS_SCREENSHOT,
+        setBonusSelections,
+      );
+    }
   }
 
   const classType = 2;
@@ -244,6 +303,25 @@ async function main(): Promise<void> {
         })
       : [];
 
+  const sliderConstraintsForVault =
+    useD2ArmorPickerTargets
+      ? (await import("../src/lib/optimizer/constraints")).defaultStatConstraints().map(
+          (row) => {
+            const target = SCREENSHOT_CONSTRAINTS.find((t) => t.stat === row.stat);
+            return target ? { ...row, min: target.min } : row;
+          },
+        )
+      : SCREENSHOT_CONSTRAINTS;
+
+  const lockedExoticLock =
+    exotic != null
+      ? {
+          mode: "locked" as const,
+          itemInstanceId: exotic.itemInstanceId,
+          slot: exotic.slot,
+        }
+      : null;
+
   report.warlockVault = {
     pieces: warlockInventory.length,
     poolNone: poolNone.length,
@@ -253,16 +331,29 @@ async function main(): Promise<void> {
       poolNone,
       {},
       { mode: "none" },
-      SCREENSHOT_CONSTRAINTS,
+      sliderConstraintsForVault,
       ASSUMED_MODS_SCREENSHOT,
+      useD2ArmorPickerTargets ? setBonuses : [],
     ),
     boundsAnyExotic: computeStatBounds(
       poolAny,
       {},
       { mode: "any" },
-      SCREENSHOT_CONSTRAINTS,
+      sliderConstraintsForVault,
       ASSUMED_MODS_SCREENSHOT,
+      useD2ArmorPickerTargets ? setBonuses : [],
     ),
+    boundsLockedWithSetBonuses:
+      poolLocked.length > 0 && lockedExoticLock != null
+        ? computeStatBounds(
+            poolLocked,
+            {},
+            lockedExoticLock,
+            sliderConstraintsForVault,
+            ASSUMED_MODS_SCREENSHOT,
+            setBonuses,
+          )
+        : null,
     combosNone: estimateFilteredComboCount(poolNone, { mode: "none" }, {
       constraints: SCREENSHOT_CONSTRAINTS,
       setBonusSelections: setBonuses,

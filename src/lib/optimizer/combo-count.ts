@@ -12,6 +12,7 @@ import {
 import { prepareDedupedSlotPool } from "@/lib/optimizer/enumeration/prepare-slot-pool";
 import {
   hasStatTargets,
+  otherActiveStatConstraints,
   totalsFromPieces,
 } from "@/lib/optimizer/constraints";
 import {
@@ -20,11 +21,12 @@ import {
   type ExoticLock,
 } from "@/lib/optimizer/exotic-lock";
 import { addStatOffsets } from "@/lib/optimizer/fragment-offset";
+import { SYNC_UI_ENUMERATION_COMBO_LIMIT } from "@/lib/optimizer/constants";
 import {
   DEFAULT_ASSUMED_STAT_MODS,
   type AssumedStatMods,
 } from "@/lib/optimizer/mod-offset";
-import { resolveLoadoutTotals } from "@/lib/optimizer/resolve-loadout-totals";
+import { resolveLoadoutStatExtremum, resolveLoadoutTotals } from "@/lib/optimizer/resolve-loadout-totals";
 import {
   satisfiesSetBonuses,
   type SetBonusSelection,
@@ -208,8 +210,156 @@ function constraintsWithStatMin(
 }
 
 /**
+ * Highest verified raw total on `focusStat` among loadouts that meet active
+ * targets on other stats. Assumed mods allocate only to those active stats —
+ * not to the focus stat (D2ArmorPicker gray-band parity).
+ */
+export function maxAchievableUntargetedStat(
+  pool: DerivedArmorPieceJson[],
+  exoticLock: ExoticLock = DEFAULT_EXOTIC_LOCK,
+  constraints: StatConstraintRow[],
+  focusStat: ArmorStatName,
+  options: StatTargetFeasibilityOptions = {},
+): number {
+  const assumedMods = options.assumedMods ?? DEFAULT_ASSUMED_STAT_MODS;
+  const setBonusSelections = options.setBonusSelections ?? [];
+  const fragmentOffset = options.statOffset ?? {};
+  const otherConstraints = otherActiveStatConstraints(constraints, focusStat);
+
+  const prepared = prepareDedupedSlotPool({ pool, exoticLock });
+  if (prepared == null) {
+    return OPTIMIZER_STAT_MIN;
+  }
+
+  const zeroTotals = totalsFromPieces([]);
+  const startTotals =
+    Object.keys(fragmentOffset).length > 0
+      ? addStatOffsets(
+          zeroTotals,
+          fragmentOffset as Record<ArmorStatName, number>,
+        )
+      : zeroTotals;
+
+  let best: number | null = null;
+  enumerateLoadouts({
+    prepared,
+    exoticLock,
+    startTotals,
+    constraints,
+    assumedMods,
+    setBonusSelections,
+    onLeaf: (chosen) => {
+      if (!satisfiesSetBonuses(chosen, setBonusSelections)) {
+        return "reject";
+      }
+      const value = resolveLoadoutStatExtremum(
+        chosen,
+        otherConstraints,
+        fragmentOffset,
+        assumedMods,
+        focusStat,
+        "max",
+      );
+      if (value == null) {
+        return "reject";
+      }
+      if (best == null || value > best) {
+        best = value;
+      }
+      return "accept";
+    },
+  });
+
+  return best ?? OPTIMIZER_STAT_MIN;
+}
+
+/** Leaf visits when full enumeration is too large for slider gray bands. */
+export const UNTARGETED_STAT_BOUNDED_LEAF_CAP = 8_000;
+
+/**
+ * Same as `maxAchievableUntargetedStat`, but caps DFS leaf visits for large
+ * vaults. Falls back to greedy verified extremum when the cap is hit early.
+ */
+export function maxAchievableUntargetedStatBounded(
+  pool: DerivedArmorPieceJson[],
+  exoticLock: ExoticLock = DEFAULT_EXOTIC_LOCK,
+  constraints: StatConstraintRow[],
+  focusStat: ArmorStatName,
+  options: StatTargetFeasibilityOptions = {},
+  leafCap: number = UNTARGETED_STAT_BOUNDED_LEAF_CAP,
+): number {
+  const rawCombo = estimateOptimizerComboCount(pool, exoticLock);
+  if (rawCombo <= SYNC_UI_ENUMERATION_COMBO_LIMIT) {
+    return maxAchievableUntargetedStat(
+      pool,
+      exoticLock,
+      constraints,
+      focusStat,
+      options,
+    );
+  }
+
+  const assumedMods = options.assumedMods ?? DEFAULT_ASSUMED_STAT_MODS;
+  const setBonusSelections = options.setBonusSelections ?? [];
+  const fragmentOffset = options.statOffset ?? {};
+  const otherConstraints = otherActiveStatConstraints(constraints, focusStat);
+
+  const prepared = prepareDedupedSlotPool({ pool, exoticLock });
+  if (prepared == null) {
+    return OPTIMIZER_STAT_MIN;
+  }
+
+  const zeroTotals = totalsFromPieces([]);
+  const startTotals =
+    Object.keys(fragmentOffset).length > 0
+      ? addStatOffsets(
+          zeroTotals,
+          fragmentOffset as Record<ArmorStatName, number>,
+        )
+      : zeroTotals;
+
+  let best: number | null = null;
+  let leaves = 0;
+  enumerateLoadouts({
+    prepared,
+    exoticLock,
+    startTotals,
+    constraints,
+    assumedMods,
+    setBonusSelections,
+    onLeaf: (chosen) => {
+      if (!satisfiesSetBonuses(chosen, setBonusSelections)) {
+        return "reject";
+      }
+      const value = resolveLoadoutStatExtremum(
+        chosen,
+        otherConstraints,
+        fragmentOffset,
+        assumedMods,
+        focusStat,
+        "max",
+      );
+      if (value == null) {
+        return "reject";
+      }
+      if (best == null || value > best) {
+        best = value;
+      }
+      leaves += 1;
+      if (leaves >= leafCap) {
+        return "accept-and-stop";
+      }
+      return "accept";
+    },
+  });
+
+  return best ?? OPTIMIZER_STAT_MIN;
+}
+
+/**
  * Highest minimum target on `focusStat` that still yields at least one verified
- * loadout (same rules as search). Used to cap slider gray-band maxes.
+ * loadout (same rules as search). Used to cap slider gray-band maxes for
+ * user-targeted stats only — activates the focus stat during mod allocation.
  */
 export function maxFeasibleStatTarget(
   pool: DerivedArmorPieceJson[],

@@ -525,10 +525,17 @@ export interface DerivedArmorPieceJson {
    */
   tier?: number | null;
   /**
-   * Numeric stat totals for this piece (intrinsic plugs + committed tuning).
-   * Optional on older cached inventory rows until the next sync.
+   * D2ArmorPicker-style per-piece display stats (intrinsics + Tier 5 filler).
+   * Armor tuning +/- is stored separately in `tuningDeltas` and aggregated in
+   * the optimizer tuning row. Older cached rows may still bake tuning into
+   * `statTotals` until the next inventory sync.
    */
   statTotals?: Partial<Record<ArmorStatName, number>>;
+  /**
+   * Committed armor tuning mod effects (+5 / −5) for this piece. Summed across
+   * the loadout before assumed stat mods (matches D2AP "Tuning" row).
+   */
+  tuningDeltas?: Array<{ stat: ArmorStatName; value: number }>;
   /**
    * When `tuningCommitted === false`, debuff variants share the same +stat but
    * differ on which stat is reduced. Optimizer may branch over these later.

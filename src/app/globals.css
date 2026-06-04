@@ -320,6 +320,25 @@
     border-radius: 0;
   }
 
+  /* Loadout optimizer stat target track (Figma: green = targeted, gray = unset) */
+  :root {
+    --optimizer-track-active-from: #07ad6b;
+    --optimizer-track-active-to: #05ee7d;
+    --optimizer-track-inactive: oklch(0.86 0 0);
+    --optimizer-track-achievable: oklch(0.45 0 0 / 35%);
+    --optimizer-tick-active-outer: #05dc78;
+    --optimizer-tick-active-inner: #07ad6b;
+    --optimizer-tick-inactive-outer: #6b6b6b;
+    --optimizer-tick-inactive-inner: #9a9a9a;
+    --optimizer-value-border: oklch(0.75 0 0);
+  }
+
+  .dark {
+    --optimizer-track-inactive: rgb(255 255 255 / 16%);
+    --optimizer-track-achievable: oklch(1 0 0 / 22%);
+    --optimizer-value-border: #4f4f4f;
+  }
+
   /* Loadout optimizer dual-thumb stat sliders */
   .optimizer-range-thumb::-webkit-slider-runnable-track {
     height: 0.5rem;
@@ -329,33 +348,44 @@
     height: 0.5rem;
     background: transparent;
   }
+  /* Invisible hit target; selection marker is a StatTrackTick on the track. */
   .optimizer-range-thumb::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 0.875rem;
-    height: 1.25rem;
-    margin-top: -0.375rem;
-    border-radius: 0.125rem;
-    border: 1px solid var(--border);
-    background: var(--foreground);
-    box-shadow: 0 1px 2px oklch(0 0 0 / 25%);
+    width: 1.25rem;
+    height: 1.5rem;
+    margin-top: -0.5rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    opacity: 0;
     cursor: grab;
   }
   .optimizer-range-thumb:active::-webkit-slider-thumb {
     cursor: grabbing;
   }
   .optimizer-range-thumb::-moz-range-thumb {
-    width: 0.875rem;
-    height: 1.25rem;
-    border-radius: 0.125rem;
-    border: 1px solid var(--border);
-    background: var(--foreground);
-    box-shadow: 0 1px 2px oklch(0 0 0 / 25%);
+    width: 1.25rem;
+    height: 1.5rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    opacity: 0;
     cursor: grab;
   }
   .optimizer-range-thumb:disabled::-webkit-slider-thumb,
   .optimizer-range-thumb:disabled::-moz-range-thumb {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  .optimizer-range-thumb-compact::-webkit-slider-thumb {
+    width: 0.25rem;
+    height: 0.625rem;
+    margin-top: -0.1875rem;
+  }
+  .optimizer-range-thumb-compact::-moz-range-thumb {
+    width: 0.25rem;
+    height: 0.625rem;
   }
 }

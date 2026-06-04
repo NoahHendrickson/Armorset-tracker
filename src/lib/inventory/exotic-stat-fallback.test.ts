@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import {
   enrichPieceWithExoticBudget,
+  EMPTY_EXOTIC_STAT_BUDGET,
   resolveExoticManifestBudget,
   type ExoticStatBudgetLookup,
 } from "@/lib/inventory/exotic-stat-fallback";
@@ -60,5 +61,53 @@ describe("exotic stat fallback", () => {
     const enriched = enrichPieceWithExoticBudget(exoticPiece(), BUDGET);
     expect(enriched.statTotals?.Weapons).toBe(42);
     expect(enriched.primaryStat).toBe("Weapons");
+  });
+
+  it("clamps inflated non-Weapons stats to manifest budget", () => {
+    const enriched = enrichPieceWithExoticBudget(
+      exoticPiece({
+        itemHash: 200,
+        statTotals: {
+          Weapons: 25,
+          Health: 8,
+          Grenade: 12,
+          Super: 31,
+          Class: 4,
+          Melee: 4,
+        },
+      }),
+      {
+        byItemHash: {
+          "200": {
+            Weapons: 30,
+            Health: 8,
+            Grenade: 4,
+            Super: 31,
+            Class: 4,
+            Melee: 4,
+          },
+        },
+        byIdentity: {},
+      },
+    );
+    expect(enriched.statTotals?.Grenade).toBe(4);
+    expect(enriched.statTotals?.Weapons).toBe(25);
+  });
+
+  it("caps inflated Grenade using Class/Melee peers when budget is absent", () => {
+    const enriched = enrichPieceWithExoticBudget(
+      exoticPiece({
+        statTotals: {
+          Weapons: 25,
+          Health: 8,
+          Grenade: 12,
+          Super: 31,
+          Class: 4,
+          Melee: 4,
+        },
+      }),
+      EMPTY_EXOTIC_STAT_BUDGET,
+    );
+    expect(enriched.statTotals?.Grenade).toBe(4);
   });
 });

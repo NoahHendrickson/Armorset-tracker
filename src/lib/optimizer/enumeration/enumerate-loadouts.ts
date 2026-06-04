@@ -2,6 +2,7 @@ import { SLOT_ORDER } from "@/lib/bungie/constants";
 import { ARMOR_STAT_NAMES, type DerivedArmorPieceJson } from "@/lib/db/types";
 import { getPieceStatCeiling } from "@/lib/inventory/compute-stat-totals";
 import type { PreparedDedupedSlotPool } from "@/lib/optimizer/enumeration/prepare-slot-pool";
+import type { OptimizerSearchShard } from "@/lib/optimizer/types";
 import { partialCanReachMins } from "@/lib/optimizer/constraints";
 import type { StatConstraintRow } from "@/lib/optimizer/types";
 import {
@@ -40,6 +41,8 @@ export type EnumerateLoadoutsOptions = {
   onVisitBatch?: (visited: number, totalCombos: number) => void;
   /** Override default stat/set-bonus pruning. */
   canExtend?: (ctx: EnumeratePruningContext) => boolean;
+  /** When set, only iterate `pieceStart`..`pieceEnd` on `slotIndex` (parallel search shards). */
+  shard?: OptimizerSearchShard;
   onLeaf: (chosen: DerivedArmorPieceJson[]) => EnumerateLeafResult;
 };
 
@@ -94,6 +97,7 @@ export function enumerateLoadouts(
     isCancelled,
     onVisitBatch,
     canExtend,
+    shard,
     onLeaf,
   } = options;
 
@@ -137,7 +141,12 @@ export function enumerateLoadouts(
     }
 
     const remainingSlots = SLOT_ORDER.slice(slotIndex + 1);
-    for (const piece of slotPieces[slotIndex] ?? []) {
+    const slotList = slotPieces[slotIndex] ?? [];
+    const pieces =
+      shard != null && shard.slotIndex === slotIndex
+        ? slotList.slice(shard.pieceStart, shard.pieceEnd)
+        : slotList;
+    for (const piece of pieces) {
       if (
         !exoticAllowedInPartialCombo(
           piece,

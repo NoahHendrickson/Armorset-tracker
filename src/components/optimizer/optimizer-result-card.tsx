@@ -6,6 +6,7 @@ import { ARMOR_STAT_NAMES, type ArmorStatName } from "@/lib/db/types";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { SLOT_ORDER, bungieIconUrl } from "@/lib/bungie/constants";
 import { inventoryPieceDisplayName } from "@/lib/filters/filter-inventory";
+import { displayedStatTotal } from "@/lib/optimizer/constraints";
 import type { OptimizerSolution } from "@/lib/optimizer/types";
 import { tuningPositiveArmorStat } from "@/lib/views/tuning-positive-stat";
 import { cn } from "@/lib/utils";
@@ -96,10 +97,10 @@ export function OptimizerResultCard({
   statIconByName,
   className,
 }: OptimizerResultCardProps) {
-  const total = ARMOR_STAT_NAMES.reduce(
-    (sum, stat) => sum + (solution.totals[stat] ?? 0),
-    0,
+  const displayTotals = ARMOR_STAT_NAMES.map(
+    (stat) => displayedStatTotal(solution.totals[stat] ?? 0),
   );
+  const total = displayTotals.reduce((sum, value) => sum + value, 0);
 
   return (
     <article
@@ -110,11 +111,15 @@ export function OptimizerResultCard({
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border pb-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          {ARMOR_STAT_NAMES.map((stat) => (
+          {ARMOR_STAT_NAMES.map((stat, index) => (
             <div
               key={stat}
               className="inline-flex items-center gap-1 rounded-none border border-border bg-background px-2 py-1"
-              title={stat}
+              title={
+                (solution.totals[stat] ?? 0) < 0
+                  ? `${stat}: ${solution.totals[stat]} (shown as ${displayTotals[index]})`
+                  : stat
+              }
             >
               <ArmorStatIcon
                 stat={stat}
@@ -122,7 +127,7 @@ export function OptimizerResultCard({
                 size="sm"
               />
               <span className="tabular-nums text-sm font-semibold text-foreground">
-                {solution.totals[stat] ?? 0}
+                {displayTotals[index]}
               </span>
             </div>
           ))}

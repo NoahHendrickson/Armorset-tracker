@@ -25,3 +25,56 @@ export function instanceArmorStatTotals(
 
   return Object.keys(totals).length > 0 ? totals : null;
 }
+
+/**
+ * Merge Bungie ItemStats (304) into plug-derived exotic display stats.
+ * Full ItemStats replacement breaks valid rolls (e.g. Weapons 25 on Speaker's
+ * Sight); we keep plug Weapons and use instance stats to fill gaps and correct
+ * inflated secondary stats (e.g. Grenade 12 → 4).
+ */
+export function mergeExoticInstanceStatTotals(
+  plugDerived: Partial<Record<ArmorStatName, number>>,
+  instanceTotals: Partial<Record<ArmorStatName, number>>,
+): Partial<Record<ArmorStatName, number>> {
+  const merged = { ...plugDerived };
+  for (const stat of Object.keys(instanceTotals) as ArmorStatName[]) {
+    const plugVal = plugDerived[stat];
+    const instVal = instanceTotals[stat];
+    if (instVal === undefined) continue;
+    if (plugVal === undefined) {
+      merged[stat] = instVal;
+      continue;
+    }
+    if (stat === "Weapons") {
+      continue;
+    }
+    if (instVal !== undefined) {
+      merged[stat] = Math.min(plugVal, instVal);
+    }
+  }
+  return merged;
+}
+
+/**
+ * For exotics, merge ItemStats (304) into plug/socket display totals when present.
+ */
+export function resolveExoticStatTotals(
+  isExotic: boolean,
+  itemInstanceId: string,
+  profile: ProfileResponse,
+  plugDerivedTotals: Partial<Record<ArmorStatName, number>>,
+  destinyStatHashToArmorStat: Map<number, ArmorStatName>,
+): Partial<Record<ArmorStatName, number>> {
+  if (!isExotic) {
+    return plugDerivedTotals;
+  }
+  const fromInstance = instanceArmorStatTotals(
+    itemInstanceId,
+    profile,
+    destinyStatHashToArmorStat,
+  );
+  if (fromInstance && Object.keys(fromInstance).length > 0) {
+    return mergeExoticInstanceStatTotals(plugDerivedTotals, fromInstance);
+  }
+  return plugDerivedTotals;
+}

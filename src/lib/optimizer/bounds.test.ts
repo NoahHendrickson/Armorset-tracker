@@ -9,6 +9,7 @@ import { estimateOptimizerComboCount } from "@/lib/optimizer/combo-count";
 import { maxFeasibleStatTarget } from "@/lib/optimizer/combo-count";
 import { defaultStatConstraints } from "@/lib/optimizer/constraints";
 import { mockPiece } from "@/lib/optimizer/__fixtures__/pieces";
+import { SLOT_ORDER } from "@/lib/bungie/constants";
 import { filterOptimizerPool } from "@/lib/optimizer/pool";
 import type { ExoticStatBudgetLookup } from "@/lib/inventory/exotic-stat-fallback";
 import { NO_ASSUMED_STAT_MODS } from "@/lib/optimizer/mod-offset";
@@ -333,6 +334,115 @@ describe("computeStatBounds", () => {
     expect(bounds.Weapons.min).toBeGreaterThanOrEqual(150);
     expect(bounds.Weapons.max).toBeGreaterThanOrEqual(150);
     expect(bounds.Weapons.max).toBeLessThanOrEqual(30 * 5 + 50);
+  });
+
+  it("shows a positive gray-band max on untargeted stats under high other targets", () => {
+    const pool = SLOT_ORDER.flatMap((slot) => [
+      mockPiece(slot, `${slot}-high`, {
+        Weapons: 45,
+        Health: 25,
+        Grenade: 30,
+        Super: 30,
+      }),
+      mockPiece(slot, `${slot}-trade`, {
+        Weapons: 42,
+        Health: -5,
+        Grenade: 5,
+        Super: 5,
+      }),
+    ]);
+    const constraints = defaultStatConstraints().map((row) => {
+      if (row.stat === "Weapons") return { ...row, min: 200 };
+      if (row.stat === "Grenade") return { ...row, min: 100 };
+      if (row.stat === "Super") return { ...row, min: 100 };
+      return row;
+    });
+
+    const bounds = computeStatBounds(
+      pool,
+      undefined,
+      { mode: "none" },
+      constraints,
+      { majorCount: 3, slotFill: true },
+    );
+    expect(bounds.Health.max).toBeGreaterThan(0);
+    expect(bounds.Health.max).toBeGreaterThanOrEqual(20);
+  });
+
+  it("uses maxFeasibleStatTarget on large vaults for targeted stats", () => {
+    const slots = [
+      "helmet",
+      "arms",
+      "chest",
+      "legs",
+      "classItem",
+    ] as const;
+    const pool: DerivedArmorPieceJson[] = [];
+    for (const slot of slots) {
+      pool.push(
+        mockPiece(slot, `${slot}-cap`, { Weapons: 40, Health: 8, Melee: 5 }),
+      );
+      for (let i = 0; i < 8; i++) {
+        pool.push(
+          mockPiece(slot, `${slot}-pad${i}`, {
+            Weapons: 10 + (i % 4),
+            Health: 5,
+            Melee: 5,
+          }),
+        );
+      }
+    }
+    expect(estimateOptimizerComboCount(pool)).toBeGreaterThan(2_000);
+
+    const constraints = [
+      { stat: "Weapons" as const, min: 200 },
+      { stat: "Health" as const, min: 8 },
+      { stat: "Melee" as const, min: 24 },
+    ];
+    const mods = { majorCount: 3, slotFill: true, artifice: true };
+    const independent = computeStatBounds(
+      pool,
+      undefined,
+      { mode: "none" },
+      undefined,
+      mods,
+    );
+    expect(independent.Health.max).toBeGreaterThan(50);
+
+    const bounds = computeStatBounds(
+      pool,
+      undefined,
+      { mode: "none" },
+      constraints,
+      mods,
+    );
+    const healthCap = maxFeasibleStatTarget(
+      pool,
+      { mode: "none" },
+      constraints,
+      "Health",
+      { assumedMods: mods, hi: independent.Health.max },
+    );
+    const meleeCap = maxFeasibleStatTarget(
+      pool,
+      { mode: "none" },
+      constraints,
+      "Melee",
+      { assumedMods: mods, hi: independent.Melee.max },
+    );
+    expect(bounds.Health.max).toBe(healthCap);
+    expect(bounds.Melee.max).toBe(meleeCap);
+    expect(bounds.Weapons.max).toBe(
+      maxFeasibleStatTarget(
+        pool,
+        { mode: "none" },
+        constraints,
+        "Weapons",
+        { assumedMods: mods, hi: independent.Weapons.max },
+      ),
+    );
+    expect(bounds.Health.max).toBeLessThanOrEqual(independent.Health.max);
+    expect(bounds.Melee.max).toBeLessThanOrEqual(independent.Melee.max);
   });
 
   it("tightens gray-band max using filtered combo count, not raw pool size", () => {

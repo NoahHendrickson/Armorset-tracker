@@ -96,8 +96,16 @@ export function mergeExoticStatTotals(
       [ArmorStatName, number]
     >) {
       if (value == null || value === 0) continue;
-      const existing = merged[stat] ?? 0;
-      if (value > existing) merged[stat] = value;
+      const existing = merged[stat];
+      if (existing === undefined) {
+        merged[stat] = value;
+        continue;
+      }
+      // Weapons budget varies by roll — keep the higher candidate.
+      // Other stats: prefer the lower socket-derived value over inflated
+      // investmentStats (matches D2ArmorPicker piece rows).
+      merged[stat] =
+        stat === "Weapons" ? Math.max(existing, value) : Math.min(existing, value);
     }
   }
   return merged;

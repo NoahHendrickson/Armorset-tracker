@@ -3,6 +3,11 @@ import {
   type ArmorStatName,
   type DerivedArmorPieceJson,
 } from "@/lib/db/types";
+import {
+  pieceDisplayStatTotals,
+  resolvePieceTuningDeltas,
+  tuningDeltasFromVariantMap,
+} from "@/lib/inventory/armor-tuning-stats";
 import { tuningPositiveArmorStat } from "@/lib/views/tuning-positive-stat";
 
 export type StatDelta = { stat: ArmorStatName; value: number };
@@ -97,7 +102,7 @@ export function resolvePieceStatTotals(
   piece: DerivedArmorPieceJson,
 ): Partial<Record<ArmorStatName, number>> {
   if (piece.statTotals != null && Object.keys(piece.statTotals).length > 0) {
-    return piece.statTotals;
+    return pieceDisplayStatTotals(piece);
   }
   return estimateStatTotalsFromLabels(piece) ?? {};
 }
@@ -115,16 +120,60 @@ export function getPieceStatValue(
   return getPieceStatTotals(piece)[stat] ?? 0;
 }
 
-/** Highest value a stat can reach on this piece (committed roll or any tuning branch). */
+/**
+ * Lowest value a stat can take on this piece (committed roll or any tuning branch).
+ * Use for conservative min bounds and greedy min picks.
+ */
+function pieceStatWithTuningDeltas(
+  piece: DerivedArmorPieceJson,
+  stat: ArmorStatName,
+  deltas: Array<{ stat: ArmorStatName; value: number }>,
+  branch?: Partial<Record<ArmorStatName, number>>,
+): number {
+  let total = pieceDisplayStatTotals(piece, branch)[stat] ?? 0;
+  for (const delta of deltas) {
+    if (delta.stat === stat) {
+      total += delta.value;
+    }
+  }
+  return total;
+}
+
+export function getPieceStatFloor(
+  piece: DerivedArmorPieceJson,
+  stat: ArmorStatName,
+): number {
+  if (piece.tuningVariants != null && piece.tuningVariants.length > 0) {
+    let min = Number.POSITIVE_INFINITY;
+    for (const variant of piece.tuningVariants) {
+      const deltas = tuningDeltasFromVariantMap(piece, variant);
+      min = Math.min(min, pieceStatWithTuningDeltas(piece, stat, deltas, variant));
+    }
+    return min === Number.POSITIVE_INFINITY ? getPieceStatValue(piece, stat) : min;
+  }
+  const deltas = resolvePieceTuningDeltas(piece);
+  return pieceStatWithTuningDeltas(piece, stat, deltas);
+}
+
+/**
+ * Optimistic per-stat high for one piece (max across tuning debuff branches).
+ * Valid only when each piece picks a single branch; use `resolveLoadoutTotals` at
+ * leaves. Do not sum ceilings across stats on the same uncommitted piece.
+ */
 export function getPieceStatCeiling(
   piece: DerivedArmorPieceJson,
   stat: ArmorStatName,
 ): number {
-  let max = getPieceStatValue(piece, stat);
-  for (const variant of piece.tuningVariants ?? []) {
-    max = Math.max(max, variant[stat] ?? 0);
+  if (piece.tuningVariants != null && piece.tuningVariants.length > 0) {
+    let max = getPieceStatValue(piece, stat);
+    for (const variant of piece.tuningVariants) {
+      const deltas = tuningDeltasFromVariantMap(piece, variant);
+      max = Math.max(max, pieceStatWithTuningDeltas(piece, stat, deltas, variant));
+    }
+    return max;
   }
-  return max;
+  const deltas = resolvePieceTuningDeltas(piece);
+  return pieceStatWithTuningDeltas(piece, stat, deltas);
 }
 
 export function pieceHasStatTotals(piece: DerivedArmorPieceJson): boolean {

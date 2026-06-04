@@ -165,11 +165,13 @@ export function partialCanReachMins(
     const armorCeiling =
       (partialTotals[row.stat] ?? 0) +
       remainingSlots * (perSlotMax[row.stat] ?? 0);
+    const deficit = Math.max(0, row.min - armorCeiling);
+    modDeficitSum += deficit;
     if (armorCeiling + modBudget < row.min) {
       return false;
     }
-    modDeficitSum += Math.max(0, row.min - armorCeiling);
   }
 
+  // DIM-style: shared mod pool cannot cover the sum of per-stat shortfalls.
   return modDeficitSum <= modBudget;
 }

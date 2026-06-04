@@ -19,7 +19,9 @@ import {
   buildStatTotals,
   tuningDeltasFromDisplayName,
 } from "@/lib/inventory/compute-stat-totals";
-import { instanceArmorStatTotals } from "@/lib/inventory/instance-armor-stats";
+import { buildPieceDisplayAndTuning } from "@/lib/inventory/armor-tuning-stats";
+import { clampExoticStatTotalsToBudget, capInflatedExoticGrenade } from "@/lib/inventory/exotic-stat-fallback";
+import { resolveExoticStatTotals } from "@/lib/inventory/instance-armor-stats";
 import { exoticPieceIdentityKey } from "@/lib/optimizer/exotic-lock";
 
 interface ItemEntry {
@@ -234,21 +236,58 @@ export function deriveArmorPiece(
     return tuningDeltasFromDisplayName(displayName ?? "") ?? [];
   };
 
-  let statTotals = buildStatTotals(
+  const committedTuningDeltas = tuningCommitted
+    ? resolveTuningDeltas(tuningPlugHash)
+    : [];
+
+  const tier = isExotic
+    ? null
+    : armorTierFromIntrinsicMagnitudes(statPlugs.map((p) => p.value));
+
+  let { statTotals, tuningDeltas } = buildPieceDisplayAndTuning(
     statPlugs,
-    resolveTuningDeltas(tuningPlugHash),
+    committedTuningDeltas,
+    tier,
   );
 
-  if (
-    isExotic &&
-    Object.keys(statTotals).length === 0
-  ) {
-    const fromInstance = instanceArmorStatTotals(
-      item.itemInstanceId,
-      profile,
-      lookups.destinyStatHashToArmorStat,
-    );
-    if (fromInstance) statTotals = fromInstance;
+  statTotals = resolveExoticStatTotals(
+    isExotic,
+    item.itemInstanceId,
+    profile,
+    statTotals,
+    lookups.destinyStatHashToArmorStat,
+  );
+
+  if (isExotic) {
+    const manifestBudget =
+      lookups.exoticStatBudgetByItemHash.get(item.itemHash) ??
+      lookups.exoticStatBudgetByIdentity.get(
+        exoticPieceIdentityKey({
+          itemInstanceId: item.itemInstanceId,
+          itemHash: item.itemHash,
+          slot,
+          classType,
+          setHash: null,
+          setName: null,
+          displayName,
+          isExotic: true,
+          archetypeHash,
+          archetypeName,
+          tuningHash,
+          tuningName,
+          primaryStat: null,
+          secondaryStat: null,
+          tertiaryStat: null,
+          location,
+        }),
+      );
+    if (manifestBudget) {
+      statTotals = capInflatedExoticGrenade(
+        clampExoticStatTotalsToBudget(statTotals, manifestBudget),
+      );
+    } else {
+      statTotals = capInflatedExoticGrenade(statTotals);
+    }
   }
 
   const uniqueVariantPlugHashes = [
@@ -272,10 +311,6 @@ export function deriveArmorPiece(
   const primaryStat = ranked[0]?.stat ?? null;
   const secondaryStat = ranked[1]?.stat ?? null;
   const tertiaryStat = ranked[2]?.stat ?? null;
-  // Exotics aren't tier-gated; only legendaries carry a 1–5 gear tier.
-  const tier = isExotic
-    ? null
-    : armorTierFromIntrinsicMagnitudes(statPlugs.map((p) => p.value));
 
   return {
     itemInstanceId: item.itemInstanceId,
@@ -297,6 +332,7 @@ export function deriveArmorPiece(
     tertiaryStat,
     tier,
     statTotals,
+    ...(tuningDeltas && tuningDeltas.length > 0 ? { tuningDeltas } : {}),
     ...(tuningVariants ? { tuningVariants } : {}),
     location,
   };

@@ -4,6 +4,8 @@ import {
   armorTierFromIntrinsicMagnitudes,
   buildStatTotals,
   estimateStatTotalsFromLabels,
+  getPieceStatCeiling,
+  getPieceStatFloor,
   isTier5Piece,
   parseTuningPairFromName,
   pieceHasStatTotals,
@@ -95,6 +97,44 @@ describe("armorTierFromIntrinsicMagnitudes", () => {
 
   it("returns null with no intrinsic plugs", () => {
     expect(armorTierFromIntrinsicMagnitudes([])).toBeNull();
+  });
+});
+
+describe("tuning variant floor and ceiling", () => {
+  const base: DerivedArmorPieceJson = {
+    itemInstanceId: "tuning-variants",
+    itemHash: 1,
+    slot: "helmet",
+    classType: 2,
+    setHash: 1,
+    setName: "Test",
+    archetypeHash: 1,
+    archetypeName: "Gunner",
+    tuningHash: 1,
+    tuningName: "+Weapons / -Grenade",
+    tuningCommitted: false,
+    primaryStat: "Weapons",
+    secondaryStat: "Health",
+    tertiaryStat: "Class",
+    location: { kind: "vault" },
+    statTotals: { Weapons: 35, Health: 25, Class: 20, Grenade: -5 },
+    tuningVariants: [
+      { Weapons: 35, Health: 25, Class: 20, Grenade: -5 },
+      { Weapons: 35, Health: 25, Class: 20, Melee: -5 },
+      { Weapons: 35, Health: 25, Class: 20, Super: -5 },
+    ],
+  };
+
+  it("floor picks the lowest value per stat across branches", () => {
+    expect(getPieceStatFloor(base, "Grenade")).toBe(-5);
+    expect(getPieceStatFloor(base, "Melee")).toBe(-5);
+    expect(getPieceStatFloor(base, "Weapons")).toBe(35);
+  });
+
+  it("ceiling picks the highest value per stat across branches", () => {
+    expect(getPieceStatCeiling(base, "Grenade")).toBe(0);
+    expect(getPieceStatCeiling(base, "Melee")).toBe(0);
+    expect(getPieceStatCeiling(base, "Weapons")).toBe(35);
   });
 });
 
