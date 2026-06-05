@@ -107,21 +107,19 @@ export async function syncUserInventory(
     );
 
   // The manifest lookups (Supabase — possibly a cold full-table load) don't
-  // depend on the Bungie profile (network), so fetch them concurrently. The
-  // cache-miss path is then bound by whichever is slower, not their sum.
-  let lookups: Awaited<ReturnType<typeof getManifestLookups>>;
-  let profile: ProfileResponse;
-  try {
-    [lookups, profile] = await Promise.all([
-      getManifestLookups(),
-      withBungieAccessTokenRetry(session.userId, fetchProfile),
-    ]);
-  } catch (err) {
+  // depend on the Bungie profile (network), so fetch them concurrently; the
+  // cache-miss path is then bound by whichever is slower, not their sum. The
+  // two now race, so on the rare double failure a Bungie-maintenance error may
+  // surface ahead of a lookups error — both are fatal here, so that's fine.
+  const [lookups, profile] = await Promise.all([
+    getManifestLookups(),
+    withBungieAccessTokenRetry(session.userId, fetchProfile),
+  ]).catch((err) => {
     if (err instanceof BungieApiError && err.maintenance) {
       throw new InventoryNotReady("Bungie API is in maintenance.", 503);
     }
     throw err;
-  }
+  });
 
   const warnings: string[] = [];
   if (!lookups.version) {
