@@ -1,8 +1,8 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
 import { CLASS_NAMES } from "@/lib/bungie/constants";
 import type { GridFilterClass } from "@/lib/workspace/grid-filters-schema";
+import { useSlidingIndicator } from "@/lib/hooks/use-sliding-indicator";
 import { cn } from "@/lib/utils";
 
 const CLASS_OPTIONS: Array<{ value: GridFilterClass; label: string }> = [
@@ -61,43 +61,22 @@ export function ClassSwitcher({
   className,
 }: ClassSwitcherProps) {
   const condensed = variant === "condensed";
-  const groupRef = useRef<HTMLDivElement>(null);
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const [indicator, setIndicator] = useState({ left: 0, width: 0 });
-  const [indicatorReady, setIndicatorReady] = useState(false);
-  const [animateIndicator, setAnimateIndicator] = useState(false);
-
   const activeIndex = CLASS_OPTIONS.findIndex((tab) => tab.value === value);
+  const {
+    groupRef,
+    registerTab,
+    indicatorStyle,
+    indicatorReady,
+    animating,
+    beginSlide,
+    endSlide,
+  } = useSlidingIndicator(activeIndex);
 
   const handleSelect = (next: GridFilterClass) => {
-    if (next !== value) {
-      setAnimateIndicator(true);
-    }
+    if (next !== value) beginSlide();
     onChange(next);
   };
   const isLastTab = activeIndex === CLASS_OPTIONS.length - 1;
-
-  useLayoutEffect(() => {
-    const update = () => {
-      const group = groupRef.current;
-      const tab = activeIndex >= 0 ? tabRefs.current[activeIndex] : null;
-      if (!group || !tab) return;
-      const groupRect = group.getBoundingClientRect();
-      const tabRect = tab.getBoundingClientRect();
-      setIndicator({
-        left: tabRect.left - groupRect.left,
-        width: tabRect.width,
-      });
-      setIndicatorReady(true);
-    };
-
-    update();
-    const group = groupRef.current;
-    if (!group) return;
-    const observer = new ResizeObserver(update);
-    observer.observe(group);
-    return () => observer.disconnect();
-  }, [activeIndex, condensed, value]);
 
   return (
     <div
@@ -115,7 +94,7 @@ export function ClassSwitcher({
         aria-hidden
         className={cn(
           "pointer-events-none absolute inset-y-0 z-0 border",
-          animateIndicator &&
+          animating &&
             "transition-[left,width] duration-200 ease-out motion-reduce:transition-none",
           CLASS_TAB_INDICATOR_CLASS,
           condensed &&
@@ -123,20 +102,15 @@ export function ClassSwitcher({
           condensed && isLastTab && "border-r-transparent",
           !indicatorReady && "opacity-0",
         )}
-        style={{
-          left: indicator.left,
-          width: indicator.width,
-        }}
-        onTransitionEnd={() => setAnimateIndicator(false)}
+        style={indicatorStyle}
+        onTransitionEnd={endSlide}
       />
       {CLASS_OPTIONS.map((tab, index) => {
         const active = value === tab.value;
         return (
           <button
             key={tab.value}
-            ref={(node) => {
-              tabRefs.current[index] = node;
-            }}
+            ref={registerTab(index)}
             type="button"
             className={classTabButtonClass(active, condensed)}
             onClick={() => handleSelect(tab.value)}
