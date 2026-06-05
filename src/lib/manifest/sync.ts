@@ -132,21 +132,29 @@ export async function syncManifest({
     throw new Error(`No manifest paths for locale '${locale}'`);
   }
 
-  // Slices are independent static CDN downloads, so fetch them concurrently.
-  // The DestinyInventoryItemDefinition slice (50MB+) dominates wall-clock time;
-  // overlapping the smaller slices with it removes their cost from the total.
-  const fetchedSlices = await Promise.all(
-    TABLES_OF_INTEREST.map(async (table) => {
-      const path = componentPaths[table];
-      if (!path) {
-        throw new Error(`Manifest index missing path for ${table}`);
-      }
-      return [table, await fetchManifestSlice(path)] as const;
-    }),
-  );
-  const slices: Record<string, Record<string, unknown>> = Object.fromEntries(
-    fetchedSlices,
-  );
+  // Slices are independent static CDN downloads, so overlap them to cut the
+  // sequential wall-clock cost. Fetch a few at a time rather than all 8 at once:
+  // the DestinyInventoryItemDefinition body alone is 50MB+, and a full Promise.all
+  // would hold every raw response (plus its parsed object) in memory together —
+  // an OOM risk on a memory-capped function. A small batch keeps the peak near
+  // the sequential footprint while still hiding the smaller slices' download time.
+  const SLICE_FETCH_CONCURRENCY = 3;
+  const slices: Record<string, Record<string, unknown>> = {};
+  for (let i = 0; i < TABLES_OF_INTEREST.length; i += SLICE_FETCH_CONCURRENCY) {
+    const batch = TABLES_OF_INTEREST.slice(i, i + SLICE_FETCH_CONCURRENCY);
+    const fetched = await Promise.all(
+      batch.map(async (table) => {
+        const path = componentPaths[table];
+        if (!path) {
+          throw new Error(`Manifest index missing path for ${table}`);
+        }
+        return [table, await fetchManifestSlice(path)] as const;
+      }),
+    );
+    for (const [table, slice] of fetched) {
+      slices[table] = slice;
+    }
+  }
 
   const derived = deriveManifestData({
     version,
