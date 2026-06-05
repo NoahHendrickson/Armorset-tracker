@@ -30,6 +30,8 @@ export type UseOptimizerComboEstimatesArgs = {
   selectedSetBonuses: SetBonusSelection[];
   fragmentStatOffset: Partial<Record<ArmorStatName, number>>;
   assumedStatMods: AssumedStatMods;
+  /** When false, skips deferred combo enumeration while the tab is hidden. */
+  enabled?: boolean;
 };
 
 export type UseOptimizerComboEstimatesResult = {
@@ -52,13 +54,14 @@ export function useOptimizerComboEstimates({
   selectedSetBonuses,
   fragmentStatOffset,
   assumedStatMods,
+  enabled = true,
 }: UseOptimizerComboEstimatesArgs): UseOptimizerComboEstimatesResult {
   const rawComboCount = useMemo(
     () =>
-      optimizerPool.length > 0
+      enabled && optimizerPool.length > 0
         ? estimateOptimizerComboCount(optimizerPool, exoticLock)
         : 0,
-    [optimizerPool, exoticLock],
+    [enabled, optimizerPool, exoticLock],
   );
 
   const hasSearchFilters =
@@ -68,7 +71,7 @@ export function useOptimizerComboEstimates({
     useState<FilteredEstimate>(EMPTY_FILTERED);
 
   useEffect(() => {
-    if (optimizerPool.length === 0 || !hasSearchFilters) {
+    if (!enabled || optimizerPool.length === 0 || !hasSearchFilters) {
       setFilteredComboEstimate(EMPTY_FILTERED);
       return;
     }
@@ -101,6 +104,7 @@ export function useOptimizerComboEstimates({
       window.clearTimeout(timer);
     };
   }, [
+    enabled,
     optimizerPool,
     exoticLock,
     searchConstraints,
@@ -125,6 +129,7 @@ export function useOptimizerComboEstimates({
 
   useEffect(() => {
     if (
+      !enabled ||
       exoticLock.mode !== "none" ||
       optimizerPool.length === 0 ||
       !hasSearchFilters ||
@@ -158,6 +163,7 @@ export function useOptimizerComboEstimates({
       window.clearTimeout(timer);
     };
   }, [
+    enabled,
     exoticLock.mode,
     optimizerPool,
     hasSearchFilters,

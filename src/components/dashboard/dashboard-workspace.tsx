@@ -71,8 +71,21 @@ export function DashboardWorkspace({
   initialMode = "table",
 }: DashboardWorkspaceProps) {
   const [mode, setMode] = useState<WorkspaceViewMode>(initialMode);
+  /** Mount a tab on first visit so state survives switches; unvisited tabs stay unmounted. */
+  const [visitedModes, setVisitedModes] = useState<Set<WorkspaceViewMode>>(
+    () => new Set([initialMode]),
+  );
   const [savedViews, setSavedViews] =
     useState<SavedFilterViewRow[]>(initialSavedViews);
+
+  useEffect(() => {
+    setVisitedModes((prev) => {
+      if (prev.has(mode)) return prev;
+      const next = new Set(prev);
+      next.add(mode);
+      return next;
+    });
+  }, [mode]);
   const tabs = <WorkspaceViewModeTabs mode={mode} onModeChange={setMode} />;
   const { filters, onFiltersChange } =
     useGridFiltersPersistence(initialGridFilters);
@@ -80,6 +93,7 @@ export function DashboardWorkspace({
   const importHandledRef = useRef(false);
 
   const activeSavedViewId = useMemo(() => {
+    if (mode !== "table" && mode !== "grid") return null;
     for (const view of savedViews) {
       const payload = parseSavedFilterViewPayload(view.filters);
       if (!payload) continue;
@@ -88,7 +102,7 @@ export function DashboardWorkspace({
       }
     }
     return null;
-  }, [filters, savedViews]);
+  }, [filters, mode, savedViews]);
 
   const applySavedView = useCallback(
     (view: SavedFilterViewRow) => {
@@ -168,73 +182,83 @@ export function DashboardWorkspace({
           leadingAccessory={tabs}
         />
         <div className="flex min-h-0 flex-1 flex-col">
-          <div
-            className={cn(
-              "flex min-h-0 flex-1 flex-col",
-              mode !== "table" && "hidden",
-            )}
-          >
-            <InventoryTableView
-              banners={banners}
-              syncWarning={syncWarning}
-              hasInventory={hasInventory}
-              inventory={inventory}
-              selectors={selectors}
-              filters={filters}
-              onFiltersChange={onFiltersChange}
-              savedViews={savedViewsMenuProps}
-            />
-          </div>
-          <div
-            className={cn(
-              "flex min-h-0 flex-1 flex-col",
-              mode !== "grid" && "hidden",
-            )}
-          >
-            <GridWorkspace
-              banners={banners}
-              syncWarning={syncWarning}
-              hasInventory={hasInventory}
-              selectors={selectors}
-              inventory={inventory}
-              lookupPayload={lookupPayload}
-              filters={filters}
-              onFiltersChange={onFiltersChange}
-              savedViews={savedViewsMenuProps}
-            />
-          </div>
-          <div
-            className={cn(
-              "flex min-h-0 flex-1 flex-col",
-              mode !== "optimizer" && "hidden",
-            )}
-          >
-            <LoadoutOptimizerView
-              banners={banners}
-              syncWarning={syncWarning}
-              hasInventory={hasInventory}
-              inventory={inventory}
-              filters={filters}
-              onFiltersChange={onFiltersChange}
-              optimizerLookup={optimizerLookup}
-              statIconByName={lookupPayload.statIconByName}
-            />
-          </div>
-          <div
-            className={cn(
-              "flex min-h-0 flex-1 flex-col",
-              mode !== "plan" && "hidden",
-            )}
-          >
-            <ArchetypePlanView
-              banners={banners}
-              syncWarning={syncWarning}
-              lookupPayload={lookupPayload}
-              selectors={selectors}
-              optimizerLookup={optimizerLookup}
-              classType={filters.class}
-            />
-          </div>
+          {visitedModes.has("table") ? (
+            <div
+              className={cn(
+                "flex min-h-0 flex-1 flex-col",
+                mode !== "table" && "hidden",
+              )}
+            >
+              <InventoryTableView
+                banners={banners}
+                syncWarning={syncWarning}
+                hasInventory={hasInventory}
+                inventory={inventory}
+                selectors={selectors}
+                filters={filters}
+                onFiltersChange={onFiltersChange}
+                savedViews={savedViewsMenuProps}
+              />
+            </div>
+          ) : null}
+          {visitedModes.has("grid") ? (
+            <div
+              className={cn(
+                "flex min-h-0 flex-1 flex-col",
+                mode !== "grid" && "hidden",
+              )}
+            >
+              <GridWorkspace
+                banners={banners}
+                syncWarning={syncWarning}
+                hasInventory={hasInventory}
+                selectors={selectors}
+                inventory={inventory}
+                lookupPayload={lookupPayload}
+                filters={filters}
+                onFiltersChange={onFiltersChange}
+                savedViews={savedViewsMenuProps}
+                enumerationActive={mode === "grid"}
+              />
+            </div>
+          ) : null}
+          {visitedModes.has("optimizer") ? (
+            <div
+              className={cn(
+                "flex min-h-0 flex-1 flex-col",
+                mode !== "optimizer" && "hidden",
+              )}
+            >
+              <LoadoutOptimizerView
+                banners={banners}
+                syncWarning={syncWarning}
+                hasInventory={hasInventory}
+                inventory={inventory}
+                filters={filters}
+                onFiltersChange={onFiltersChange}
+                optimizerLookup={optimizerLookup}
+                statIconByName={lookupPayload.statIconByName}
+                sessionActive={mode === "optimizer"}
+              />
+            </div>
+          ) : null}
+          {visitedModes.has("plan") ? (
+            <div
+              className={cn(
+                "flex min-h-0 flex-1 flex-col",
+                mode !== "plan" && "hidden",
+              )}
+            >
+              <ArchetypePlanView
+                banners={banners}
+                syncWarning={syncWarning}
+                lookupPayload={lookupPayload}
+                selectors={selectors}
+                optimizerLookup={optimizerLookup}
+                classType={filters.class}
+              />
+            </div>
+          ) : null}
         </div>
         </div>
       </WorkspaceSyncProvider>

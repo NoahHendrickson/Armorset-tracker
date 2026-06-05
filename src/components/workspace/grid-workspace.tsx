@@ -48,6 +48,7 @@ import { usePinnedArmorSets } from "@/lib/views/use-pinned-armor-sets";
 
 /** Stable empty bucket so tiles with no matching pieces keep referential identity. */
 const EMPTY_PIECES: DerivedArmorPieceJson[] = [];
+const EMPTY_INVENTORY_INDEX = new Map<string, DerivedArmorPieceJson[]>();
 
 const ROW_GAP_PX = 16;
 /** Virtual row height for scaled tiles + vertical gap. */
@@ -70,6 +71,8 @@ interface GridWorkspaceProps {
   filters: GridFiltersJson;
   onFiltersChange: (next: GridFiltersJson) => void;
   savedViews?: SavedViewsBarProps;
+  /** When false (tab hidden), skip tracker cross-product and tile indexing. */
+  enumerationActive?: boolean;
 }
 
 export function GridWorkspace({
@@ -82,6 +85,7 @@ export function GridWorkspace({
   filters,
   onFiltersChange,
   savedViews,
+  enumerationActive = true,
 }: GridWorkspaceProps) {
   const { pinnedHashes, togglePin } = usePinnedArmorSets();
   const {
@@ -126,8 +130,11 @@ export function GridWorkspace({
   }, [inventory]);
 
   const inventoryForClass = useMemo(
-    () => inventoryByClass[filters.class] ?? EMPTY_PIECES,
-    [inventoryByClass, filters.class],
+    () =>
+      enumerationActive
+        ? (inventoryByClass[filters.class] ?? EMPTY_PIECES)
+        : EMPTY_PIECES,
+    [enumerationActive, inventoryByClass, filters.class],
   );
 
   // Typing in the search box must stay responsive. Defer the search term so the
@@ -142,15 +149,21 @@ export function GridWorkspace({
     [filters, deferredSearch],
   );
   const visibleTrackers = useMemo(
-    () => enumerateVisibleTrackers(filtersForEnumeration, selectors),
-    [filtersForEnumeration, selectors],
+    () =>
+      enumerationActive
+        ? enumerateVisibleTrackers(filtersForEnumeration, selectors)
+        : [],
+    [enumerationActive, filtersForEnumeration, selectors],
   );
 
   // Bucket the class inventory once so each tile resolves its matching pieces
   // with a single lookup instead of re-scanning the whole inventory.
   const inventoryIndex = useMemo(
-    () => indexInventoryByTriple(inventoryForClass),
-    [inventoryForClass],
+    () =>
+      enumerationActive
+        ? indexInventoryByTriple(inventoryForClass)
+        : EMPTY_INVENTORY_INDEX,
+    [enumerationActive, inventoryForClass],
   );
   const unblocked = gridFiltersHaveUnblockingSelection(filters);
 

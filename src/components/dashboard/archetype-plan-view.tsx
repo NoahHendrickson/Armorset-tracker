@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { AssumedStatModsPanel } from "@/components/optimizer/assumed-stat-mods-panel";
 import { OptimizerSettingsSection } from "@/components/optimizer/optimizer-settings-section";
 import { ArchetypeLoadoutPlanner } from "@/components/plan/archetype-loadout-planner";
@@ -35,6 +36,8 @@ import {
 import { cn } from "@/lib/utils";
 
 const MAX_PLAN_FRAGMENTS = 5;
+/** Match optimizer bounds debounce — keeps piece-count UI responsive. */
+const PLAN_BOUNDS_DEBOUNCE_MS = 150;
 
 export type ArchetypePlanViewProps = {
   className?: string;
@@ -105,9 +108,20 @@ export function ArchetypePlanView({
     [assumedMods, statGoals, fragmentStatOffset],
   );
 
+  const debouncedSelections = useDebouncedValue(selections, PLAN_BOUNDS_DEBOUNCE_MS);
+  const debouncedBoundsOptions = useDebouncedValue(
+    boundsOptions,
+    PLAN_BOUNDS_DEBOUNCE_MS,
+  );
+
   const loadoutBounds = useMemo(
-    () => mixedLoadoutBounds(archetypeRows, selections, boundsOptions),
-    [archetypeRows, selections, boundsOptions],
+    () =>
+      mixedLoadoutBounds(
+        archetypeRows,
+        debouncedSelections,
+        debouncedBoundsOptions,
+      ),
+    [archetypeRows, debouncedSelections, debouncedBoundsOptions],
   );
 
   const hasTopMessage = Boolean(banners) || Boolean(syncWarning);

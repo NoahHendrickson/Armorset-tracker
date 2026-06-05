@@ -27,6 +27,8 @@ export type UseOptimizerSearchSessionArgs = {
   searchTooLarge: boolean;
   canGenerateBuilds: boolean;
   targetsPending: boolean;
+  /** When false, skips auto-run and cancels in-flight search while tab is hidden. */
+  sessionActive?: boolean;
 };
 
 export type UseOptimizerSearchSessionResult = {
@@ -50,6 +52,7 @@ export function useOptimizerSearchSession({
   searchTooLarge,
   canGenerateBuilds,
   targetsPending,
+  sessionActive = true,
 }: UseOptimizerSearchSessionArgs): UseOptimizerSearchSessionResult {
   const { state: workerState, run, cancel } = useOptimizerWorker();
 
@@ -75,7 +78,8 @@ export function useOptimizerSearchSession({
 
   useOptimizerAutoRun(
     optimizerRequest,
-    canRunOptimizer &&
+    sessionActive &&
+      canRunOptimizer &&
       setBonusConflict == null &&
       !searchTooLarge &&
       canGenerateBuilds,
@@ -85,6 +89,7 @@ export function useOptimizerSearchSession({
 
   useEffect(() => {
     if (
+      !sessionActive ||
       !canRunOptimizer ||
       setBonusConflict != null ||
       (!hasStatTargets(searchConstraints) && selectedSetBonuses.length === 0)
@@ -92,6 +97,7 @@ export function useOptimizerSearchSession({
       cancel();
     }
   }, [
+    sessionActive,
     canRunOptimizer,
     setBonusConflict,
     searchConstraints,

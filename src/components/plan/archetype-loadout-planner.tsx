@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useCallback, useMemo } from "react";
 import {
   Select,
   SelectContent,
@@ -30,6 +30,25 @@ import { cn } from "@/lib/utils";
 
 const PIECE_COUNTS = [0, 1, 2, 3, 4, 5] as const;
 
+function tuningPairKey(positive: ArmorStatName, negative: ArmorStatName): string {
+  return `${positive}:${negative}`;
+}
+
+/** Shared across all archetype rows — identical for every pair. */
+const ALL_TUNING_PAIR_OPTIONS: ReadonlyArray<{
+  positive: ArmorStatName;
+  negative: ArmorStatName;
+  key: string;
+  label: string;
+}> = ARMOR_STAT_NAMES.flatMap((positive) =>
+  tuningNegativeOptions(positive).map((negative) => ({
+    positive,
+    negative,
+    key: tuningPairKey(positive, negative),
+    label: formatTuningLabel(positive, negative),
+  })),
+);
+
 const thClass =
   "px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground";
 const tdClass = "px-3 py-3 align-top text-sm";
@@ -37,9 +56,9 @@ const tdClass = "px-3 py-3 align-top text-sm";
 export type ArchetypeLoadoutPlannerProps = {
   rows: readonly PlanArchetypeRow[];
   selections: Record<string, PlanArchetypeSelection>;
-  onSelectionsChange: (
-    next: Record<string, PlanArchetypeSelection>,
-  ) => void;
+  onSelectionsChange: React.Dispatch<
+    React.SetStateAction<Record<string, PlanArchetypeSelection>>
+  >;
   statIconByName?: GridLookupPayload["statIconByName"];
 };
 
@@ -52,29 +71,28 @@ export function ArchetypeLoadoutPlanner({
   const assigned = totalSelectedPieces(selections);
   const remaining = LOADOUT_PIECE_COUNT - assigned;
 
-  const updateRow = (
-    id: string,
-    patch: Partial<PlanArchetypeSelection>,
-  ) => {
-    const row = rows.find((r) => r.id === id);
-    if (!row) return;
-    const current = resolvePlanSelection(row.pair, selections[id]);
-    const merged = { ...current, ...patch };
-    if (
-      patch.tuningPositive != null &&
-      patch.tuningNegative == null &&
-      merged.tuningNegative === patch.tuningPositive
-    ) {
-      merged.tuningNegative = defaultTuningNegative(
-        merged.tuningPositive,
-        merged.tertiary,
-      );
-    }
-    onSelectionsChange({
-      ...selections,
-      [id]: merged,
-    });
-  };
+  const updateRow = useCallback(
+    (id: string, patch: Partial<PlanArchetypeSelection>) => {
+      const row = rows.find((r) => r.id === id);
+      if (!row) return;
+      onSelectionsChange((prev) => {
+        const current = resolvePlanSelection(row.pair, prev[id]);
+        const merged = { ...current, ...patch };
+        if (
+          patch.tuningPositive != null &&
+          patch.tuningNegative == null &&
+          merged.tuningNegative === patch.tuningPositive
+        ) {
+          merged.tuningNegative = defaultTuningNegative(
+            merged.tuningPositive,
+            merged.tertiary,
+          );
+        }
+        return { ...prev, [id]: merged };
+      });
+    },
+    [rows, onSelectionsChange],
+  );
 
   return (
     <div className="space-y-3">
@@ -110,14 +128,8 @@ export function ArchetypeLoadoutPlanner({
                 key={row.id}
                 row={row}
                 statIconByName={statIconByName}
-                selection={resolvePlanSelection(row.pair, selections[row.id])}
-                onTertiaryChange={(tertiary) => updateRow(row.id, { tertiary })}
-                onTuningChange={(tuningPositive, tuningNegative) =>
-                  updateRow(row.id, { tuningPositive, tuningNegative })
-                }
-                onPieceCountChange={(pieceCount) =>
-                  updateRow(row.id, { pieceCount })
-                }
+                selection={selections[row.id]}
+                updateRow={updateRow}
               />
             ))}
           </tbody>
@@ -125,10 +137,6 @@ export function ArchetypeLoadoutPlanner({
       </div>
     </div>
   );
-}
-
-function tuningPairKey(positive: ArmorStatName, negative: ArmorStatName): string {
-  return `${positive}:${negative}`;
 }
 
 function ArchetypeIntrinsicStats({
@@ -160,49 +168,41 @@ function ArchetypeIntrinsicStats({
   );
 }
 
-function PlannerRow({
+const PlannerRow = memo(function PlannerRow({
   row,
   statIconByName,
   selection,
-  onTertiaryChange,
-  onTuningChange,
-  onPieceCountChange,
+  updateRow,
 }: {
   row: PlanArchetypeRow;
   statIconByName: GridLookupPayload["statIconByName"];
-  selection: PlanArchetypeSelection;
-  onTertiaryChange: (tertiary: ArmorStatName) => void;
-  onTuningChange: (positive: ArmorStatName, negative: ArmorStatName) => void;
-  onPieceCountChange: (count: number) => void;
+  selection: PlanArchetypeSelection | undefined;
+  updateRow: (id: string, patch: Partial<PlanArchetypeSelection>) => void;
 }) {
+  const resolved = resolvePlanSelection(row.pair, selection);
+
   const tertiaryOptions = useMemo(
     () => tertiaryStatsForArchetype(row.pair),
     [row.pair],
   );
 
-  const tuningOptions = useMemo(() => {
-    const out: Array<{
-      positive: ArmorStatName;
-      negative: ArmorStatName;
-      key: string;
-      label: string;
-    }> = [];
-    for (const positive of ARMOR_STAT_NAMES) {
-      for (const negative of tuningNegativeOptions(positive)) {
-        out.push({
-          positive,
-          negative,
-          key: tuningPairKey(positive, negative),
-          label: formatTuningLabel(positive, negative),
-        });
-      }
-    }
-    return out;
-  }, []);
+  const onTertiaryChange = useCallback(
+    (tertiary: ArmorStatName) => updateRow(row.id, { tertiary }),
+    [row.id, updateRow],
+  );
+  const onTuningChange = useCallback(
+    (tuningPositive: ArmorStatName, tuningNegative: ArmorStatName) =>
+      updateRow(row.id, { tuningPositive, tuningNegative }),
+    [row.id, updateRow],
+  );
+  const onPieceCountChange = useCallback(
+    (pieceCount: number) => updateRow(row.id, { pieceCount }),
+    [row.id, updateRow],
+  );
 
   const tuningValue = tuningPairKey(
-    selection.tuningPositive,
-    selection.tuningNegative,
+    resolved.tuningPositive,
+    resolved.tuningNegative,
   );
 
   return (
@@ -218,7 +218,7 @@ function PlannerRow({
       </td>
       <td className={tdClass}>
         <Select
-          value={selection.tertiary}
+          value={resolved.tertiary}
           onValueChange={(v) => onTertiaryChange(v as ArmorStatName)}
         >
           <SelectTrigger className="h-8 w-full min-w-[6.5rem] text-xs">
@@ -237,7 +237,7 @@ function PlannerRow({
         <Select
           value={tuningValue}
           onValueChange={(key) => {
-            const opt = tuningOptions.find((o) => o.key === key);
+            const opt = ALL_TUNING_PAIR_OPTIONS.find((o) => o.key === key);
             if (opt) onTuningChange(opt.positive, opt.negative);
           }}
         >
@@ -248,7 +248,7 @@ function PlannerRow({
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="max-h-60">
-            {tuningOptions.map((opt) => (
+            {ALL_TUNING_PAIR_OPTIONS.map((opt) => (
               <SelectItem key={opt.key} value={opt.key}>
                 {opt.label}
               </SelectItem>
@@ -258,7 +258,7 @@ function PlannerRow({
       </td>
       <td className={tdClass}>
         <OptimizerSegmentedControl
-          value={selection.pieceCount}
+          value={resolved.pieceCount}
           options={PIECE_COUNTS}
           onChange={onPieceCountChange}
           ariaLabel={`Piece count for ${row.name}`}
@@ -266,4 +266,4 @@ function PlannerRow({
       </td>
     </tr>
   );
-}
+});

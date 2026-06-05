@@ -21,6 +21,8 @@ export type UseStatBoundsForSlidersArgs = {
   exoticLock: ExoticLock;
   constraints: StatConstraintRow[];
   setBonusSelections?: SetBonusSelection[];
+  /** When false, skips worker/main-thread recompute (inactive optimizer tab). */
+  enabled?: boolean;
 };
 
 function boundsPayload(args: UseStatBoundsForSlidersArgs): OptimizerBoundsRequest {
@@ -45,6 +47,7 @@ export function useStatBoundsForSliders({
   exoticLock,
   constraints,
   setBonusSelections = [],
+  enabled = true,
 }: UseStatBoundsForSlidersArgs): StatBounds {
   const deferredPool = useDeferredValue(pool);
   const deferredConstraints = useDeferredValue(constraints);
@@ -69,6 +72,12 @@ export function useStatBoundsForSliders({
   );
 
   useEffect(() => {
+    if (!enabled) {
+      workerRef.current?.terminate();
+      workerRef.current = null;
+      return;
+    }
+
     runIdRef.current += 1;
     const runId = runIdRef.current;
     let cancelled = false;
@@ -153,6 +162,7 @@ export function useStatBoundsForSliders({
       }
     };
   }, [
+    enabled,
     deferredPool,
     deferredStatOffset,
     deferredExoticLock,

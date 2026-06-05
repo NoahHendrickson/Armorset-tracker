@@ -67,6 +67,8 @@ export interface LoadoutOptimizerViewProps {
   optimizerLookup?: OptimizerLookupPayload;
   /** Manifest stat icons (same slice as the Tracker grid). */
   statIconByName?: GridLookupPayload["statIconByName"];
+  /** When false, heavy pool/bounds/search work is paused (tab hidden). */
+  sessionActive?: boolean;
 }
 
 export function LoadoutOptimizerView({
@@ -78,6 +80,7 @@ export function LoadoutOptimizerView({
   filters,
   optimizerLookup = EMPTY_OPTIMIZER_LOOKUP,
   statIconByName = {},
+  sessionActive = true,
 }: LoadoutOptimizerViewProps) {
   const {
     health,
@@ -147,6 +150,7 @@ export function LoadoutOptimizerView({
     exoticLock,
     setExoticLock,
     exoticStatBudget: optimizerLookup.exoticStatBudget,
+    enabled: sessionActive,
   });
 
   const bounds = useStatBoundsForSliders({
@@ -156,6 +160,7 @@ export function LoadoutOptimizerView({
     exoticLock,
     constraints: boundsConstraints,
     setBonusSelections: selectedSetBonuses,
+    enabled: sessionActive,
   });
 
   const {
@@ -172,6 +177,7 @@ export function LoadoutOptimizerView({
     selectedSetBonuses,
     fragmentStatOffset,
     assumedStatMods,
+    enabled: sessionActive,
   });
 
   const setBonusConflict = setBonusSelectionConflict(selectedSetBonuses);
@@ -197,6 +203,7 @@ export function LoadoutOptimizerView({
     searchTooLarge,
     canGenerateBuilds,
     targetsPending,
+    sessionActive,
   });
 
   const lockedExoticLabel = useMemo(() => {
