@@ -374,10 +374,6 @@ const GridTile = memo(function GridTile({
     () => buildEphemeralTrackerPayload(descriptor, inventory, lookupPayload),
     [descriptor, inventory, lookupPayload],
   );
-  const handleCompareClick = useCallback(
-    () => onCompareClick(descriptor),
-    [onCompareClick, descriptor],
-  );
   return (
     <div
       className="shrink-0 overflow-hidden"
@@ -397,7 +393,7 @@ const GridTile = memo(function GridTile({
         <TrackerGridContent
           payload={payload}
           hasInventory={hasInventory}
-          onCompareClick={handleCompareClick}
+          onCompareClick={() => onCompareClick(descriptor)}
         />
       </div>
     </div>
