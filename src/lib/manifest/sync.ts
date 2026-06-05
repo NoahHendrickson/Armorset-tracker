@@ -132,14 +132,21 @@ export async function syncManifest({
     throw new Error(`No manifest paths for locale '${locale}'`);
   }
 
-  const slices: Record<string, Record<string, unknown>> = {};
-  for (const table of TABLES_OF_INTEREST) {
-    const path = componentPaths[table];
-    if (!path) {
-      throw new Error(`Manifest index missing path for ${table}`);
-    }
-    slices[table] = await fetchManifestSlice(path);
-  }
+  // Slices are independent static CDN downloads, so fetch them concurrently.
+  // The DestinyInventoryItemDefinition slice (50MB+) dominates wall-clock time;
+  // overlapping the smaller slices with it removes their cost from the total.
+  const fetchedSlices = await Promise.all(
+    TABLES_OF_INTEREST.map(async (table) => {
+      const path = componentPaths[table];
+      if (!path) {
+        throw new Error(`Manifest index missing path for ${table}`);
+      }
+      return [table, await fetchManifestSlice(path)] as const;
+    }),
+  );
+  const slices: Record<string, Record<string, unknown>> = Object.fromEntries(
+    fetchedSlices,
+  );
 
   const derived = deriveManifestData({
     version,
