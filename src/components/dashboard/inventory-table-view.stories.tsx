@@ -13,6 +13,8 @@ import {
   MOCK_WORKSPACE_HEALTH_NO_CACHE,
   MOCK_WORKSPACE_HEALTH_NO_MANIFEST,
 } from "../../../.storybook/mocks/workspace-health";
+import { MOCK_DROP_FEED } from "../../../.storybook/mocks/drop-feed";
+import { InventoryDropFeedProvider } from "./inventory-drop-feed-context";
 import { WorkspaceSyncProvider } from "./workspace-sync-status";
 
 import { InventoryTableView } from "./inventory-table-view";
@@ -29,7 +31,9 @@ const meta: Meta<typeof InventoryTableView> = {
           MOCK_WORKSPACE_HEALTH_LOADED
         }
       >
-        <Story />
+        <InventoryDropFeedProvider initialFeed={MOCK_DROP_FEED}>
+          <Story />
+        </InventoryDropFeedProvider>
       </WorkspaceSyncProvider>
     ),
   ],
@@ -49,6 +53,7 @@ function LoadedShell() {
         syncWarning={null}
         filters={filters}
         onFiltersChange={setFilters}
+        inventorySyncedAt={MOCK_WORKSPACE_HEALTH_LOADED.inventorySyncedAt}
       />
     </div>
   );
@@ -65,6 +70,7 @@ function NoInventoryShell() {
         syncWarning={null}
         filters={filters}
         onFiltersChange={setFilters}
+        inventorySyncedAt={null}
       />
     </div>
   );
@@ -81,6 +87,7 @@ function SyncWarningShell() {
         syncWarning="Bungie returned only equipped items. Re-grant the inventory scope."
         filters={filters}
         onFiltersChange={setFilters}
+        inventorySyncedAt={MOCK_WORKSPACE_HEALTH_LOADED.inventorySyncedAt}
       />
     </div>
   );
@@ -118,6 +125,7 @@ export const EmptyInventoryCache: Story = {
           syncWarning={null}
           filters={filters}
           onFiltersChange={setFilters}
+          inventorySyncedAt={MOCK_WORKSPACE_HEALTH_LOADED.inventorySyncedAt}
         />
       </div>
     );

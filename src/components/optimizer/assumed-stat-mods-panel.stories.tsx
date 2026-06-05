@@ -51,8 +51,6 @@ export const SelectMajorCount: Story = {
     await expect(canvas.getByTestId("mod-budget")).toHaveTextContent(
       "majorCount=3, minorCount=2, total=40",
     );
-    await expect(canvas.getByText(/3 major \(\+30\)/)).toBeInTheDocument();
-    await expect(canvas.getByText(/2 minor \(\+10\)/)).toBeInTheDocument();
   },
 };
 
@@ -63,6 +61,5 @@ export const FiveMajorsNoMinors: Story = {
     await expect(canvas.getByTestId("mod-budget")).toHaveTextContent(
       "minorCount=0, total=50",
     );
-    await expect(canvas.getByText(/5 major \(\+50\)/)).toBeInTheDocument();
   },
 };

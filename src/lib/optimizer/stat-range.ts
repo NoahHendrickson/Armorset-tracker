@@ -1,6 +1,21 @@
+import type { ArmorStatName } from "@/lib/db/types";
+
 /** Armor 3.0 stat point cap used by the loadout optimizer UI. */
 export const OPTIMIZER_STAT_MIN = 0;
 export const OPTIMIZER_STAT_MAX = 200;
+
+/**
+ * Stat target list order in the optimizer UI.
+ * Matches D2ArmorPicker `ARMORSTAT_ORDER` (Health → Melee → Grenade → Super → Class → Weapons).
+ */
+export const OPTIMIZER_STAT_DISPLAY_ORDER: readonly ArmorStatName[] = [
+  "Health",
+  "Melee",
+  "Grenade",
+  "Super",
+  "Class",
+  "Weapons",
+];
 
 /** Tier milestone ticks on the 0–200 stat track (D2ArmorPicker-style). */
 export const OPTIMIZER_STAT_TIER_MARKS = [50, 100, 150, 200] as const;

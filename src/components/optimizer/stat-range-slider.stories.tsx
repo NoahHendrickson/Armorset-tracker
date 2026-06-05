@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, fireEvent, userEvent, waitFor, within } from "storybook/test";
 
-import { ARMOR_STAT_NAMES } from "@/lib/db/types";
+import { OPTIMIZER_STAT_DISPLAY_ORDER } from "@/lib/optimizer/stat-range";
 import { StatRangeSlider } from "./stat-range-slider";
 
 const meta: Meta<typeof StatRangeSlider> = {
@@ -100,7 +100,7 @@ export const CompactStack: Story = {
     return (
       <div className="max-w-sm border border-border bg-card p-4">
         <ul className="space-y-1">
-          {ARMOR_STAT_NAMES.map((stat) => (
+          {OPTIMIZER_STAT_DISPLAY_ORDER.map((stat) => (
             <li key={stat}>
               <StatRangeSlider
                 stat={stat}
@@ -168,6 +168,19 @@ export const DragThumb: Story = {
   },
 };
 
+export const ClickMaxLabel: Story = {
+  render: () => (
+    <SliderShell achievableMin={40} achievableMax={175} initialMin={0} compact />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId("stat-max-label"));
+    await expect(canvas.getByTestId("stat-min-value")).toHaveTextContent(
+      "min=175",
+    );
+  },
+};
+
 export const TypeMinInInput: Story = {
   render: () => <SliderShell />,
   play: async ({ canvasElement }) => {
@@ -179,6 +192,21 @@ export const TypeMinInInput: Story = {
     await waitFor(() =>
       expect(canvas.getByTestId("stat-min-value")).toHaveTextContent(
         "min=120",
+      ),
+    );
+  },
+};
+
+export const TypeMinAndPressEnter: Story = {
+  render: () => <SliderShell />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByTestId("stat-min-input");
+    await userEvent.clear(input);
+    await userEvent.type(input, "200{Enter}");
+    await waitFor(() =>
+      expect(canvas.getByTestId("stat-min-value")).toHaveTextContent(
+        "min=200",
       ),
     );
   },

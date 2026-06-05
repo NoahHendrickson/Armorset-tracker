@@ -36,6 +36,7 @@ import {
   type SavedViewsBarProps,
 } from "@/components/workspace/saved-views-menu";
 import { ClassSwitcher } from "@/components/workspace/class-switcher";
+import { EmbeddedClassSearchField } from "@/components/workspace/embedded-class-search-field";
 import { TrackerFilterBarOverflowMenus } from "@/components/workspace/tracker-filter-bar-overflow-menus";
 
 interface TrackerFilterBarProps {
@@ -257,38 +258,17 @@ export function TrackerFilterBar({
 
   const searchField = searchExpanded ? (
     embedClassInSearch ? (
-      <div
-        role="search"
-        className={cn(
-          "relative isolate shrink-0 flex h-9 min-w-0 items-stretch border",
-          "w-80 sm:w-96 lg:w-[26rem]",
-          "focus-within:outline-none",
-          searchActive
-            ? INLINE_TRIGGER_ACTIVE_CLASS
-            : cn(
-                INLINE_TRIGGER_IDLE_CLASS,
-                "border-border focus-within:border-primary/60 focus-within:bg-primary/5",
-              ),
-        )}
-      >
-        <div className="relative flex min-w-0 flex-1 items-center gap-1 ps-8 pe-2">
-          <MagnifyingGlass
-            weight="regular"
-            className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <input
-            {...searchInputProps}
-            className="h-full min-w-0 flex-1 border-0 bg-transparent py-0 text-xs shadow-none outline-none placeholder:text-muted-foreground/80 focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-search-cancel-button]:hidden"
-          />
-          {clearSearchButton(true)}
-        </div>
-        <ClassSwitcher
-          variant="condensed"
-          value={value.class}
-          onChange={switchClass}
-        />
-      </div>
+      <EmbeddedClassSearchField
+        className="shrink-0"
+        search={value.search}
+        onSearchChange={(search) => onChange({ ...value, search })}
+        classValue={value.class}
+        onClassChange={switchClass}
+        placeholder={searchPlaceholder}
+        searchInputRef={searchInputRef}
+        onSearchBlur={searchInputProps.onBlur}
+        onSearchKeyDown={searchInputProps.onKeyDown}
+      />
     ) : (
       <div
         role="search"

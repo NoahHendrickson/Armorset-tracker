@@ -12,8 +12,10 @@ import {
   inventoryCacheNeedsSync,
   inventoryMsUntilResync,
 } from "@/lib/inventory/cache-status";
+import { useInventoryDropFeed } from "@/components/dashboard/inventory-drop-feed-context";
 import { useInventoryEquipmentOnlyAlert } from "@/components/dashboard/inventory-equipment-only-alert";
 import { useWorkspaceSync } from "@/components/dashboard/workspace-sync-status";
+import type { DerivedArmorPieceJson } from "@/lib/db/types";
 
 type ManifestSyncResponse = {
   error?: string;
@@ -32,6 +34,7 @@ type InventorySyncResponse = {
   warnings?: string[];
   equipmentOnlyRestricted?: boolean;
   cached?: boolean;
+  newPieces?: DerivedArmorPieceJson[];
 };
 
 const manifestToastDefaults = {
@@ -45,6 +48,7 @@ const manifestToastDefaults = {
  */
 export function WorkspaceAutoSync() {
   const router = useRouter();
+  const { prependFromSync } = useInventoryDropFeed();
   const equipmentOnlyAlert = useInventoryEquipmentOnlyAlert();
   const {
     health,
@@ -176,6 +180,11 @@ export function WorkspaceAutoSync() {
           latestSyncedAtRef.current = body.syncedAt;
         }
 
+        prependFromSync({
+          syncedAt: body.syncedAt,
+          newPieces: body.newPieces,
+        });
+
         if (!body.cached) {
           router.refresh();
         }
@@ -194,6 +203,7 @@ export function WorkspaceAutoSync() {
     [
       equipmentOnlyAlert,
       handleReauth,
+      prependFromSync,
       router,
       setInventoryError,
       setInventoryWarnings,

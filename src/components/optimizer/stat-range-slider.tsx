@@ -157,9 +157,9 @@ export function StatRangeSlider({
     [applyTrackValue, valueFromClientX],
   );
 
-  const handleAchievableDoubleClick = () => {
+  const setToAchievableMax = useCallback(() => {
     onChange(clampOptimizerStat(achievableMax));
-  };
+  }, [achievableMax, onChange]);
 
   const bandMin = Math.max(OPTIMIZER_STAT_MIN, achievableMin);
   const bandMax = Math.max(bandMin, achievableMax);
@@ -185,10 +185,17 @@ export function StatRangeSlider({
         draftRef.current = e.target.value;
         setDraftValue(e.target.value);
       }}
-      onBlur={() => commitDraftValue(draftRef.current ?? String(safeMin))}
+      onBlur={() => {
+        if (draftRef.current !== null) {
+          commitDraftValue(draftRef.current);
+        }
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
-          commitDraftValue(draftRef.current ?? String(safeMin));
+          e.preventDefault();
+          if (draftRef.current !== null) {
+            commitDraftValue(draftRef.current);
+          }
           e.currentTarget.blur();
         }
       }}
@@ -244,7 +251,7 @@ export function StatRangeSlider({
         <div
           className={cn(
             "relative touch-none select-none",
-            compact ? "pt-2 pb-5" : "pt-2 pb-5",
+            compact ? "pt-2 pb-6" : "pt-2 pb-5",
           )}
           role="group"
           aria-labelledby={labelId}
@@ -280,7 +287,7 @@ export function StatRangeSlider({
                 )}
                 style={{ left: `${achLeft}%`, width: `${achWidth}%` }}
                 title={`Achievable ${bandMin}–${bandMax}`}
-                onDoubleClick={handleAchievableDoubleClick}
+                onDoubleClick={setToAchievableMax}
               />
             ) : null}
 
@@ -340,19 +347,33 @@ export function StatRangeSlider({
           <div
             className={cn(
               "pointer-events-none absolute bottom-0 left-0 right-0 leading-none text-muted-foreground",
-              compact ? "text-[10px]" : "text-xs",
+              "text-xs",
             )}
             style={{ left: trackInset, right: trackInset }}
           >
-            {OPTIMIZER_STAT_TICKS.map((tick) => (
-              <span
-                key={tick}
-                className="absolute whitespace-nowrap"
-                style={anchorLabelStyle(tick)}
-              >
-                {tick}
-              </span>
-            ))}
+            {OPTIMIZER_STAT_TICKS.map((tick) =>
+              tick === OPTIMIZER_STAT_MAX ? (
+                <button
+                  key={tick}
+                  type="button"
+                  data-testid="stat-max-label"
+                  aria-label={`Set ${stat} to maximum achievable (${achievableMax})`}
+                  className="pointer-events-auto absolute cursor-pointer whitespace-nowrap rounded-sm border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground"
+                  style={anchorLabelStyle(tick)}
+                  onClick={setToAchievableMax}
+                >
+                  max
+                </button>
+              ) : (
+                <span
+                  key={tick}
+                  className="absolute whitespace-nowrap"
+                  style={anchorLabelStyle(tick)}
+                >
+                  {tick}
+                </span>
+              ),
+            )}
           </div>
         </div>
 

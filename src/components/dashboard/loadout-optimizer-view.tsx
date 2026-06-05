@@ -15,10 +15,10 @@ import { OptimizerResultCard } from "@/components/optimizer/optimizer-result-car
 import { OptimizerSettingsSection } from "@/components/optimizer/optimizer-settings-section";
 import { SetBonusPicker } from "@/components/optimizer/set-bonus-picker";
 import { StatRangeSlider } from "@/components/optimizer/stat-range-slider";
-import { SubclassFragmentPanel } from "@/components/optimizer/subclass-fragment-panel";
+import { PlanFragmentSelector } from "@/components/plan/plan-fragment-selector";
 import type { GridLookupPayload } from "@/lib/views/grid-lookup-payload";
 import { SLOT_ORDER } from "@/lib/bungie/constants";
-import { ARMOR_STAT_NAMES, type ArmorStatName } from "@/lib/db/types";
+import type { ArmorStatName } from "@/lib/db/types";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { ClassSwitcher } from "@/components/workspace/class-switcher";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
@@ -44,6 +44,7 @@ import {
 } from "@/lib/optimizer/use-optimizer-combo-estimates";
 import { useOptimizerPool } from "@/lib/optimizer/use-optimizer-pool";
 import { useOptimizerSearchSession } from "@/lib/optimizer/use-optimizer-search-session";
+import { OPTIMIZER_STAT_DISPLAY_ORDER } from "@/lib/optimizer/stat-range";
 import type { StatConstraintRow } from "@/lib/optimizer/types";
 import type { OptimizerLookupPayload } from "@/lib/views/optimizer-lookup-payload";
 import { EMPTY_OPTIMIZER_LOOKUP } from "@/lib/views/optimizer-lookup-payload";
@@ -110,24 +111,17 @@ export function LoadoutOptimizerView({
   );
 
   const [exoticLock, setExoticLock] = useState<ExoticLock>(DEFAULT_EXOTIC_LOCK);
-  const [subclassState, setSubclassState] = useState<{
+  const [fragmentState, setFragmentState] = useState<{
     classType: number;
-    subclassKey: string | null;
     fragmentHashes: number[];
   }>({
     classType,
-    subclassKey: null,
     fragmentHashes: [],
   });
-  const selectedSubclassKey = useMemo(
-    () =>
-      subclassState.classType === classType ? subclassState.subclassKey : null,
-    [subclassState, classType],
-  );
   const selectedFragmentHashes = useMemo(
     () =>
-      subclassState.classType === classType ? subclassState.fragmentHashes : [],
-    [subclassState, classType],
+      fragmentState.classType === classType ? fragmentState.fragmentHashes : [],
+    [fragmentState, classType],
   );
   const [selectedSetBonuses, setSelectedSetBonuses] = useState<
     SetBonusSelection[]
@@ -264,32 +258,21 @@ export function LoadoutOptimizerView({
     });
   };
 
-  const handleSubclassChange = (key: string | null) => {
-    setSubclassState({ classType, subclassKey: key, fragmentHashes: [] });
-  };
-
   const toggleFragment = (plugHash: number) => {
-    setSubclassState((prev) => {
-      const base =
-        prev.classType === classType
-          ? prev
-          : {
-              classType,
-              subclassKey: null,
-              fragmentHashes: [] as number[],
-            };
-      const hashes = base.fragmentHashes;
-      const alreadySelected = hashes.includes(plugHash);
-      if (!alreadySelected && hashes.length >= MAX_FRAGMENTS) {
-        return base;
+    setFragmentState((prev) => {
+      const hashes =
+        prev.classType === classType ? prev.fragmentHashes : [];
+      const already = hashes.includes(plugHash);
+      if (already) {
+        return {
+          classType,
+          fragmentHashes: hashes.filter((h) => h !== plugHash),
+        };
       }
-      return {
-        classType,
-        subclassKey: base.subclassKey,
-        fragmentHashes: alreadySelected
-          ? hashes.filter((h) => h !== plugHash)
-          : [...hashes, plugHash],
-      };
+      if (hashes.length >= MAX_FRAGMENTS) {
+        return { classType, fragmentHashes: hashes };
+      }
+      return { classType, fragmentHashes: [...hashes, plugHash] };
     });
   };
 
@@ -332,7 +315,7 @@ export function LoadoutOptimizerView({
                   >
                     <section
                       aria-label="Class"
-                      className="border-b border-border first:pt-0 last:border-b-0 py-5"
+                      className="border-b border-border py-5"
                     >
                       <ClassSwitcher
                         value={classType}
@@ -374,9 +357,9 @@ export function LoadoutOptimizerView({
                         compact
                         className="border-b-0"
                       >
-                        <div className="space-y-3">
-                          <ul className="space-y-2.5">
-                            {ARMOR_STAT_NAMES.map((stat) => {
+                        <div className="space-y-4">
+                          <ul className="space-y-5 pb-2">
+                            {OPTIMIZER_STAT_DISPLAY_ORDER.map((stat) => {
                               const row = constraints.find((r) => r.stat === stat)!;
                               const range = bounds[stat];
                               return (
@@ -394,54 +377,65 @@ export function LoadoutOptimizerView({
                               );
                             })}
                           </ul>
-                          <AssumedStatModsPanel
-                            value={assumedStatMods}
-                            onChange={setAssumedStatMods}
-                          />
                         </div>
                       </OptimizerSettingsSection>
 
                       <OptimizerSettingsSection
-                        id="optimizer-set-bonus-heading"
-                        title="Armor set"
+                        id="optimizer-major-mods-heading"
+                        title="Major mods used"
                         compact
                         className="border-b-0"
                       >
-                        <SetBonusPicker
-                          pool={optimizerPool}
-                          setPerks={optimizerLookup.setPerks}
-                          selected={selectedSetBonuses}
-                          onChange={setSelectedSetBonuses}
-                          compact
+                        <AssumedStatModsPanel
+                          value={assumedStatMods}
+                          onChange={setAssumedStatMods}
+                          showHeader={false}
                         />
                       </OptimizerSettingsSection>
-                    </div>
 
-                    <OptimizerSettingsSection
-                      id="optimizer-exotic-heading"
-                      title="Exotic armor"
-                    >
-                      <ExoticArmorPicker
-                        inventory={inventory}
-                        classType={classType}
-                        exoticLock={exoticLock}
-                        onExoticLockChange={setExoticLock}
-                      />
-                    </OptimizerSettingsSection>
+                      <div className="flex items-start gap-4">
+                        <OptimizerSettingsSection
+                          id="optimizer-set-bonus-heading"
+                          title="Armor set"
+                          compact
+                          className="min-w-0 flex-1 border-b-0"
+                        >
+                          <SetBonusPicker
+                            pool={optimizerPool}
+                            setPerks={optimizerLookup.setPerks}
+                            selected={selectedSetBonuses}
+                            onChange={setSelectedSetBonuses}
+                            compact
+                          />
+                        </OptimizerSettingsSection>
+
+                        <OptimizerSettingsSection
+                          id="optimizer-exotic-heading"
+                          title="Exotic armor"
+                          compact
+                          className="shrink-0 border-b-0"
+                        >
+                          <ExoticArmorPicker
+                            inventory={inventory}
+                            classType={classType}
+                            exoticLock={exoticLock}
+                            onExoticLockChange={setExoticLock}
+                          />
+                        </OptimizerSettingsSection>
+                      </div>
+                    </div>
 
                     <OptimizerSettingsSection
                       id="optimizer-fragments-heading"
                       title="Fragments"
                       className="pb-6"
                     >
-                      <SubclassFragmentPanel
-                        classType={classType}
+                      <PlanFragmentSelector
                         lookup={optimizerLookup}
-                        selectedSubclassKey={selectedSubclassKey}
-                        onSubclassChange={handleSubclassChange}
                         selectedFragmentHashes={selectedFragmentHashes}
                         onToggleFragment={toggleFragment}
                         maxFragments={MAX_FRAGMENTS}
+                        statIconByName={statIconByName}
                       />
                     </OptimizerSettingsSection>
                   </div>

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { getServiceRoleClient } from "@/lib/db/server";
+import { listDropFeed } from "@/lib/inventory/drop-feed";
 import { getCachedInventoryWithSyncedAt } from "@/lib/inventory/sync";
 import { getManifestLookups } from "@/lib/manifest/lookups";
 import { checkManifestVersion } from "@/lib/manifest/version-check";
@@ -59,7 +60,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const sb = getServiceRoleClient();
 
-  const [userRowRes, cached, lookups, savedViews, versionCheck] = await Promise.all([
+  const [userRowRes, cached, lookups, savedViews, versionCheck, initialDropFeed] =
+    await Promise.all([
     sb
       .from("users")
       .select("display_name, profile_picture_path, grid_filters")
@@ -69,6 +71,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     getManifestLookups(),
     listSavedViewsForUser(session.userId),
     checkManifestVersion(),
+    listDropFeed(session.userId).catch(() => []),
   ]);
 
   const userRow = userRowRes.data;
@@ -126,6 +129,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       invalidShareLink={invalidShareLink}
       savedViewImportedId={savedViewImported ?? null}
       initialMode={initialMode}
+      initialDropFeed={initialDropFeed}
     />
   );
 }

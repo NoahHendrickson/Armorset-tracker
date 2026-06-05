@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
-import type { DerivedArmorPieceJson, SavedFilterViewRow } from "@/lib/db/types";
+import type {
+  DerivedArmorPieceJson,
+  InventoryDropFeedEntry,
+  SavedFilterViewRow,
+} from "@/lib/db/types";
 import type { GridLookupPayload } from "@/lib/views/grid-lookup-payload";
 import type { OptimizerLookupPayload } from "@/lib/views/optimizer-lookup-payload";
 import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
@@ -24,6 +28,7 @@ import {
   type WorkspaceViewMode,
 } from "@/components/dashboard/workspace-view-mode-tabs";
 import { WorkspaceAutoSync } from "@/components/dashboard/workspace-auto-sync";
+import { InventoryDropFeedProvider } from "@/components/dashboard/inventory-drop-feed-context";
 import { WorkspaceSyncProvider } from "@/components/dashboard/workspace-sync-status";
 import type { WorkspaceDataHealth } from "@/lib/workspace/workspace-data-health.shared";
 import { cn } from "@/lib/utils";
@@ -50,6 +55,7 @@ export interface DashboardWorkspaceProps {
   savedViewImportedId?: string | null;
   /** Deep-link initial tab (e.g. `?mode=optimizer`, `?mode=plan`). */
   initialMode?: WorkspaceViewMode;
+  initialDropFeed?: InventoryDropFeedEntry[];
 }
 
 export function DashboardWorkspace({
@@ -69,6 +75,7 @@ export function DashboardWorkspace({
   invalidShareLink = false,
   savedViewImportedId = null,
   initialMode = "table",
+  initialDropFeed = [],
 }: DashboardWorkspaceProps) {
   const [mode, setMode] = useState<WorkspaceViewMode>(initialMode);
   /** Mount a tab on first visit so state survives switches; unvisited tabs stay unmounted. */
@@ -173,6 +180,7 @@ export function DashboardWorkspace({
   return (
     <InventoryEquipmentOnlyProvider>
       <WorkspaceSyncProvider health={dataHealth}>
+        <InventoryDropFeedProvider initialFeed={initialDropFeed}>
         <div className="flex h-full min-h-0 flex-col">
           <WorkspaceAutoSync />
           <InventoryEquipmentOnlyBanner />
@@ -198,6 +206,7 @@ export function DashboardWorkspace({
                 filters={filters}
                 onFiltersChange={onFiltersChange}
                 savedViews={savedViewsMenuProps}
+                inventorySyncedAt={dataHealth.inventorySyncedAt}
               />
             </div>
           ) : null}
@@ -261,6 +270,7 @@ export function DashboardWorkspace({
           ) : null}
         </div>
         </div>
+        </InventoryDropFeedProvider>
       </WorkspaceSyncProvider>
     </InventoryEquipmentOnlyProvider>
   );

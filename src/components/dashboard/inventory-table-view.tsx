@@ -25,6 +25,7 @@ import { TrackerFilterBar } from "@/components/workspace/tracker-filter-bar";
 import type { SavedViewsBarProps } from "@/components/workspace/saved-views-menu";
 import type { GridFiltersJson } from "@/lib/workspace/grid-filters-schema";
 import { InventoryItemActions } from "@/components/dashboard/inventory-item-actions";
+import { NewArmorFeedPanel } from "@/components/dashboard/new-armor-feed-panel";
 import { WorkspaceSyncGatePanel } from "@/components/dashboard/workspace-sync-gate-panel";
 import { useWorkspaceSync } from "@/components/dashboard/workspace-sync-status";
 import {
@@ -78,6 +79,7 @@ interface InventoryTableViewProps {
   filters: GridFiltersJson;
   onFiltersChange: (next: GridFiltersJson) => void;
   savedViews?: SavedViewsBarProps;
+  inventorySyncedAt: string | null;
 }
 
 export function InventoryTableView({
@@ -90,6 +92,7 @@ export function InventoryTableView({
   filters,
   onFiltersChange,
   savedViews,
+  inventorySyncedAt,
 }: InventoryTableViewProps) {
   const { pinnedHashes, togglePin } = usePinnedArmorSets();
   const {
@@ -180,11 +183,13 @@ export function InventoryTableView({
       ) : null}
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4 pt-4 sm:px-6">
+        <div className="flex min-h-0 flex-1 gap-0 px-4 pb-4 pt-4 sm:px-6">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {!hasInventory && emptyState ? (
             <WorkspaceSyncGatePanel state={emptyState} onRetry={retrySync} />
           ) : (
-            <div className="flex min-h-0 flex-1 min-w-0 w-full flex-col overflow-hidden rounded-none border-x border-b border-border bg-card">
+            <div className="flex min-h-0 flex-1 min-w-0 w-full overflow-hidden rounded-none border border-border bg-card">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <div
                 ref={showTableBody ? scrollerRefCallback : undefined}
                 className={
@@ -339,8 +344,13 @@ export function InventoryTableView({
                   onRetry={retrySync}
                 />
               ) : null}
+              </div>
             </div>
           )}
+          </div>
+          <div className="flex min-h-0 shrink-0 overflow-hidden rounded-none border border-l-0 border-border bg-card">
+            <NewArmorFeedPanel inventorySyncedAt={inventorySyncedAt} />
+          </div>
         </div>
       </div>
     </div>

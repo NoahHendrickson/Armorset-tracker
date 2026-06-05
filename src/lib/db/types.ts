@@ -216,6 +216,61 @@ export type Database = {
           }
         ];
       };
+      inventory_seen_instances: {
+        Row: {
+          user_id: string;
+          item_instance_id: string;
+          first_seen_at: string;
+        };
+        Insert: {
+          user_id: string;
+          item_instance_id: string;
+          first_seen_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          item_instance_id?: string;
+          first_seen_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "inventory_seen_instances_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      inventory_drop_feed: {
+        Row: {
+          user_id: string;
+          item_instance_id: string;
+          first_seen_at: string;
+          piece: Json;
+        };
+        Insert: {
+          user_id: string;
+          item_instance_id: string;
+          first_seen_at?: string;
+          piece: Json;
+        };
+        Update: {
+          user_id?: string;
+          item_instance_id?: string;
+          first_seen_at?: string;
+          piece?: Json;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "inventory_drop_feed_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       manifest_versions: {
         Row: { version: string; fetched_at: string; is_active: boolean };
         Insert: { version: string; fetched_at?: string; is_active?: boolean };
@@ -460,6 +515,8 @@ export type ViewRow = Tables<"views">;
 export type SavedFilterViewRow = Tables<"saved_filter_views">;
 export type OAuthTokensRow = Tables<"oauth_tokens">;
 export type InventoryCacheRow = Tables<"inventory_cache">;
+export type InventorySeenInstanceRow = Tables<"inventory_seen_instances">;
+export type InventoryDropFeedRow = Tables<"inventory_drop_feed">;
 export type ManifestVersionRow = Tables<"manifest_versions">;
 export type ArmorSetRow = Tables<"armor_sets">;
 export type ArmorItemRow = Tables<"armor_items">;
@@ -552,3 +609,10 @@ export type ItemLocationJson =
       classType: number;
       equipped: boolean;
     };
+
+/** Server-persisted new-drop feed entry (UI-facing). */
+export interface InventoryDropFeedEntry {
+  itemInstanceId: string;
+  firstSeenAt: string;
+  piece: DerivedArmorPieceJson;
+}

@@ -68,9 +68,8 @@ export function PlanFragmentSelector({
       />
 
       <div className="inline-block max-w-full overflow-x-auto border border-border">
-        <div className="max-h-52 overflow-y-auto menu-scrollbar">
           <table className="border-collapse text-xs">
-            <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur-sm">
+            <thead className="border-b border-border bg-muted/95">
               <tr className="border-b border-border">
                 <th className={cn(thClass, "w-8")} scope="col">
                   <span className="sr-only">Equipped</span>
@@ -123,7 +122,6 @@ export function PlanFragmentSelector({
               )}
             </tbody>
           </table>
-        </div>
       </div>
 
       {selectedFragmentHashes.length > 0 ? (
@@ -154,21 +152,41 @@ function FragmentRow({
     return map;
   }, [frag.deltas]);
 
+  const interactive = !disabled || checked;
+
+  const handleActivate = () => {
+    if (interactive) onToggle();
+  };
+
   return (
     <tr
+      role="button"
+      tabIndex={interactive ? 0 : undefined}
+      aria-pressed={checked}
+      aria-disabled={disabled && !checked}
+      aria-label={`${checked ? "Deselect" : "Select"} ${frag.name}`}
+      onClick={handleActivate}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleActivate();
+        }
+      }}
       className={cn(
         "transition-colors",
+        interactive && "cursor-pointer hover:bg-accent/40",
         checked && "bg-primary/5",
         disabled && !checked && "opacity-50",
       )}
     >
-      <td className={tdClass}>
+      <td className={tdClass} onClick={(event) => event.stopPropagation()}>
         <Checkbox
           checked={checked}
           disabled={disabled}
           onCheckedChange={() => onToggle()}
           aria-label={`Toggle ${frag.name}`}
           className="h-3.5 w-3.5"
+          tabIndex={-1}
         />
       </td>
       <td className={tdClass}>

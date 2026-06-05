@@ -56,7 +56,7 @@ export function ExoticArmorPicker({
 
   return (
     <ul
-      className="grid grid-cols-[repeat(auto-fill,minmax(2rem,1fr))] gap-1.5 leading-none sm:grid-cols-[repeat(auto-fill,minmax(2.25rem,1fr))]"
+      className="grid w-max grid-cols-8 gap-1.5 leading-none"
       role="list"
       aria-label="Exotic armor"
     >
@@ -70,7 +70,7 @@ export function ExoticArmorPicker({
               aria-pressed={selected}
               title={name}
               className={cn(
-                "flex aspect-square w-full overflow-hidden rounded-none border transition-colors",
+                "flex size-10 overflow-hidden rounded-none border transition-colors",
                 selected
                   ? "border-foreground ring-1 ring-foreground"
                   : "border-border hover:border-foreground/50",

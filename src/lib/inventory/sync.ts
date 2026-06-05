@@ -11,6 +11,7 @@ import type { Session } from "@/lib/auth/session";
 import type { DerivedArmorPieceJson, InventoryCacheRow, Json } from "@/lib/db/types";
 import type { ProfileResponse } from "@/lib/bungie/types";
 import { deriveAllArmorPieces } from "./derive";
+import { listDropFeed, recordNewDropsFromSync } from "./drop-feed";
 
 /** Raw item counts from GetProfile — used to detect withheld inventory components. */
 function rawInventoryItemCounts(profile: ProfileResponse): {
@@ -44,6 +45,9 @@ export interface InventorySyncResult {
    * out and back in (and confirm the scope on the Bungie app).
    */
   equipmentOnlyRestricted?: boolean;
+  /** Armor pieces newly detected this sync (empty when `cached` or first-time baseline seed). */
+  newPieces?: DerivedArmorPieceJson[];
+  feedCount?: number;
 }
 
 export interface InventorySyncOptions {
@@ -68,6 +72,12 @@ export async function syncUserInventory(
       const ageMs = Date.now() - new Date(existing.synced_at).getTime();
       if (ageMs < INVENTORY_TTL_MS) {
         const items = existing.items as DerivedArmorPieceJson[] | null;
+        let feedCount = 0;
+        try {
+          feedCount = (await listDropFeed(session.userId)).length;
+        } catch {
+          // Drop-feed tables not migrated yet — inventory cache is still valid.
+        }
         return {
           syncedAt: existing.synced_at,
           itemCount: Array.isArray(items) ? items.length : 0,
@@ -75,6 +85,8 @@ export async function syncUserInventory(
           manifestVersion: null,
           warnings: [],
           equipmentOnlyRestricted: false,
+          newPieces: [],
+          feedCount,
         };
       }
     }
@@ -134,6 +146,22 @@ export async function syncUserInventory(
   const { error } = await sb.from("inventory_cache").upsert(row);
   if (error) throw new Error(`Inventory cache upsert failed: ${error.message}`);
 
+  let newPieces: DerivedArmorPieceJson[] = [];
+  let feedCount = 0;
+  try {
+    newPieces = await recordNewDropsFromSync(session.userId, items);
+    feedCount = (await listDropFeed(session.userId)).length;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("schema cache") || msg.includes("inventory_seen_instances")) {
+      warnings.push(
+        "New drops feed is unavailable — run npm run db:push to apply pending migrations.",
+      );
+    } else {
+      throw err;
+    }
+  }
+
   return {
     syncedAt,
     itemCount: items.length,
@@ -141,6 +169,8 @@ export async function syncUserInventory(
     manifestVersion: lookups.version,
     warnings,
     equipmentOnlyRestricted,
+    newPieces,
+    feedCount,
   };
 }
 

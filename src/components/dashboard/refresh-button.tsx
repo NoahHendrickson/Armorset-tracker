@@ -9,7 +9,9 @@ import {
   BUNGIE_RECONNECT_PATH,
   BUNGIE_REAUTH_USER_MESSAGE,
 } from "@/lib/auth/bungie-reauth";
+import { useInventoryDropFeedOptional } from "@/components/dashboard/inventory-drop-feed-context";
 import { useInventoryEquipmentOnlyAlert } from "@/components/dashboard/inventory-equipment-only-alert";
+import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -52,6 +54,7 @@ export function RefreshButton({
   const [, startTransition] = useTransition();
   const router = useRouter();
   const equipmentOnlyAlert = useInventoryEquipmentOnlyAlert();
+  const dropFeed = useInventoryDropFeedOptional();
 
   async function refresh() {
     if (isLoading) return;
@@ -68,6 +71,9 @@ export function RefreshButton({
         itemCount?: number;
         warnings?: string[];
         equipmentOnlyRestricted?: boolean;
+        syncedAt?: string;
+        newPieces?: DerivedArmorPieceJson[];
+        cached?: boolean;
       };
       if (!res.ok) {
         if (body.code === BUNGIE_REAUTH_REQUIRED_CODE) {
@@ -112,6 +118,11 @@ export function RefreshButton({
           }
         }
       }
+
+      dropFeed?.prependFromSync({
+        syncedAt: body.syncedAt,
+        newPieces: body.newPieces,
+      });
 
       startTransition(() => router.refresh());
     } catch (err) {
