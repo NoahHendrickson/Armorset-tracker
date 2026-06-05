@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  memo,
   useCallback,
   useDeferredValue,
   useLayoutEffect,
@@ -209,6 +210,12 @@ export function GridWorkspace({
     useState<TrackerDescriptor | null>(null);
   const compareOpen = compareAnchor !== null;
 
+  // Stable identity so memoized tiles don't re-render when the parent updates
+  // for unrelated reasons (scroll, compare open/close).
+  const handleCompareClick = useCallback((descriptor: TrackerDescriptor) => {
+    setCompareAnchor(descriptor);
+  }, []);
+
   const hasTopMessage = Boolean(banners) || Boolean(syncWarning);
   const totalSize = virtualizer.getTotalSize();
 
@@ -311,7 +318,7 @@ export function GridWorkspace({
                             }
                             lookupPayload={lookupPayload}
                             hasInventory={hasInventory}
-                            onCompareClick={() => setCompareAnchor(d)}
+                            onCompareClick={handleCompareClick}
                           />
                         ))}
                       </div>
@@ -347,10 +354,16 @@ interface GridTileProps {
   inventory: DerivedArmorPieceJson[];
   lookupPayload: GridLookupPayload;
   hasInventory: boolean;
-  onCompareClick: () => void;
+  onCompareClick: (descriptor: TrackerDescriptor) => void;
 }
 
-function GridTile({
+/**
+ * Memoized so a parent re-render (scroll, compare open/close) doesn't rebuild
+ * every visible tile's payload and re-reconcile its ~25 tooltip cells. Props
+ * are referentially stable per tile: the descriptor and pre-bucketed inventory
+ * keep identity until enumeration or inventory actually changes.
+ */
+const GridTile = memo(function GridTile({
   descriptor,
   inventory,
   lookupPayload,
@@ -360,6 +373,10 @@ function GridTile({
   const payload = useMemo(
     () => buildEphemeralTrackerPayload(descriptor, inventory, lookupPayload),
     [descriptor, inventory, lookupPayload],
+  );
+  const handleCompareClick = useCallback(
+    () => onCompareClick(descriptor),
+    [onCompareClick, descriptor],
   );
   return (
     <div
@@ -380,9 +397,9 @@ function GridTile({
         <TrackerGridContent
           payload={payload}
           hasInventory={hasInventory}
-          onCompareClick={onCompareClick}
+          onCompareClick={handleCompareClick}
         />
       </div>
     </div>
   );
-}
+});
