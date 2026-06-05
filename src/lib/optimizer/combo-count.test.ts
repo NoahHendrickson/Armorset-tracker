@@ -111,4 +111,40 @@ describe("maxFeasibleStatTarget", () => {
       ).count,
     ).toBe(0);
   });
+
+  it("stays bounded on large pools when visitCap is set", () => {
+    const pool: ReturnType<typeof mockPiece>[] = [];
+    for (const slot of SLOT_ORDER) {
+      for (let i = 0; i < 25; i++) {
+        pool.push(
+          mockPiece(slot, `${slot}-${i}`, {
+            Weapons: 5 + i,
+            Health: 3 + i * 2,
+            Grenade: 4 + i * 3,
+            Melee: 2 + i,
+            Class: 1 + i,
+            Super: 3 + i * 2,
+          }),
+        );
+      }
+    }
+    const constraints = ARMOR_STAT_NAMES.map((stat) => ({
+      stat,
+      min:
+        stat === "Weapons" ? 200 : stat === "Grenade" ? 100 : stat === "Super" ? 100 : 0,
+    }));
+
+    const t0 = performance.now();
+    const capped = maxFeasibleStatTarget(
+      pool,
+      { mode: "none" },
+      constraints,
+      "Weapons",
+      { assumedMods: { majorCount: 3, slotFill: true }, feasibilityVisitCap: 500 },
+    );
+    const elapsed = performance.now() - t0;
+
+    expect(capped).toBeGreaterThanOrEqual(0);
+    expect(elapsed).toBeLessThan(500);
+  });
 });

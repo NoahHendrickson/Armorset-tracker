@@ -36,6 +36,8 @@ export type EnumerateLoadoutsOptions = {
   setBonusSelections: SetBonusSelection[];
   /** Stop after this many accepted leaf visits. */
   cap?: number;
+  /** Stop after this many branch visits (feasibility probes on large vaults). */
+  visitCap?: number;
   isCancelled?: () => boolean;
   /** Called every 5000 internal visits (for progress reporting). */
   onVisitBatch?: (visited: number, totalCombos: number) => void;
@@ -94,6 +96,7 @@ export function enumerateLoadouts(
     assumedMods,
     setBonusSelections,
     cap,
+    visitCap,
     isCancelled,
     onVisitBatch,
     canExtend,
@@ -158,6 +161,10 @@ export function enumerateLoadouts(
         continue;
       }
       visited += 1;
+      if (visitCap != null && visited >= visitCap) {
+        capped = true;
+        return;
+      }
       if (visited % 5000 === 0) {
         onVisitBatch?.(visited, totalCombos);
       }

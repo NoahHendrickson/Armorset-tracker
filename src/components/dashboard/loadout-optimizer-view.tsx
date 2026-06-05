@@ -96,7 +96,14 @@ export function LoadoutOptimizerView({
     defaultStatConstraints,
   );
   const searchConstraints = useDebouncedValue(constraints, 400);
-  const boundsConstraints = useDebouncedValue(constraints, 150);
+  const debouncedBoundsConstraints = useDebouncedValue(constraints, 150);
+  const boundsPending = useMemo(
+    () => !statConstraintsEqual(constraints, debouncedBoundsConstraints),
+    [constraints, debouncedBoundsConstraints],
+  );
+  const boundsConstraints = boundsPending
+    ? constraints
+    : debouncedBoundsConstraints;
   const targetsPending = useMemo(
     () => !statConstraintsEqual(constraints, searchConstraints),
     [constraints, searchConstraints],
@@ -160,6 +167,7 @@ export function LoadoutOptimizerView({
     exoticLock,
     constraints: boundsConstraints,
     setBonusSelections: selectedSetBonuses,
+    previewOnly: boundsPending,
     enabled: sessionActive,
   });
 

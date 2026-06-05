@@ -207,9 +207,14 @@ function greedyLoadoutStatExtremum(
 export type HeuristicConstrainedStatBoundsOptions = {
   /**
    * Skip full filtered enumeration for untargeted stats — use bounded DFS instead.
-   * Targeted stats always use `maxFeasibleStatTarget` (binary search, fast).
+   * Targeted stats use `maxFeasibleStatTarget` unless `previewOnly` is set.
    */
   greedyOnly?: boolean;
+  /**
+   * Greedy tightening only — skips `maxFeasibleStatTarget` and bounded untargeted
+   * enumeration for instant slider gray-band previews during drag.
+   */
+  previewOnly?: boolean;
 };
 
 export function computeHeuristicConstrainedStatBounds(
@@ -222,6 +227,7 @@ export function computeHeuristicConstrainedStatBounds(
   options: HeuristicConstrainedStatBoundsOptions = {},
 ): StatBounds | null {
   const greedyOnly = options.greedyOnly === true;
+  const previewOnly = options.previewOnly === true;
   const prepared = prepareSlotPool(pool, statOffset, exoticLock, assumedMods);
   if (prepared == null) {
     return null;
@@ -260,7 +266,7 @@ export function computeHeuristicConstrainedStatBounds(
     );
 
   const filteredCombo =
-    greedyOnly || !needsCrossStatTightening
+    previewOnly || greedyOnly || !needsCrossStatTightening
       ? null
       : (() => {
           const rawCombo = estimateOptimizerComboCount(pool, exoticLock);
@@ -310,7 +316,7 @@ export function computeHeuristicConstrainedStatBounds(
       assumedMods,
     };
 
-    if (isTargeted) {
+    if (isTargeted && !previewOnly) {
       const cappedTarget = maxFeasibleStatTarget(
         pool,
         exoticLock,
@@ -325,7 +331,7 @@ export function computeHeuristicConstrainedStatBounds(
         verifiedCap = cappedTarget;
         tightenedMax = Math.min(tightenedMax, cappedTarget);
       }
-    } else if (othersActive.length > 0) {
+    } else if (!previewOnly && othersActive.length > 0) {
       const canRunFullUntargetedEnumeration =
         !greedyOnly &&
         filteredCombo != null &&

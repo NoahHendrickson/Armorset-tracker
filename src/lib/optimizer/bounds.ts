@@ -31,6 +31,11 @@ import {
 import type { SetBonusSelection } from "@/lib/optimizer/set-bonus";
 import type { StatBounds, StatConstraintRow } from "@/lib/optimizer/types";
 
+export type StatBoundsComputeOptions = {
+  /** Greedy bands only — for instant slider previews before the worker refines. */
+  previewOnly?: boolean;
+};
+
 export {
   JOINT_BOUNDS_COMBO_LIMIT,
   SEARCH_AUTO_RUN_COMBO_LIMIT,
@@ -50,7 +55,9 @@ export function computeStatBounds(
   constraints?: StatConstraintRow[],
   assumedMods: AssumedStatMods = DEFAULT_ASSUMED_STAT_MODS,
   setBonusSelections: SetBonusSelection[] = [],
+  options: StatBoundsComputeOptions = {},
 ): StatBounds {
+  const previewOnly = options.previewOnly === true;
   const bySlot = groupPoolBySlot(pool);
 
   for (const slot of SLOT_ORDER) {
@@ -81,6 +88,7 @@ export function computeStatBounds(
         setBonusSelections,
         {
           greedyOnly: comboCount > SYNC_UI_ENUMERATION_COMBO_LIMIT,
+          previewOnly,
         },
       );
     }

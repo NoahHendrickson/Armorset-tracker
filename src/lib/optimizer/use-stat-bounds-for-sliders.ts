@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import type { ArmorStatName, DerivedArmorPieceJson } from "@/lib/db/types";
 import { computeStatBounds } from "@/lib/optimizer/bounds";
 import type { ExoticLock } from "@/lib/optimizer/exotic-lock";
@@ -21,6 +21,11 @@ export type UseStatBoundsForSlidersArgs = {
   exoticLock: ExoticLock;
   constraints: StatConstraintRow[];
   setBonusSelections?: SetBonusSelection[];
+  /**
+   * When true, only the fast greedy preview runs (no worker). Use while constraints
+   * are still changing so drag/input stays responsive.
+   */
+  previewOnly?: boolean;
   /** When false, skips worker/main-thread recompute (inactive optimizer tab). */
   enabled?: boolean;
 };
@@ -37,8 +42,8 @@ function boundsPayload(args: UseStatBoundsForSlidersArgs): OptimizerBoundsReques
 }
 
 /**
- * Achievable ranges for stat sliders. Computes in a dedicated Web Worker so
- * large-vault bound passes do not block the main thread.
+ * Achievable ranges for stat sliders. Shows a greedy preview immediately, then
+ * refines in a persistent Web Worker so large-vault bound passes stay off-thread.
  */
 export function useStatBoundsForSliders({
   pool,
@@ -47,14 +52,10 @@ export function useStatBoundsForSliders({
   exoticLock,
   constraints,
   setBonusSelections = [],
+  previewOnly = false,
   enabled = true,
 }: UseStatBoundsForSlidersArgs): StatBounds {
   const deferredPool = useDeferredValue(pool);
-  const deferredConstraints = useDeferredValue(constraints);
-  const deferredStatOffset = useDeferredValue(statOffset);
-  const deferredExoticLock = useDeferredValue(exoticLock);
-  const deferredAssumedMods = useDeferredValue(assumedStatMods);
-  const deferredSetBonuses = useDeferredValue(setBonusSelections);
 
   const runIdRef = useRef(0);
   const workerRef = useRef<Worker | null>(null);
@@ -65,111 +66,135 @@ export function useStatBoundsForSliders({
       pool,
       statOffset,
       exoticLock,
-      undefined,
+      constraints,
       assumedStatMods,
       setBonusSelections,
     ),
   );
 
+  const applyBounds = useCallback((runId: number, next: StatBounds) => {
+    if (runId !== runIdRef.current) return;
+    setBounds(next);
+  }, []);
+
+  const runFullBoundsOnMainThread = useCallback(
+    (runId: number, payload: OptimizerBoundsRequest) => {
+      window.setTimeout(() => {
+        if (runId !== runIdRef.current) return;
+        applyBounds(
+          runId,
+          computeStatBounds(
+            payload.pool,
+            payload.statOffset,
+            payload.exoticLock,
+            payload.constraints,
+            payload.assumedStatMods,
+            payload.setBonusSelections,
+          ),
+        );
+      }, 0);
+    },
+    [applyBounds],
+  );
+
+  const ensureWorker = useCallback((): Worker | null => {
+    if (workerBrokenRef.current || typeof Worker === "undefined") {
+      return null;
+    }
+    if (workerRef.current) {
+      return workerRef.current;
+    }
+    try {
+      const worker = new Worker(new URL("./bounds.worker.ts", import.meta.url), {
+        type: "module",
+      });
+      worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+        const message = event.data;
+        if (message.type === "bounds") {
+          applyBounds(Number(message.id), message.bounds);
+        }
+      };
+      worker.onerror = () => {
+        workerBrokenRef.current = true;
+        worker.terminate();
+        if (workerRef.current === worker) {
+          workerRef.current = null;
+        }
+      };
+      workerRef.current = worker;
+      return worker;
+    } catch {
+      workerBrokenRef.current = true;
+      return null;
+    }
+  }, [applyBounds]);
+
   useEffect(() => {
     if (!enabled) {
-      workerRef.current?.terminate();
-      workerRef.current = null;
       return;
     }
 
     runIdRef.current += 1;
     const runId = runIdRef.current;
-    let cancelled = false;
 
-    const applyBounds = (next: StatBounds) => {
-      if (cancelled || runId !== runIdRef.current) return;
-      setBounds(next);
-    };
+    const payload = boundsPayload({
+      pool: deferredPool,
+      statOffset,
+      assumedStatMods,
+      exoticLock,
+      constraints,
+      setBonusSelections,
+    });
 
-    const runOnMainThread = () => {
-      window.setTimeout(() => {
-        if (cancelled || runId !== runIdRef.current) return;
-        applyBounds(
-          computeStatBounds(
-            deferredPool,
-            deferredStatOffset,
-            deferredExoticLock,
-            deferredConstraints,
-            deferredAssumedMods,
-            deferredSetBonuses,
-          ),
-        );
-      }, 0);
-    };
+    applyBounds(
+      runId,
+      computeStatBounds(
+        pool,
+        statOffset,
+        exoticLock,
+        constraints,
+        assumedStatMods,
+        setBonusSelections,
+        { previewOnly: true },
+      ),
+    );
 
-    workerRef.current?.terminate();
-    workerRef.current = null;
-
-    if (workerBrokenRef.current || typeof Worker === "undefined") {
-      runOnMainThread();
-      return () => {
-        cancelled = true;
-      };
+    if (previewOnly) {
+      return;
     }
 
-    let worker: Worker;
-    try {
-      worker = new Worker(new URL("./bounds.worker.ts", import.meta.url), {
-        type: "module",
-      });
-    } catch {
-      workerBrokenRef.current = true;
-      runOnMainThread();
-      return () => {
-        cancelled = true;
-      };
+    const worker = ensureWorker();
+    if (!worker) {
+      runFullBoundsOnMainThread(runId, payload);
+      return;
     }
-
-    workerRef.current = worker;
-    worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-      const message = event.data;
-      if (message.id !== String(runId) || runId !== runIdRef.current) return;
-      if (message.type === "bounds") {
-        applyBounds(message.bounds);
-      }
-    };
-    worker.onerror = () => {
-      workerBrokenRef.current = true;
-      worker.terminate();
-      workerRef.current = null;
-      runOnMainThread();
-    };
 
     worker.postMessage({
       type: "computeBounds",
       id: String(runId),
-      payload: boundsPayload({
-        pool: deferredPool,
-        statOffset: deferredStatOffset,
-        assumedStatMods: deferredAssumedMods,
-        exoticLock: deferredExoticLock,
-        constraints: deferredConstraints,
-        setBonusSelections: deferredSetBonuses,
-      }),
+      payload,
     });
-
-    return () => {
-      cancelled = true;
-      worker.terminate();
-      if (workerRef.current === worker) {
-        workerRef.current = null;
-      }
-    };
   }, [
     enabled,
     deferredPool,
-    deferredStatOffset,
-    deferredExoticLock,
-    deferredConstraints,
-    deferredAssumedMods,
-    deferredSetBonuses,
+    pool,
+    statOffset,
+    exoticLock,
+    constraints,
+    assumedStatMods,
+    setBonusSelections,
+    previewOnly,
+    applyBounds,
+    ensureWorker,
+    runFullBoundsOnMainThread,
   ]);
+
+  useEffect(() => {
+    if (!enabled) {
+      workerRef.current?.terminate();
+      workerRef.current = null;
+    }
+  }, [enabled]);
 
   useEffect(() => {
     return () => {

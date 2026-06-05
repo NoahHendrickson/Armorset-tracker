@@ -21,7 +21,10 @@ import {
   type ExoticLock,
 } from "@/lib/optimizer/exotic-lock";
 import { addStatOffsets } from "@/lib/optimizer/fragment-offset";
-import { SYNC_UI_ENUMERATION_COMBO_LIMIT } from "@/lib/optimizer/constants";
+import {
+  FEASIBILITY_PROBE_VISIT_CAP,
+  SYNC_UI_ENUMERATION_COMBO_LIMIT,
+} from "@/lib/optimizer/constants";
 import {
   DEFAULT_ASSUMED_STAT_MODS,
   type AssumedStatMods,
@@ -114,6 +117,8 @@ export type FilteredComboCountOptions = {
   assumedMods?: AssumedStatMods;
   /** Stop counting once this many feasible loadouts are found. */
   cap?: number;
+  /** Stop after this many DFS branch visits (large-vault feasibility probes). */
+  visitCap?: number;
 };
 
 export type FilteredComboCountResult = {
@@ -137,6 +142,7 @@ export function estimateFilteredComboCount(
   const assumedMods = options.assumedMods ?? DEFAULT_ASSUMED_STAT_MODS;
   const fragmentOffset = options.statOffset ?? {};
   const cap = options.cap;
+  const visitCap = options.visitCap;
 
   if (!hasStatTargets(constraints) && setBonusSelections.length === 0) {
     return {
@@ -168,6 +174,7 @@ export function estimateFilteredComboCount(
     assumedMods,
     setBonusSelections,
     cap,
+    visitCap,
     onLeaf: (chosen) => {
       if (!satisfiesSetBonuses(chosen, setBonusSelections)) {
         return "reject";
@@ -196,6 +203,8 @@ export type StatTargetFeasibilityOptions = Omit<
 > & {
   /** Upper bound for the binary search (defaults to 200). */
   hi?: number;
+  /** Per-probe DFS visit budget (defaults to FEASIBILITY_PROBE_VISIT_CAP). */
+  feasibilityVisitCap?: number;
 };
 
 function constraintsWithStatMin(
@@ -369,11 +378,14 @@ export function maxFeasibleStatTarget(
   options: StatTargetFeasibilityOptions = {},
 ): number {
   const hi = clampOptimizerStat(options.hi ?? OPTIMIZER_STAT_MAX);
+  const feasibilityVisitCap =
+    options.feasibilityVisitCap ?? FEASIBILITY_PROBE_VISIT_CAP;
   const feasible = (min: number): boolean =>
     estimateFilteredComboCount(pool, exoticLock, {
       ...options,
       constraints: constraintsWithStatMin(constraints, focusStat, min),
       cap: 1,
+      visitCap: feasibilityVisitCap,
     }).count > 0;
 
   if (!feasible(OPTIMIZER_STAT_MIN)) {
