@@ -11,7 +11,7 @@ import type { Session } from "@/lib/auth/session";
 import type { DerivedArmorPieceJson, InventoryCacheRow, Json } from "@/lib/db/types";
 import type { ProfileResponse } from "@/lib/bungie/types";
 import { deriveAllArmorPieces } from "./derive";
-import { listDropFeed, recordNewDropsFromSync } from "./drop-feed";
+import { countDropFeed, recordNewDropsFromSync } from "./drop-feed";
 
 /** Raw item counts from GetProfile — used to detect withheld inventory components. */
 function rawInventoryItemCounts(profile: ProfileResponse): {
@@ -74,7 +74,7 @@ export async function syncUserInventory(
         const items = existing.items as DerivedArmorPieceJson[] | null;
         let feedCount = 0;
         try {
-          feedCount = (await listDropFeed(session.userId)).length;
+          feedCount = await countDropFeed(session.userId);
         } catch {
           // Drop-feed tables not migrated yet — inventory cache is still valid.
         }
@@ -92,14 +92,6 @@ export async function syncUserInventory(
     }
   }
 
-  const lookups = await getManifestLookups();
-  const warnings: string[] = [];
-  if (!lookups.version) {
-    warnings.push(
-      "Manifest is still loading — inventory may be incomplete until it finishes.",
-    );
-  }
-
   const fetchProfile = (token: string) =>
     withUserRateLimit(session.userId, () =>
       withBackoff(
@@ -114,14 +106,26 @@ export async function syncUserInventory(
       ),
     );
 
-  let profile;
-  try {
-    profile = await withBungieAccessTokenRetry(session.userId, fetchProfile);
-  } catch (err) {
+  // The manifest lookups (Supabase — possibly a cold full-table load) don't
+  // depend on the Bungie profile (network), so fetch them concurrently; the
+  // cache-miss path is then bound by whichever is slower, not their sum. The
+  // two now race, so on the rare double failure a Bungie-maintenance error may
+  // surface ahead of a lookups error — both are fatal here, so that's fine.
+  const [lookups, profile] = await Promise.all([
+    getManifestLookups(),
+    withBungieAccessTokenRetry(session.userId, fetchProfile),
+  ]).catch((err) => {
     if (err instanceof BungieApiError && err.maintenance) {
       throw new InventoryNotReady("Bungie API is in maintenance.", 503);
     }
     throw err;
+  });
+
+  const warnings: string[] = [];
+  if (!lookups.version) {
+    warnings.push(
+      "Manifest is still loading — inventory may be incomplete until it finishes.",
+    );
   }
 
   const rawCounts = rawInventoryItemCounts(profile);
@@ -150,7 +154,7 @@ export async function syncUserInventory(
   let feedCount = 0;
   try {
     newPieces = await recordNewDropsFromSync(session.userId, items);
-    feedCount = (await listDropFeed(session.userId)).length;
+    feedCount = await countDropFeed(session.userId);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("schema cache") || msg.includes("inventory_seen_instances")) {
