@@ -16,6 +16,8 @@ export type AssumedStatModsPanelProps = {
   value: AssumedStatMods;
   onChange: (next: AssumedStatMods) => void;
   compact?: boolean;
+  /** When false, only the major-count control is shown (no section title/blurb). */
+  showHeader?: boolean;
   className?: string;
 };
 
@@ -24,6 +26,7 @@ export function AssumedStatModsPanel({
   value,
   onChange,
   compact = true,
+  showHeader = true,
   className,
 }: AssumedStatModsPanelProps) {
   const budget = totalAssumedModBudget(value, PIECE_COUNT);
@@ -32,25 +35,23 @@ export function AssumedStatModsPanel({
   return (
     <div
       className={cn(
-        "border-t border-border pt-3",
+        showHeader && "border-t border-border pt-3",
         compact ? "space-y-2.5" : "space-y-3",
         className,
       )}
     >
-      <div>
-        <p
-          className={cn(
-            "font-semibold uppercase tracking-wide text-muted-foreground",
-            compact ? "text-[10px]" : "text-xs",
-          )}
-        >
-          Assumed stat mods
-        </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          One mod per armor piece (+10 major or +5 minor on remaining pieces).
-          Applied to stats with a minimum target.
-        </p>
-      </div>
+      {showHeader ? (
+        <div>
+          <p
+            className={cn(
+              "font-semibold uppercase tracking-wide text-muted-foreground",
+              compact ? "text-[10px]" : "text-xs",
+            )}
+          >
+            Assumed stat mods
+          </p>
+        </div>
+      ) : null}
 
       <div className="space-y-1">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">

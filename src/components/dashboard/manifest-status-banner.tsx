@@ -23,10 +23,6 @@ export function ManifestStatusBanner({
         <Warning weight="duotone" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
         <div className="flex-1">
           <p className="font-medium">Loading Destiny manifest</p>
-          <p className="text-muted-foreground">
-            Sets, archetypes, and tunings will populate automatically. This
-            usually takes under a minute.
-          </p>
         </div>
       </div>
     );
@@ -41,9 +37,6 @@ export function ManifestStatusBanner({
         <Warning weight="duotone" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
         <div className="flex-1">
           <p className="font-medium">Updating manifest data</p>
-          <p className="text-muted-foreground">
-            New lookup tables are being backfilled after a schema change.
-          </p>
         </div>
       </div>
     );
@@ -57,13 +50,12 @@ export function ManifestStatusBanner({
       >
         <Info weight="duotone" className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
         <div className="flex-1">
-          <p className="font-medium">Updating to a new Bungie manifest</p>
-          <p className="text-muted-foreground">
-            Cached version{" "}
-            <code className="font-mono text-xs">{versionCheck.cachedVersion}</code>{" "}
-            &rarr; live version{" "}
-            <code className="font-mono text-xs">{versionCheck.liveVersion}</code>.
-            This runs in the background.
+          <p className="font-medium">
+            Updating to a new Bungie manifest (
+            <code className="font-mono text-xs">{versionCheck.cachedVersion}</code>
+            {" → "}
+            <code className="font-mono text-xs">{versionCheck.liveVersion}</code>
+            )
           </p>
         </div>
       </div>

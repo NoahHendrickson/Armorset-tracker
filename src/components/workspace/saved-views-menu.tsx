@@ -198,7 +198,6 @@ export function SavedViewsMenu({
         open={saveOpen}
         onOpenChange={setSaveOpen}
         title="Save view"
-        description="Saves your current set, archetype, tuning, and tertiary filters. Class and search are not included."
         submitLabel="Save"
         busyLabel="Saving…"
         onSubmit={(name) => api.createView(name, filters)}

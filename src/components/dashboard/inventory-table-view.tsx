@@ -216,11 +216,6 @@ export function InventoryTableView({
                           onChange={onFiltersChange}
                           pinnedHashes={pinnedHashes}
                           onTogglePin={togglePin}
-                          resultCount={filteredRows.length}
-                          resultNoun={{
-                            singular: "piece",
-                            plural: "pieces",
-                          }}
                           showRarityFilter
                           searchPlacement="start"
                           searchDefaultExpanded

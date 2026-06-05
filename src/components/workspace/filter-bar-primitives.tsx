@@ -17,39 +17,39 @@ export const FILTER_BAR_CONTAINER_CLASS = "@container/filter-bar";
  * Breakpoint rem values must match {@link FILTER_BAR_COLLAPSE_BREAKPOINTS_REM}
  * in filter-bar-collapse-policy.ts.
  *
- * - ≥72rem: all filters inline
- * - 64–72rem: tertiary + tunings → "More" menu; sets/archetypes stay inline
- * - 56–64rem: archetypes join "More"; sets stay inline
- * - <56rem: everything → "Filters" menu
+ * - ≥60rem: all filters inline
+ * - 52–60rem: tertiary + tunings → "More" menu; sets/archetypes stay inline
+ * - 44–52rem: archetypes join "More"; sets stay inline
+ * - <44rem: everything → "Filters" menu
  */
 
 /** Tier 1 — tunings & tertiary stats inline. */
 export const FILTER_INLINE_TUNINGS_TERTIARY =
-  "hidden @[72rem]/filter-bar:inline-flex";
+  "hidden @[60rem]/filter-bar:inline-flex";
 
 /** Tier 1 — tunings & tertiary in the full "Filters" menu (narrowest). */
 export const FILTER_STOWED_IN_FILTERS_TUNINGS_TERTIARY =
-  "@[56rem]/filter-bar:hidden";
+  "@[44rem]/filter-bar:hidden";
 
 /** Tier 2 — archetypes inline. */
-export const FILTER_INLINE_ARCHETYPES = "hidden @[64rem]/filter-bar:inline-flex";
+export const FILTER_INLINE_ARCHETYPES = "hidden @[52rem]/filter-bar:inline-flex";
 
 /** Tier 2 — archetypes in full "Filters". */
 export const FILTER_STOWED_IN_FILTERS_ARCHETYPES =
-  "@[56rem]/filter-bar:hidden";
+  "@[44rem]/filter-bar:hidden";
 
 /** Tier 3 — armor sets inline. */
-export const FILTER_INLINE_CORE = "hidden @[56rem]/filter-bar:inline-flex";
+export const FILTER_INLINE_CORE = "hidden @[44rem]/filter-bar:inline-flex";
 
 /** Tier 3 — armor sets in full "Filters". */
-export const FILTER_STOWED_IN_FILTERS_CORE = "@[56rem]/filter-bar:hidden";
+export const FILTER_STOWED_IN_FILTERS_CORE = "@[44rem]/filter-bar:hidden";
 
-/** "More" overflow trigger — visible between 56rem and 72rem. */
+/** "More" overflow trigger — visible between 44rem and 60rem. */
 export const FILTER_MORE_MENU_BUTTON =
-  "hidden @[56rem]/filter-bar:inline-flex @[72rem]/filter-bar:hidden";
+  "hidden @[44rem]/filter-bar:inline-flex @[60rem]/filter-bar:hidden";
 
-/** Full "Filters" trigger — visible below 56rem. */
-export const FILTER_FULL_MENU_BUTTON = "inline-flex @[56rem]/filter-bar:hidden";
+/** Full "Filters" trigger — visible below 44rem. */
+export const FILTER_FULL_MENU_BUTTON = "inline-flex @[44rem]/filter-bar:hidden";
 
 export const INLINE_TRIGGER_BASE_CLASS =
   "group/inline-trigger h-9 shrink-0 gap-1.5 rounded-none px-3 text-xs";

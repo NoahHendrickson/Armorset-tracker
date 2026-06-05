@@ -5,10 +5,11 @@ import type { SavedViewsBarProps } from "@/components/workspace/saved-views-menu
  * Single source of truth for filter-bar collapse breakpoints (rem).
  * Must stay in sync with container-query classes in filter-bar-primitives.tsx.
  */
+/** Tuned after removing the center "Showing N trackers" strip — more width for inline chips. */
 export const FILTER_BAR_COLLAPSE_BREAKPOINTS_REM = {
-  fullInline: 72,
-  moreTunings: 64,
-  moreAll: 56,
+  fullInline: 60,
+  moreTunings: 52,
+  moreAll: 44,
 } as const;
 
 export type FilterBarCollapseTier =

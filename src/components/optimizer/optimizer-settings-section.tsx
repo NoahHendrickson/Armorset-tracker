@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 export interface OptimizerSettingsSectionProps {
   id: string;
   title: string;
-  description?: ReactNode;
   children: ReactNode;
   /** Tighter vertical rhythm for nested or paired sections. */
   compact?: boolean;
@@ -17,7 +16,6 @@ export interface OptimizerSettingsSectionProps {
 export function OptimizerSettingsSection({
   id,
   title,
-  description,
   children,
   compact = false,
   className,
@@ -37,16 +35,6 @@ export function OptimizerSettingsSection({
       >
         {title}
       </h2>
-      {description ? (
-        <div
-          className={cn(
-            "max-w-prose text-xs text-muted-foreground",
-            compact ? "mt-0.5" : "mt-1",
-          )}
-        >
-          {description}
-        </div>
-      ) : null}
       <div className={compact ? "mt-2" : "mt-3"}>{children}</div>
     </section>
   );

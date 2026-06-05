@@ -6,7 +6,6 @@ import {
   MagnifyingGlass,
   X,
 } from "@phosphor-icons/react/dist/ssr";
-import { CLASS_NAMES } from "@/lib/bungie/constants";
 import type { ArmorStatName } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -39,19 +38,12 @@ import {
 import { ClassSwitcher } from "@/components/workspace/class-switcher";
 import { TrackerFilterBarOverflowMenus } from "@/components/workspace/tracker-filter-bar-overflow-menus";
 
-interface ResultNoun {
-  singular: string;
-  plural: string;
-}
-
 interface TrackerFilterBarProps {
   selectors: TrackerFormSelectors;
   value: GridFiltersJson;
   onChange: (next: GridFiltersJson) => void;
   pinnedHashes: readonly string[];
   onTogglePin: (hash: string) => void;
-  resultCount: number;
-  resultNoun: ResultNoun;
   showTertiaryStatFilter?: boolean;
   showRarityFilter?: boolean;
   /** Table view: search is the primary control — leftmost and always visible. */
@@ -69,8 +61,6 @@ export function TrackerFilterBar({
   onChange,
   pinnedHashes,
   onTogglePin,
-  resultCount,
-  resultNoun,
   showTertiaryStatFilter = true,
   showRarityFilter = false,
   searchPlacement = "end",
@@ -445,14 +435,7 @@ export function TrackerFilterBar({
 
       <TrackerFilterBarOverflowMenus {...overflowProps} />
 
-      <p
-        className="min-w-0 flex-1 truncate text-xs leading-snug text-muted-foreground/80"
-        aria-live="polite"
-      >
-        Showing {resultCount}{" "}
-        {resultCount === 1 ? resultNoun.singular : resultNoun.plural} for{" "}
-        {CLASS_NAMES[value.class] ?? "class"}.
-      </p>
+      <div aria-hidden className="min-w-0 flex-1" />
 
       {(showRarityFilter || savedViews) && collapseTier !== "filters-menu" ? (
         <div aria-hidden className="h-6 w-px shrink-0 self-center bg-border" />

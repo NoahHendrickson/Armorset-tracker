@@ -30,7 +30,9 @@ export function WorkspaceSyncGatePanel({
       ) : null}
       <div className="max-w-md space-y-2">
         <p className="text-base font-medium text-foreground">{state.title}</p>
-        <p className="text-sm text-muted-foreground">{state.detail}</p>
+        {state.detail ? (
+          <p className="text-sm text-muted-foreground">{state.detail}</p>
+        ) : null}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
         {state.kind === "reauth" ? (

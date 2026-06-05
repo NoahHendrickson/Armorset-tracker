@@ -82,8 +82,7 @@ export function inventoryTableEmptyState(opts: {
     return {
       kind: "syncing-manifest",
       title: "Loading Destiny manifest",
-      detail:
-        "Sets, archetypes, and tunings are being pulled from Bungie. This runs once per environment and usually takes under a minute.",
+      detail: "",
     };
   }
 
@@ -99,8 +98,7 @@ export function inventoryTableEmptyState(opts: {
     return {
       kind: "manifest-not-ready",
       title: "Manifest not ready",
-      detail:
-        "Armor names and tuning data come from the Bungie manifest. This loads automatically on first visit — usually under a minute.",
+      detail: "",
     };
   }
 
@@ -108,8 +106,7 @@ export function inventoryTableEmptyState(opts: {
     return {
       kind: "syncing-inventory",
       title: "Fetching your armor",
-      detail:
-        "Pulling vault and character inventory from Bungie. This happens automatically after sign-in — no refresh needed unless it stalls.",
+      detail: "",
     };
   }
 
@@ -125,17 +122,15 @@ export function inventoryTableEmptyState(opts: {
     return {
       kind: "empty-inventory",
       title: "No Armor 3.0 pieces found",
-      detail:
-        "Your inventory synced successfully but no eligible armor was returned. Try Refresh in the header, or check /debug for raw counts.",
+      detail: "",
     };
   }
 
   if (opts.filteredCount === 0 && opts.filtersExcludeAll) {
-    const classLabel = CLASS_LABELS[opts.classType] ?? "this class";
     return {
       kind: "empty-filters",
       title: "No armor matches these filters",
-      detail: `Nothing in your synced inventory matches the current filters for ${classLabel}. Clear filters or switch class to see more.`,
+      detail: "",
     };
   }
 
@@ -144,8 +139,7 @@ export function inventoryTableEmptyState(opts: {
     return {
       kind: "empty-filters",
       title: `No armor for ${classLabel}`,
-      detail:
-        "Your inventory synced, but nothing matches this class and rarity. Switch class or change the rarity filter.",
+      detail: "",
     };
   }
 

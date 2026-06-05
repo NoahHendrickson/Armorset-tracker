@@ -110,10 +110,6 @@ export function TrackerGridContent({
               className="rounded-none border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200"
             >
               <p className="font-medium">No class assigned</p>
-              <p className="text-muted-foreground">
-                Created before class scoping. Delete and remake to filter by
-                class.
-              </p>
             </div>
           ) : null}
 

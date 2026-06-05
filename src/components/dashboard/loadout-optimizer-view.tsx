@@ -13,7 +13,6 @@ import { AssumedStatModsPanel } from "@/components/optimizer/assumed-stat-mods-p
 import { ExoticArmorPicker } from "@/components/optimizer/exotic-armor-picker";
 import { OptimizerResultCard } from "@/components/optimizer/optimizer-result-card";
 import { OptimizerSettingsSection } from "@/components/optimizer/optimizer-settings-section";
-import { OptimizerStatTargetsNotice } from "@/components/optimizer/optimizer-stat-targets-notice";
 import { SetBonusPicker } from "@/components/optimizer/set-bonus-picker";
 import { StatRangeSlider } from "@/components/optimizer/stat-range-slider";
 import { SubclassFragmentPanel } from "@/components/optimizer/subclass-fragment-panel";
@@ -142,8 +141,6 @@ export function LoadoutOptimizerView({
     optimizerPool,
     classPieceCount,
     canRunOptimizer,
-    missingSlotCoverage,
-    noTier5,
   } = useOptimizerPool({
     inventory,
     classType,
@@ -318,10 +315,9 @@ export function LoadoutOptimizerView({
                     className="min-h-0 overflow-x-hidden overflow-y-auto border-b border-border px-4 sm:px-6 lg:border-b-0 lg:border-r"
                     aria-label="Optimizer settings"
                   >
-                    <OptimizerSettingsSection
-                      id="optimizer-class-heading"
-                      title="Class"
-                      description="Optimizer uses vault and character armor for the selected class."
+                    <section
+                      aria-label="Class"
+                      className="border-b border-border first:pt-0 last:border-b-0 py-5"
                     >
                       <ClassSwitcher
                         value={classType}
@@ -354,28 +350,16 @@ export function LoadoutOptimizerView({
                           </>
                         ) : null}
                       </p>
-                    </OptimizerSettingsSection>
+                    </section>
 
                     <div className="space-y-4 border-b border-border py-4">
                       <OptimizerSettingsSection
                         id="optimizer-stat-priorities-heading"
                         title="Stat targets"
                         compact
-                        description="Minimums on the 0–200 track. Double-click the shaded band to snap to max."
                         className="border-b-0"
                       >
                         <div className="space-y-3">
-                          <OptimizerStatTargetsNotice
-                            noTier5={noTier5}
-                            missingStatData={
-                              !noTier5 &&
-                              classPieceCount > 0 &&
-                              optimizerPool.length === 0
-                            }
-                            missingSlotCoverage={missingSlotCoverage}
-                            searchTooLarge={searchTooLarge}
-                            canGenerateBuilds={canGenerateBuilds}
-                          />
                           <ul className="space-y-2.5">
                             {ARMOR_STAT_NAMES.map((stat) => {
                               const row = constraints.find((r) => r.stat === stat)!;
@@ -406,7 +390,6 @@ export function LoadoutOptimizerView({
                         id="optimizer-set-bonus-heading"
                         title="Armor set"
                         compact
-                        description="Require set bonuses from pieces in your pool."
                         className="border-b-0"
                       >
                         <SetBonusPicker
@@ -434,7 +417,6 @@ export function LoadoutOptimizerView({
                     <OptimizerSettingsSection
                       id="optimizer-fragments-heading"
                       title="Fragments"
-                      description="Subclass fragments adjust achievable ranges and build totals."
                       className="pb-6"
                     >
                       <SubclassFragmentPanel
@@ -462,10 +444,6 @@ export function LoadoutOptimizerView({
                           >
                             Results
                           </h2>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Totals include armor rolls, fragments, and assumed
-                            stat mods.
-                          </p>
                           {groupedResults.size > 0 ? (
                             <p className="mt-2 text-xs text-muted-foreground">
                               Showing {groupedResults.size} build
@@ -557,7 +535,6 @@ export function LoadoutOptimizerView({
                             <li key={signature}>
                               <OptimizerResultCard
                                 solution={solutions[0]!}
-                                variantCount={solutions.length}
                                 piecesById={piecesById}
                                 statIconByName={statIconByName}
                               />

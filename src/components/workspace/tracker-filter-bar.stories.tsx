@@ -65,8 +65,6 @@ function Render({
         onChange={setValue}
         pinnedHashes={[]}
         onTogglePin={() => {}}
-        resultCount={42}
-        resultNoun={{ singular: "tracker", plural: "trackers" }}
         showTertiaryStatFilter={showTertiaryStatFilter}
         showRarityFilter={showRarityFilter}
         searchPlacement={searchPlacement}
@@ -96,26 +94,26 @@ export const TrackerGridNoTertiaryMenu: Story = {
   ),
 };
 
-/** ≥72rem — all filters inline. */
+/** ≥60rem — all filters inline (typical dashboard filter bar width). */
 export const WideAllInline: Story = {
-  render: () => <Render initial={MOCK_GRID_FILTERS_POPULATED} width={1200} />,
+  render: () => <Render initial={MOCK_GRID_FILTERS_POPULATED} width={1060} />,
 };
 
-/** 64–72rem — tertiary/tunings in More; sets & archetypes stay inline. */
+/** 52–60rem — tertiary/tunings in More; sets & archetypes stay inline. */
 export const MidMoreOverflow: Story = {
   render: () => (
-    <Render initial={MOCK_GRID_FILTERS_POPULATED} width={1080} showRarityFilter />
+    <Render initial={MOCK_GRID_FILTERS_POPULATED} width={880} showRarityFilter />
   ),
 };
 
-/** 56–64rem — archetypes join More; sets/rarity stay inline. */
+/** 44–52rem — archetypes join More; sets/rarity stay inline. */
 export const MidMoreWithArchetypes: Story = {
   render: () => (
-    <Render initial={MOCK_GRID_FILTERS_POPULATED} width={960} showRarityFilter />
+    <Render initial={MOCK_GRID_FILTERS_POPULATED} width={760} showRarityFilter />
   ),
 };
 
-/** <56rem — everything in Filters menu. */
+/** <44rem — everything in Filters menu. */
 export const NarrowFullFilters: Story = {
   render: () => (
     <Render initial={MOCK_GRID_FILTERS_POPULATED} width={480} showRarityFilter />

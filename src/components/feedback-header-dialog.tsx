@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -81,9 +80,6 @@ export function FeedbackHeaderDialog() {
       <DialogContent className="rounded-none sm:rounded-none">
         <DialogHeader className="pb-4">
           <DialogTitle>Feedback</DialogTitle>
-          <DialogDescription>
-            Describe a bug or share a feature idea. Please be as detailed as possible.
-          </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-6">

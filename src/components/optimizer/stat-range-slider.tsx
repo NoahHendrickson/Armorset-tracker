@@ -279,7 +279,7 @@ export function StatRangeSlider({
                   compact ? "h-1.5" : "h-2",
                 )}
                 style={{ left: `${achLeft}%`, width: `${achWidth}%` }}
-                title={`Achievable ${bandMin}–${bandMax} — double-click to set min to ${bandMax}`}
+                title={`Achievable ${bandMin}–${bandMax}`}
                 onDoubleClick={handleAchievableDoubleClick}
               />
             ) : null}
@@ -357,12 +357,7 @@ export function StatRangeSlider({
         </div>
 
         {!compact ? (
-          <>
-            <p className="text-xs text-muted-foreground sm:hidden">{stat}</p>
-            <p className="hidden text-xs text-muted-foreground sm:block">
-              Achievable {achievableMin}–{achievableMax}
-            </p>
-          </>
+          <p className="text-xs text-muted-foreground sm:hidden">{stat}</p>
         ) : null}
       </div>
 
@@ -373,11 +368,6 @@ export function StatRangeSlider({
         )}
       >
         {valueInput}
-        {!compact ? (
-          <p className="mt-0.5 text-center text-[10px] tabular-nums text-muted-foreground">
-            max {achievableMax}
-          </p>
-        ) : null}
       </div>
     </div>
   );

@@ -234,8 +234,6 @@ export function GridWorkspace({
               onChange={onFiltersChange}
               pinnedHashes={pinnedHashes}
               onTogglePin={togglePin}
-              resultCount={visibleTrackers.length}
-              resultNoun={{ singular: "tracker", plural: "trackers" }}
               showTertiaryStatFilter={false}
               savedViews={savedViews}
             />
@@ -246,10 +244,6 @@ export function GridWorkspace({
               <div className="max-w-md text-center text-sm text-muted-foreground">
                 <p className="text-base font-medium text-foreground">
                   Pick a set, archetype, or tuning to see trackers.
-                </p>
-                <p className="mt-2">
-                  Use the Filters menu above to narrow down to the combinations
-                  you care about.
                 </p>
               </div>
             </div>

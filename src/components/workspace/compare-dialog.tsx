@@ -7,7 +7,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { MergedCompareGrid } from "@/components/views/merged-compare-grid";
@@ -100,11 +99,6 @@ export function CompareDialog({
       <DialogContent className="max-w-5xl gap-4">
         <DialogHeader>
           <DialogTitle>Compare trackers</DialogTitle>
-          <DialogDescription>
-            {anchor
-              ? `Pick a second tracker to compare against ${anchor.setName} · ${anchor.archetypeName}.`
-              : "Pick a tracker to compare."}
-          </DialogDescription>
         </DialogHeader>
 
         {anchor ? (

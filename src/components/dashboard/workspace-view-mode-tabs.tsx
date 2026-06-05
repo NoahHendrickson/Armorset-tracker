@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Compass,
   SlidersHorizontal,
   SquaresFour,
   Table,
@@ -8,7 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 import { chromeToolbarShellClass } from "@/components/ui/chrome-square-icon-button";
 
-export type WorkspaceViewMode = "grid" | "table" | "optimizer";
+export type WorkspaceViewMode = "grid" | "table" | "optimizer" | "plan";
 
 interface WorkspaceViewModeTabsProps {
   mode: WorkspaceViewMode;
@@ -68,6 +69,20 @@ export function WorkspaceViewModeTabs({
       >
         <SlidersHorizontal className="h-4 w-4" weight="duotone" aria-hidden />
         Optimize
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "plan"}
+        className={cn(
+          segmentBtn,
+          "border-l border-border",
+          mode === "plan" && "bg-accent text-foreground",
+        )}
+        onClick={() => onModeChange("plan")}
+      >
+        <Compass className="h-4 w-4" weight="duotone" aria-hidden />
+        Plan
       </button>
     </div>
   );

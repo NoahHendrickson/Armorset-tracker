@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -20,7 +19,6 @@ interface SavedViewNameDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  description?: string;
   initialName?: string;
   submitLabel: string;
   busyLabel: string;
@@ -31,7 +29,6 @@ export function SavedViewNameDialog({
   open,
   onOpenChange,
   title,
-  description,
   initialName = "",
   submitLabel,
   busyLabel,
@@ -59,9 +56,6 @@ export function SavedViewNameDialog({
       <DialogContent className="rounded-none sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          {description ? (
-            <DialogDescription>{description}</DialogDescription>
-          ) : null}
         </DialogHeader>
         <Input
           value={name}
@@ -139,10 +133,6 @@ export function ShareViewDialog({
       <DialogContent className="rounded-none sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Share view</DialogTitle>
-          <DialogDescription>
-            Anyone with this link can add a snapshot to their dashboard after
-            signing in.
-          </DialogDescription>
         </DialogHeader>
         <div className="flex gap-2">
           <Input

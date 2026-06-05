@@ -11,10 +11,17 @@ import type { OptimizerSolution } from "@/lib/optimizer/types";
 import { tuningPositiveArmorStat } from "@/lib/views/tuning-positive-stat";
 import { cn } from "@/lib/utils";
 
-function pieceRollStats(
-  piece: DerivedArmorPieceJson,
-  statIconByName: Partial<Record<ArmorStatName, string>>,
-): ReactNode {
+/**
+ * Three aligned grid cells (archetype · tertiary · tuning) for one piece row.
+ * Returned as a fragment so the parent `<li>` grid controls column widths.
+ */
+function PieceMetaCells({
+  piece,
+  statIconByName,
+}: {
+  piece: DerivedArmorPieceJson;
+  statIconByName: Partial<Record<ArmorStatName, string>>;
+}): ReactNode {
   const tuningPositive = piece.tuningName
     ? tuningPositiveArmorStat(piece.tuningName)
     : null;
@@ -26,15 +33,15 @@ function pieceRollStats(
         }`;
 
   return (
-    <div className="flex shrink-0 items-center gap-2.5 text-[10px]">
+    <>
       <span
-        className="w-[4.5rem] truncate font-medium text-muted-foreground"
+        className="truncate text-xs text-muted-foreground"
         title={`Archetype: ${piece.archetypeName ?? "unknown"}`}
       >
         {piece.archetypeName ?? "—"}
       </span>
       <span
-        className="inline-flex w-[4.25rem] items-center gap-0.5"
+        className="inline-flex min-w-0 items-center gap-1 text-xs"
         title={`Tertiary: ${piece.tertiaryStat ?? "unknown"}`}
       >
         {piece.tertiaryStat ? (
@@ -44,7 +51,7 @@ function pieceRollStats(
               iconPath={statIconByName[piece.tertiaryStat]}
               size="sm"
             />
-            <span className="truncate font-medium text-foreground">
+            <span className="truncate text-foreground">
               {piece.tertiaryStat}
             </span>
           </>
@@ -53,7 +60,7 @@ function pieceRollStats(
         )}
       </span>
       <span
-        className="inline-flex max-w-[5.5rem] items-center gap-0.5"
+        className="inline-flex min-w-0 items-center gap-1 text-xs"
         title={tuningTitle}
       >
         {tuningPositive ? (
@@ -63,9 +70,7 @@ function pieceRollStats(
               iconPath={statIconByName[tuningPositive]}
               size="sm"
             />
-            <span className="truncate font-medium text-foreground">
-              +{tuningPositive}
-            </span>
+            <span className="truncate text-foreground">+{tuningPositive}</span>
           </>
         ) : (
           <span className="truncate text-muted-foreground">
@@ -73,7 +78,7 @@ function pieceRollStats(
           </span>
         )}
       </span>
-    </div>
+    </>
   );
 }
 
@@ -84,7 +89,6 @@ function pieceLocationLabel(piece: DerivedArmorPieceJson): string {
 
 export interface OptimizerResultCardProps {
   solution: OptimizerSolution;
-  variantCount: number;
   piecesById: Map<string, DerivedArmorPieceJson>;
   statIconByName: Partial<Record<ArmorStatName, string>>;
   className?: string;
@@ -92,7 +96,6 @@ export interface OptimizerResultCardProps {
 
 export function OptimizerResultCard({
   solution,
-  variantCount,
   piecesById,
   statIconByName,
   className,
@@ -136,64 +139,61 @@ export function OptimizerResultCard({
           <p className="tabular-nums text-lg font-semibold leading-none text-foreground">
             {total}
           </p>
-          <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Total
           </p>
         </div>
       </div>
 
-      {variantCount > 1 ? (
-        <p className="mt-2 text-xs text-muted-foreground">
-          {variantCount} builds hit these stats — one shown.
-        </p>
-      ) : null}
-
-      <ul className="mt-3 space-y-1">
+      <ul className="mt-3 grid grid-cols-[2rem_minmax(0,1fr)_auto_auto_auto_auto] gap-x-3 gap-y-1">
         {SLOT_ORDER.map((slot) => {
           const piece = piecesById.get(solution.slots[slot]);
           const swaps = (solution.interchangeable?.[slot]?.length ?? 1) - 1;
+          const name = piece
+            ? (inventoryPieceDisplayName(piece) ?? "Unknown piece")
+            : "Unknown piece";
           return (
             <li
               key={slot}
-              className="flex items-center gap-2 text-sm"
+              className="col-span-full grid grid-cols-subgrid items-center"
             >
               {piece?.iconPath ? (
                 <img
                   src={bungieIconUrl(piece.iconPath)}
-                  alt={
-                    piece
-                      ? (inventoryPieceDisplayName(piece) ?? "Armor piece")
-                      : ""
-                  }
-                  className="size-8 shrink-0 rounded-none border border-border object-cover"
+                  alt={name}
+                  className="size-8 rounded-none border border-border object-cover"
                 />
               ) : (
-                <span className="size-8 shrink-0 rounded-none border border-border bg-muted" />
+                <span className="size-8 rounded-none border border-border bg-muted" />
               )}
-              <span className="min-w-0 flex-1 truncate text-foreground">
-                {piece
-                  ? (inventoryPieceDisplayName(piece) ?? "Unknown piece")
-                  : "Unknown piece"}
-              </span>
-              {piece ? pieceRollStats(piece, statIconByName) : null}
-              {swaps > 0 ? (
-                <span
-                  className="shrink-0 text-[10px] text-muted-foreground"
-                  title={`${swaps} interchangeable cop${swaps === 1 ? "y" : "ies"}`}
-                >
-                  +{swaps}
-                </span>
-              ) : null}
-              {piece?.isExotic ? (
-                <span className="shrink-0 rounded-none border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-500">
-                  Exotic
-                </span>
-              ) : null}
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate text-sm text-foreground">{name}</span>
+                {piece?.isExotic ? (
+                  <span className="shrink-0 rounded-none border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-500">
+                    Exotic
+                  </span>
+                ) : null}
+                {swaps > 0 ? (
+                  <span
+                    className="shrink-0 text-xs tabular-nums text-muted-foreground"
+                    title={`${swaps} interchangeable cop${swaps === 1 ? "y" : "ies"}`}
+                  >
+                    +{swaps}
+                  </span>
+                ) : null}
+              </div>
               {piece ? (
-                <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {pieceLocationLabel(piece)}
-                </span>
-              ) : null}
+                <PieceMetaCells piece={piece} statIconByName={statIconByName} />
+              ) : (
+                <>
+                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-xs text-muted-foreground">—</span>
+                </>
+              )}
+              <span className="truncate text-right text-xs uppercase tracking-wide text-muted-foreground">
+                {piece ? pieceLocationLabel(piece) : ""}
+              </span>
             </li>
           );
         })}

@@ -17,6 +17,7 @@ import type { TrackerFormSelectors } from "@/lib/views/tracker-form-selectors";
 import { AppHeader } from "@/components/app-header";
 import { GridWorkspace } from "@/components/workspace/grid-workspace";
 import { InventoryTableView } from "@/components/dashboard/inventory-table-view";
+import { ArchetypePlanView } from "@/components/dashboard/archetype-plan-view";
 import { LoadoutOptimizerView } from "@/components/dashboard/loadout-optimizer-view";
 import {
   WorkspaceViewModeTabs,
@@ -47,6 +48,8 @@ export interface DashboardWorkspaceProps {
   appliedFromShare?: boolean;
   invalidShareLink?: boolean;
   savedViewImportedId?: string | null;
+  /** Deep-link initial tab (e.g. `?mode=optimizer`, `?mode=plan`). */
+  initialMode?: WorkspaceViewMode;
 }
 
 export function DashboardWorkspace({
@@ -65,8 +68,9 @@ export function DashboardWorkspace({
   appliedFromShare = false,
   invalidShareLink = false,
   savedViewImportedId = null,
+  initialMode = "table",
 }: DashboardWorkspaceProps) {
-  const [mode, setMode] = useState<WorkspaceViewMode>("table");
+  const [mode, setMode] = useState<WorkspaceViewMode>(initialMode);
   const [savedViews, setSavedViews] =
     useState<SavedFilterViewRow[]>(initialSavedViews);
   const tabs = <WorkspaceViewModeTabs mode={mode} onModeChange={setMode} />;
@@ -214,6 +218,21 @@ export function DashboardWorkspace({
               onFiltersChange={onFiltersChange}
               optimizerLookup={optimizerLookup}
               statIconByName={lookupPayload.statIconByName}
+            />
+          </div>
+          <div
+            className={cn(
+              "flex min-h-0 flex-1 flex-col",
+              mode !== "plan" && "hidden",
+            )}
+          >
+            <ArchetypePlanView
+              banners={banners}
+              syncWarning={syncWarning}
+              lookupPayload={lookupPayload}
+              selectors={selectors}
+              optimizerLookup={optimizerLookup}
+              classType={filters.class}
             />
           </div>
         </div>

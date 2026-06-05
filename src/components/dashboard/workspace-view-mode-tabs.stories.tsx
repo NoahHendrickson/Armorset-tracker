@@ -35,3 +35,10 @@ export const OptimizerSelected: Story = {
     return <WorkspaceViewModeTabs mode={mode} onModeChange={setMode} />;
   },
 };
+
+export const PlanSelected: Story = {
+  render: function Render() {
+    const [mode, setMode] = useState<WorkspaceViewMode>("plan");
+    return <WorkspaceViewModeTabs mode={mode} onModeChange={setMode} />;
+  },
+};

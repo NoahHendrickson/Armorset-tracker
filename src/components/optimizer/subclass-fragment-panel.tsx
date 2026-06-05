@@ -58,11 +58,7 @@ export function SubclassFragmentPanel({
         </select>
       </label>
 
-      {selectedSubclassKey == null ? (
-        <p className="text-sm text-muted-foreground">
-          Pick a subclass to see its fragments.
-        </p>
-      ) : fragments.length === 0 ? (
+      {selectedSubclassKey == null ? null : fragments.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No fragments cataloged for this subclass yet.
         </p>
@@ -111,11 +107,9 @@ export function SubclassFragmentPanel({
         </ul>
       )}
 
-      {selectedFragmentHashes.length > 0 ? (
-        <p className="text-xs text-muted-foreground">
-          {maxFragments != null
-            ? `${selectedFragmentHashes.length}/${maxFragments} fragments · offset applied to totals and achievable ranges.`
-            : "Fragment offset applied to totals and achievable ranges."}
+      {selectedFragmentHashes.length > 0 && maxFragments != null ? (
+        <p className="text-xs tabular-nums text-muted-foreground">
+          {selectedFragmentHashes.length}/{maxFragments} fragments
         </p>
       ) : null}
     </div>

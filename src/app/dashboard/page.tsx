@@ -22,8 +22,13 @@ export const dynamic = "force-dynamic";
 
 function parseWorkspaceViewMode(
   value: string | undefined,
-): "grid" | "table" | "optimizer" | null {
-  if (value === "grid" || value === "table" || value === "optimizer") {
+): "grid" | "table" | "optimizer" | "plan" | null {
+  if (
+    value === "grid" ||
+    value === "table" ||
+    value === "optimizer" ||
+    value === "plan"
+  ) {
     return value;
   }
   return null;

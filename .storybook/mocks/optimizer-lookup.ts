@@ -6,6 +6,29 @@ export const MOCK_OPTIMIZER_LOOKUP: OptimizerLookupPayload = {
     { key: "solar.titan", label: "Solar Titan", element: "solar", classType: 0 },
   ],
   fragmentsBySubclass: {
+    solar: [
+      {
+        plugHash: 2001,
+        name: "Ember of Beams",
+        iconPath: "/common/destiny2_content/icons/ember.png",
+        subclassKey: "solar",
+        deltas: [{ stat: "Super", value: 10 }],
+      },
+      {
+        plugHash: 2002,
+        name: "Ember of Benevolence",
+        iconPath: "/common/destiny2_content/icons/ember.png",
+        subclassKey: "solar",
+        deltas: [{ stat: "Health", value: -10 }],
+      },
+      {
+        plugHash: 2003,
+        name: "Ember of Combustion",
+        iconPath: "/common/destiny2_content/icons/ember.png",
+        subclassKey: "solar",
+        deltas: [{ stat: "Weapons", value: 10 }],
+      },
+    ],
     "void.warlock": [
       {
         plugHash: 1001,
@@ -28,6 +51,27 @@ export const MOCK_OPTIMIZER_LOOKUP: OptimizerLookupPayload = {
   },
   fragmentPlugs: [
     {
+      plugHash: 2001,
+      name: "Ember of Beams",
+      iconPath: "/common/destiny2_content/icons/ember.png",
+      subclassKey: "solar",
+      deltas: [{ stat: "Super", value: 10 }],
+    },
+    {
+      plugHash: 2002,
+      name: "Ember of Benevolence",
+      iconPath: "/common/destiny2_content/icons/ember.png",
+      subclassKey: "solar",
+      deltas: [{ stat: "Health", value: -10 }],
+    },
+    {
+      plugHash: 2003,
+      name: "Ember of Combustion",
+      iconPath: "/common/destiny2_content/icons/ember.png",
+      subclassKey: "solar",
+      deltas: [{ stat: "Weapons", value: 10 }],
+    },
+    {
       plugHash: 1001,
       name: "Echo of Exchange",
       iconPath: "/common/destiny2_content/icons/echo.png",
@@ -46,6 +90,27 @@ export const MOCK_OPTIMIZER_LOOKUP: OptimizerLookupPayload = {
     },
   ],
   fragmentPlugsByHash: {
+    "2001": {
+      plugHash: 2001,
+      name: "Ember of Beams",
+      iconPath: "/common/destiny2_content/icons/ember.png",
+      subclassKey: "solar",
+      deltas: [{ stat: "Super", value: 10 }],
+    },
+    "2002": {
+      plugHash: 2002,
+      name: "Ember of Benevolence",
+      iconPath: "/common/destiny2_content/icons/ember.png",
+      subclassKey: "solar",
+      deltas: [{ stat: "Health", value: -10 }],
+    },
+    "2003": {
+      plugHash: 2003,
+      name: "Ember of Combustion",
+      iconPath: "/common/destiny2_content/icons/ember.png",
+      subclassKey: "solar",
+      deltas: [{ stat: "Weapons", value: 10 }],
+    },
     "1001": {
       plugHash: 1001,
       name: "Echo of Exchange",
