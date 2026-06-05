@@ -165,6 +165,19 @@ export async function listDropFeed(
   return (data ?? []).map(rowToEntry);
 }
 
+/** Feed size only — avoids fetching the per-row `piece` JSON blobs just to count them. */
+export async function countDropFeed(userId: string): Promise<number> {
+  const sb = getServiceRoleClient();
+  const { count, error } = await sb
+    .from("inventory_drop_feed")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId);
+  if (error) {
+    throw new Error(`inventory_drop_feed count failed: ${error.message}`);
+  }
+  return count ?? 0;
+}
+
 export async function clearDropFeed(userId: string): Promise<void> {
   const sb = getServiceRoleClient();
   const { error } = await sb
