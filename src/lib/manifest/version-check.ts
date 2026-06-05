@@ -36,6 +36,12 @@ export async function checkManifestVersion(
   }
 
   const sb = getServiceRoleClient();
+  // The live version comes from Bungie (network) and is independent of the
+  // Supabase schema-health queries below, so start it now and await it after —
+  // it overlaps the queries instead of running sequentially after them.
+  const liveVersionPromise = getDestinyManifest()
+    .then((manifest) => manifest.version)
+    .catch(() => null);
   const [
     cachedRes,
     statPairsRes,
@@ -86,13 +92,7 @@ export async function checkManifestVersion(
   const armorSetsCount = armorSetsRes.count ?? 0;
   const setPerksCount = setPerksRes.count ?? 0;
 
-  let liveVersion: string | null = null;
-  try {
-    const manifest = await getDestinyManifest();
-    liveVersion = manifest.version;
-  } catch {
-    liveVersion = null;
-  }
+  const liveVersion = await liveVersionPromise;
 
   const versionMismatch =
     liveVersion !== null && cachedVersion !== null && cachedVersion !== liveVersion;
