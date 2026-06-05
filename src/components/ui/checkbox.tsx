@@ -19,8 +19,10 @@ export const checkboxBoxClassName =
 /**
  * Inner check icon used inside `checkboxBoxClassName`. The mark eases in (it
  * only mounts when checked) so toggling a filter feels tactile rather than
- * snapping; `motion-reduce` keeps it instant for reduced-motion users. Shared
- * by the standalone `<Checkbox>` and `<DropdownMenuCheckboxItem>`.
+ * snapping; `motion-reduce` keeps it instant for reduced-motion users. Reused
+ * by every check mark in the app — standalone `<Checkbox>`,
+ * `<DropdownMenuCheckboxItem>`, and the armor-set listbox — so the entrance
+ * stays consistent.
  */
 export const checkboxIconClassName =
   "h-3 w-3 animate-in zoom-in-75 fade-in-0 duration-150 motion-reduce:animate-none";
