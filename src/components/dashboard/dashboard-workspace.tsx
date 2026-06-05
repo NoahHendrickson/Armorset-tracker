@@ -207,6 +207,7 @@ export function DashboardWorkspace({
                 onFiltersChange={onFiltersChange}
                 savedViews={savedViewsMenuProps}
                 inventorySyncedAt={dataHealth.inventorySyncedAt}
+                filteringActive={mode === "table"}
               />
             </div>
           ) : null}

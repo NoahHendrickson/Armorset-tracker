@@ -52,6 +52,9 @@ const TABLE_SCROLL_GUTTER =
 /** Approximate single-row height; the virtualizer remeasures real rows on mount. */
 const ESTIMATED_ROW_HEIGHT_PX = 48;
 
+/** Stable empty result so the filter memo keeps identity while the tab is hidden. */
+const EMPTY_ROWS: DerivedArmorPieceJson[] = [];
+
 function formatLocation(piece: DerivedArmorPieceJson): string {
   const loc = piece.location;
   if (loc.kind === "vault") return "Vault";
@@ -80,6 +83,8 @@ interface InventoryTableViewProps {
   onFiltersChange: (next: GridFiltersJson) => void;
   savedViews?: SavedViewsBarProps;
   inventorySyncedAt: string | null;
+  /** When false (tab hidden), skip the full inventory filter + sort pass. */
+  filteringActive?: boolean;
 }
 
 export function InventoryTableView({
@@ -93,6 +98,7 @@ export function InventoryTableView({
   onFiltersChange,
   savedViews,
   inventorySyncedAt,
+  filteringActive = true,
 }: InventoryTableViewProps) {
   const { pinnedHashes, togglePin } = usePinnedArmorSets();
   const {
@@ -113,8 +119,11 @@ export function InventoryTableView({
     [filters, deferredSearch],
   );
   const filteredRows = useMemo(
-    () => filterInventoryPieces(inventory, filtersForFiltering),
-    [inventory, filtersForFiltering],
+    () =>
+      filteringActive
+        ? filterInventoryPieces(inventory, filtersForFiltering)
+        : EMPTY_ROWS,
+    [filteringActive, inventory, filtersForFiltering],
   );
 
   const emptyState = useMemo(
