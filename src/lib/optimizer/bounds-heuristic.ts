@@ -207,13 +207,14 @@ function greedyLoadoutStatExtremum(
  */
 export type HeuristicConstrainedStatBoundsOptions = {
   /**
-   * Skip full filtered enumeration for untargeted stats — use bounded DFS instead.
-   * Targeted stats use `maxFeasibleStatTarget` unless `previewOnly` is set.
+   * Skip full filtered enumeration — use bounded DFS (`maxAchievable*StatBounded`)
+   * instead of full vault enumeration when the pool is large.
    */
   greedyOnly?: boolean;
   /**
-   * Greedy tightening only — skips `maxFeasibleStatTarget` and bounded untargeted
-   * enumeration for instant slider gray-band previews during drag.
+   * Greedy tightening only — skips `maxAchievableTargetedStat` /
+   * `maxAchievableUntargetedStat` (and bounded variants) for instant slider
+   * gray-band previews during drag.
    */
   previewOnly?: boolean;
 };

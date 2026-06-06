@@ -117,9 +117,10 @@ Search: **1** build with Boots locked; **0** with “no exotic”.
 | UI | `src/components/optimizer/stat-range-slider.tsx` | Dark band: `achievableMin`–`achievableMax`. Clamps display with `Math.max(0, achievableMin)`. Invisible when `achievableMax ≤ 0`. |
 | Hook | `src/lib/optimizer/use-stat-bounds-for-sliders.ts` | Calls `computeStatBounds`. |
 | Router | `src/lib/optimizer/bounds.ts` | If `hasStatTargets` → heuristic (always; `JOINT_BOUNDS_COMBO_LIMIT = 0`). Else independent per-slot extrema. |
-| Heuristic | `src/lib/optimizer/bounds-heuristic.ts` | Greedy five-piece + `maxFeasibleStatTarget` when filtered combo count ≤ 50k. |
+| Heuristic | `src/lib/optimizer/bounds-heuristic.ts` | Greedy five-piece + `maxAchievableTargetedStat` / `maxAchievableUntargetedStat` (bounded variants on large pools). |
 | Verified totals | `src/lib/optimizer/resolve-loadout-totals.ts` | `resolveLoadoutStatExtremum` — max/min one stat with **other** constraints only (correct semantics for untargeted stats). |
-| Feasibility cap | `src/lib/optimizer/combo-count.ts` | `maxFeasibleStatTarget` — binary search highest **min target** on focus stat that still has ≥1 verified loadout. |
+| Achievable max | `src/lib/optimizer/combo-count.ts` | `maxAchievable*Stat` — highest verified **total** on focus stat under current constraints (gray-band max). |
+| Slider-min search | `src/lib/optimizer/combo-count.ts` | `maxFeasibleStatTarget` — binary search highest **min target** (diagnostics/tests only; **not** used for gray-band max). |
 | View | `src/components/dashboard/loadout-optimizer-view.tsx` | Passes pool, constraints, set bonuses, assumed mods, exotic lock. |
 
 **Constants:** `src/lib/optimizer/constants.ts` — `JOINT_BOUNDS_COMBO_LIMIT = 0` (joint enumeration disabled on hot path).
@@ -158,7 +159,7 @@ Search: **1** build with Boots locked; **0** with “no exotic”.
 | Melee   | -20–**5**            | **25**            |
 | Class   | 0–**5**              | **25**            |
 
-**Hypothesis (primary):** `maxFeasibleStatTarget` is invoked for **every** stat when `othersActive.length > 0`, including **untargeted** stats. It uses `constraintsWithStatMin`, which sets the focus stat’s `min` to the search value — making that stat **active** (`min > 0`) during mod allocation in `resolveLoadoutTotals`. That steals mod budget and answers the wrong question.
+**Historical hypothesis (fixed in `bounds-heuristic.ts`):** `maxFeasibleStatTarget` was invoked for **untargeted** stats. It uses `constraintsWithStatMin`, which activates the focus stat during mod allocation — wrong semantics for gray-band max. Current code uses `maxAchievableUntargetedStat` / `maxAchievableTargetedStat` instead; `maxFeasibleStatTarget` remains for slider-min binary search (tests/diagnostics only).
 
 - **Correct question for untargeted stat gray max:** “What is the highest value this stat can take in a verified loadout that meets **other** active targets, **without** allocating assumed mods to this stat?”
 - **That API already exists:** `resolveLoadoutStatExtremum(..., otherConstraints, ..., focusStat, "max")` and joint enumeration in `bounds-joint.ts` (disabled on hot path).

@@ -17,7 +17,7 @@ import {
   investmentStatsToStatTotals,
   mergeExoticStatTotals,
 } from "@/lib/manifest/exotic-stat-budget";
-import { parseSubclassKeyFromPlugCategory } from "@/lib/optimizer/subclass-key";
+import { djb2, derivePlugLookups } from "@/lib/manifest/derive-plug-lookups";
 
 export interface DeriveInputs {
   version: string;
@@ -117,45 +117,6 @@ function itemHasArmor30SocketCategories(
   return hasArchetype && hasTuning;
 }
 
-/**
- * Choosable armor stat mods (general minor/major + artifice +3). Masterwork is
- * excluded — base stats should keep masterwork baked in (matches D2AP/DIM).
- *
- * Discovered via scripts/tmp-discover-stat-mod-plugs.ts (public manifest A0).
- */
-const STAT_MOD_PLUG_CATEGORY_IDS = new Set([
-  "enhancements.v2_general",
-  "enhancements.artifice",
-]);
-
-function categorizePlug(
-  plug: ManifestInventoryItemDefinition,
-): "archetype" | "tuning" | "stat" | "statmod" | null {
-  const id = plug.plug?.plugCategoryIdentifier?.toLowerCase() ?? "";
-  if (!id) return null;
-  if (id.includes("masterwork")) return null;
-  if (id.includes("archetype")) return "archetype";
-  if (id.includes("tuning") || id.includes("tertiary")) return "tuning";
-  // Be permissive for stat plugs: match exact "armor_stats" and any namespaced
-  // form (e.g. "enhancements.armor_stats"). Fall back to investment-stat shape
-  // if the identifier is missing entirely.
-  if (id.includes("armor_stats")) return "stat";
-  const rawId = plug.plug?.plugCategoryIdentifier ?? "";
-  if (STAT_MOD_PLUG_CATEGORY_IDS.has(rawId)) return "statmod";
-  return null;
-}
-
-/** Subclass fragment plugs (aspects use different categories — excluded here). */
-function isSubclassFragmentPlug(item: ManifestInventoryItemDefinition): boolean {
-  const id = item.plug?.plugCategoryIdentifier?.toLowerCase() ?? "";
-  if (!id) return false;
-  return (
-    id.includes(".fragments") ||
-    id.endsWith("fragments") ||
-    id.includes(".trinkets")
-  );
-}
-
 // Build a stat-hash -> canonical ArmorStatName map from DestinyStatDefinition.
 // Multiple stat hashes may resolve to the same name (the manifest has dupes
 // for "Class" and "Melee") — we accept all of them since we only care about
@@ -227,49 +188,6 @@ function buildArmorStatIcons(
   }));
 }
 
-// Archetype plug descriptions look like:
-//   "Armor configured for ... | | Primary Stat: Weapons | Secondary Stat: Grenade"
-// We pull out the two stat names so we know which 4 stats are valid tertiary
-// rolls for that archetype.
-const ARCHETYPE_DESC_RE = /Primary Stat:\s*([A-Za-z]+)[\s\S]*?Secondary Stat:\s*([A-Za-z]+)/i;
-
-function parseArchetypePair(
-  description: string | undefined,
-): { primary: ArmorStatName; secondary: ArmorStatName } | null {
-  if (!description) return null;
-  const m = ARCHETYPE_DESC_RE.exec(description);
-  if (!m) return null;
-  const allowed = new Set<string>(ARMOR_STAT_NAMES);
-  if (!allowed.has(m[1]) || !allowed.has(m[2])) return null;
-  return { primary: m[1] as ArmorStatName, secondary: m[2] as ArmorStatName };
-}
-
-// Extract the positive stat from a tuning name, e.g.
-//   "+Weapons / -Health"        -> "Weapons"
-//   "+Class / -Super"           -> "Class"
-//   "Balanced Tuning"           -> null
-//   "Empty Tuning Mod Socket"   -> null
-//
-// We deliberately ignore the negative side of the tuning. From a tracker
-// perspective, a "+Weapons" view should match a piece with any "+Weapons / -X"
-// roll — collapsing 30 paired tunings down to 6 positive-stat groups.
-const POSITIVE_STAT_RE = /^\+(\w+)/;
-
-function extractPositiveStat(name: string | undefined): string | null {
-  if (!name) return null;
-  const m = POSITIVE_STAT_RE.exec(name.trim());
-  if (!m) return null;
-  return m[1];
-}
-
-function djb2(str: string): number {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash + str.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-}
-
 function stripSlotSuffix(name: string, slot: ArmorSlot): string {
   const config = SLOT_SUFFIX_PATTERNS.find((s) => s.slot === slot);
   if (!config) return name;
@@ -304,121 +222,17 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
   const statNameByHash = buildStatNameByHash(stats);
   const armorStatIcons = buildArmorStatIcons(stats, statNameByHash);
 
-  const archetypes = new Map<number, string>();
-  const archetypeStatPairs = new Map<
-    number,
-    { primary: ArmorStatName; secondary: ArmorStatName }
-  >();
-  // Tunings are bucketed by positive stat (Weapons, Health, Grenade, Melee,
-  // Class, Super). Each bucket gets a synthetic hash via djb2 of the stat name
-  // so it fits the bigint primary-key schema.
-  const tuningBucketByStat = new Map<string, { hash: number; name: string }>();
-  const plugToArchetype = new Map<number, number>();
-  const plugToTuning = new Map<number, number>();
-  const tuningPlugStats = new Map<
-    number,
-    Array<{ stat: ArmorStatName; value: number }>
-  >();
-  const statModPlugStats = new Map<
-    number,
-    Array<{ stat: ArmorStatName; value: number }>
-  >();
-  // armor_stats plug -> (stat name, magnitude). The manifest has 180 of these
-  // (6 stats x 30 magnitudes). We use them at inventory time to label each
-  // piece's primary/secondary/tertiary stat by ranking the 3 plugs by magnitude.
-  const statPlugs = new Map<number, { stat: ArmorStatName; value: number }>();
-  const subclassFragmentPlugs = new Map<
-    number,
-    {
-      name: string;
-      icon_path: string;
-      subclass_key: string;
-      deltas: Array<{ stat: ArmorStatName; value: number }>;
-    }
-  >();
-
-  for (const item of Object.values(items)) {
-    if (item.redacted || item.blacklisted) continue;
-    const category = categorizePlug(item);
-    if (!category) continue;
-    const name = item.displayProperties?.name;
-    if (category === "archetype") {
-      if (!name) continue;
-      archetypes.set(item.hash, name);
-      plugToArchetype.set(item.hash, item.hash);
-      const pair = parseArchetypePair(item.displayProperties?.description);
-      if (pair) archetypeStatPairs.set(item.hash, pair);
-      continue;
-    }
-    if (category === "stat") {
-      // armor_stats plugs are intrinsic/hidden and have no displayProperties.name —
-      // we identify them by plugCategoryIdentifier + a positive investmentStat.
-      const inv = item.investmentStats?.find(
-        (s) => !s.isConditionallyActive && (s.value ?? 0) > 0,
-      );
-      if (!inv) continue;
-      const statName = statNameByHash.get(inv.statTypeHash);
-      if (!statName) continue;
-      statPlugs.set(item.hash, { stat: statName, value: inv.value });
-      continue;
-    }
-    if (category === "statmod") {
-      const deltas: Array<{ stat: ArmorStatName; value: number }> = [];
-      for (const inv of item.investmentStats ?? []) {
-        if (inv.isConditionallyActive) continue;
-        const statName = statNameByHash.get(inv.statTypeHash);
-        if (!statName || (inv.value ?? 0) <= 0) continue;
-        deltas.push({ stat: statName, value: inv.value });
-      }
-      if (deltas.length > 0) {
-        statModPlugStats.set(item.hash, deltas);
-      }
-      continue;
-    }
-    if (!name) continue;
-    const positive = extractPositiveStat(name);
-    if (!positive) continue; // skip "Balanced Tuning", "Empty Tuning Mod Socket", etc.
-    let bucket = tuningBucketByStat.get(positive);
-    if (!bucket) {
-      bucket = { hash: djb2(`tuning:${positive}`), name: `+${positive}` };
-      tuningBucketByStat.set(positive, bucket);
-    }
-    plugToTuning.set(item.hash, bucket.hash);
-    const deltas: Array<{ stat: ArmorStatName; value: number }> = [];
-    for (const inv of item.investmentStats ?? []) {
-      if (inv.isConditionallyActive) continue;
-      const statName = statNameByHash.get(inv.statTypeHash);
-      if (!statName || inv.value === 0) continue;
-      deltas.push({ stat: statName, value: inv.value });
-    }
-    if (deltas.length > 0) {
-      tuningPlugStats.set(item.hash, deltas);
-    }
-  }
-
-  for (const item of Object.values(items)) {
-    if (item.redacted || item.blacklisted) continue;
-    if (!isSubclassFragmentPlug(item)) continue;
-    const name = item.displayProperties?.name?.trim();
-    if (!name) continue;
-    const deltas: Array<{ stat: ArmorStatName; value: number }> = [];
-    for (const inv of item.investmentStats ?? []) {
-      const statName = statNameByHash.get(inv.statTypeHash);
-      if (!statName || inv.value === 0) continue;
-      // Fragment armor-stat bonuses are often isConditionallyActive in the manifest
-      // even though they always apply when the fragment is slotted (DIM treats them as active).
-      deltas.push({ stat: statName, value: inv.value });
-    }
-    if (deltas.length === 0) continue;
-    subclassFragmentPlugs.set(item.hash, {
-      name,
-      icon_path: pickStatIconPath(item.displayProperties),
-      subclass_key: parseSubclassKeyFromPlugCategory(
-        item.plug?.plugCategoryIdentifier ?? "",
-      ),
-      deltas,
-    });
-  }
+  const {
+    archetypes,
+    archetypeStatPairs,
+    tuningBucketByStat,
+    plugToArchetype,
+    plugToTuning,
+    tuningPlugStats,
+    statModPlugStats,
+    statPlugs,
+    subclassFragmentPlugs,
+  } = derivePlugLookups(items, statNameByHash);
 
   // Group armor by manifest equipable set hash (avoids merging unrelated rows that share a display name).
   const armorSetByEqHash = new Map<

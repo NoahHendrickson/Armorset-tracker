@@ -11,7 +11,8 @@ export const SYNC_UI_ENUMERATION_COMBO_LIMIT = 2_000;
 export const SEARCH_AUTO_RUN_COMBO_LIMIT = 50_000;
 
 /**
- * Max DFS node visits per feasibility probe inside `maxFeasibleStatTarget`.
+ * Max DFS node visits per feasibility probe inside `maxFeasibleStatTarget`
+ * (slider-min binary search — not gray-band max computation).
  * Proves "no match" without scanning the full combinatorial space on large vaults.
  */
 export const FEASIBILITY_PROBE_VISIT_CAP = 5_000;

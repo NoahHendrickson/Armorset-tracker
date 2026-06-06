@@ -79,6 +79,36 @@ export function resolveExoticStatTotals(
   return plugDerivedTotals;
 }
 
+/**
+ * Exotic optimizer base stats: strip slotted general/artifice mods from ItemStats
+ * (304), then merge plug-derived totals so plug Weapons is preserved when 304
+ * is inflated. Falls back to plug-derived totals when 304 is absent.
+ */
+export function resolveExoticBaseStatsForOptimizer(
+  itemInstanceId: string,
+  profile: ProfileResponse,
+  plugDerivedTotals: Partial<Record<ArmorStatName, number>>,
+  sockets: Array<{ plugHash?: number }>,
+  destinyStatHashToArmorStat: Map<number, ArmorStatName>,
+  statModPlugStats: Map<number, Array<{ stat: ArmorStatName; value: number }>>,
+): Partial<Record<ArmorStatName, number>> {
+  const fromInstance = instanceArmorStatTotals(
+    itemInstanceId,
+    profile,
+    destinyStatHashToArmorStat,
+  );
+  if (!fromInstance || Object.keys(fromInstance).length === 0) {
+    return plugDerivedTotals;
+  }
+
+  const stripped = stripSlottedStatMods(
+    fromInstance,
+    sockets,
+    statModPlugStats,
+  );
+  return mergeExoticInstanceStatTotals(plugDerivedTotals, stripped);
+}
+
 /** Subtract slotted general / artifice stat mods from ItemStats (304) totals. */
 export function stripSlottedStatMods(
   totals: Partial<Record<ArmorStatName, number>>,
