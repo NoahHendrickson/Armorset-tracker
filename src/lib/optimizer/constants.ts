@@ -16,6 +16,9 @@ export const SEARCH_AUTO_RUN_COMBO_LIMIT = 50_000;
  */
 export const FEASIBILITY_PROBE_VISIT_CAP = 5_000;
 
+/** Accepted leaves per focused worker gray-band pass on large vaults. */
+export const BOUNDS_WORKER_UNTARGETED_LEAF_CAP = 8_000;
+
 /** Shard the longest armor slot across workers when deduped combos exceed this. */
 export const SEARCH_SHARD_MIN_COMBO = 20_000;
 

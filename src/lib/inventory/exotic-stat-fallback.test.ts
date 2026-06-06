@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import {
   enrichPieceWithExoticBudget,
-  EMPTY_EXOTIC_STAT_BUDGET,
   resolveExoticManifestBudget,
   type ExoticStatBudgetLookup,
 } from "@/lib/inventory/exotic-stat-fallback";
@@ -63,51 +62,30 @@ describe("exotic stat fallback", () => {
     expect(enriched.primaryStat).toBe("Weapons");
   });
 
-  it("clamps inflated non-Weapons stats to manifest budget", () => {
+  it("never lowers real instance stats to the manifest budget", () => {
     const enriched = enrichPieceWithExoticBudget(
       exoticPiece({
         itemHash: 200,
         statTotals: {
           Weapons: 25,
           Health: 8,
-          Grenade: 12,
+          Grenade: 4,
           Super: 31,
           Class: 4,
           Melee: 4,
         },
       }),
       {
+        // Garbage low-roll budget — must not pull the real roll down.
         byItemHash: {
-          "200": {
-            Weapons: 30,
-            Health: 8,
-            Grenade: 4,
-            Super: 31,
-            Class: 4,
-            Melee: 4,
-          },
+          "200": { Weapons: 5, Health: 5, Grenade: 5, Super: 5, Class: 5, Melee: 5 },
         },
         byIdentity: {},
       },
     );
-    expect(enriched.statTotals?.Grenade).toBe(4);
+    expect(enriched.statTotals?.Super).toBe(31);
+    expect(enriched.statTotals?.Health).toBe(8);
     expect(enriched.statTotals?.Weapons).toBe(25);
-  });
-
-  it("caps inflated Grenade using Class/Melee peers when budget is absent", () => {
-    const enriched = enrichPieceWithExoticBudget(
-      exoticPiece({
-        statTotals: {
-          Weapons: 25,
-          Health: 8,
-          Grenade: 12,
-          Super: 31,
-          Class: 4,
-          Melee: 4,
-        },
-      }),
-      EMPTY_EXOTIC_STAT_BUDGET,
-    );
     expect(enriched.statTotals?.Grenade).toBe(4);
   });
 });

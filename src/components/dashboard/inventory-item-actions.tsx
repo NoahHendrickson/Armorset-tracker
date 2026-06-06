@@ -4,10 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import {
-  BUNGIE_REAUTH_REQUIRED_CODE,
-  BUNGIE_RECONNECT_PATH,
-} from "@/lib/auth/bungie-reauth";
+import { BUNGIE_REAUTH_REQUIRED_CODE } from "@/lib/auth/bungie-reauth";
+import { showBungieReconnectToast } from "@/lib/auth/show-bungie-reconnect-toast";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import {
   equipDisabledMessage,
@@ -55,14 +53,7 @@ async function postInventoryAction(
   const data = (await res.json()) as InventoryItemActionResponse;
   if (!res.ok) {
     if (data.code === BUNGIE_REAUTH_REQUIRED_CODE) {
-      toast.error(data.error ?? "Reconnect Bungie", {
-        action: {
-          label: "Sign in",
-          onClick: () => {
-            window.location.href = BUNGIE_RECONNECT_PATH;
-          },
-        },
-      });
+      showBungieReconnectToast(data.error, undefined, "Sign in");
       return data;
     }
     if (data.partial) {

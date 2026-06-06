@@ -117,15 +117,31 @@ function itemHasArmor30SocketCategories(
   return hasArchetype && hasTuning;
 }
 
-function categorizePlug(plug: ManifestInventoryItemDefinition): "archetype" | "tuning" | "stat" | null {
+/**
+ * Choosable armor stat mods (general minor/major + artifice +3). Masterwork is
+ * excluded — base stats should keep masterwork baked in (matches D2AP/DIM).
+ *
+ * Discovered via scripts/tmp-discover-stat-mod-plugs.ts (public manifest A0).
+ */
+const STAT_MOD_PLUG_CATEGORY_IDS = new Set([
+  "enhancements.v2_general",
+  "enhancements.artifice",
+]);
+
+function categorizePlug(
+  plug: ManifestInventoryItemDefinition,
+): "archetype" | "tuning" | "stat" | "statmod" | null {
   const id = plug.plug?.plugCategoryIdentifier?.toLowerCase() ?? "";
   if (!id) return null;
+  if (id.includes("masterwork")) return null;
   if (id.includes("archetype")) return "archetype";
   if (id.includes("tuning") || id.includes("tertiary")) return "tuning";
   // Be permissive for stat plugs: match exact "armor_stats" and any namespaced
   // form (e.g. "enhancements.armor_stats"). Fall back to investment-stat shape
   // if the identifier is missing entirely.
   if (id.includes("armor_stats")) return "stat";
+  const rawId = plug.plug?.plugCategoryIdentifier ?? "";
+  if (STAT_MOD_PLUG_CATEGORY_IDS.has(rawId)) return "statmod";
   return null;
 }
 
@@ -303,6 +319,10 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
     number,
     Array<{ stat: ArmorStatName; value: number }>
   >();
+  const statModPlugStats = new Map<
+    number,
+    Array<{ stat: ArmorStatName; value: number }>
+  >();
   // armor_stats plug -> (stat name, magnitude). The manifest has 180 of these
   // (6 stats x 30 magnitudes). We use them at inventory time to label each
   // piece's primary/secondary/tertiary stat by ranking the 3 plugs by magnitude.
@@ -340,6 +360,19 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
       const statName = statNameByHash.get(inv.statTypeHash);
       if (!statName) continue;
       statPlugs.set(item.hash, { stat: statName, value: inv.value });
+      continue;
+    }
+    if (category === "statmod") {
+      const deltas: Array<{ stat: ArmorStatName; value: number }> = [];
+      for (const inv of item.investmentStats ?? []) {
+        if (inv.isConditionallyActive) continue;
+        const statName = statNameByHash.get(inv.statTypeHash);
+        if (!statName || (inv.value ?? 0) <= 0) continue;
+        deltas.push({ stat: statName, value: inv.value });
+      }
+      if (deltas.length > 0) {
+        statModPlugStats.set(item.hash, deltas);
+      }
       continue;
     }
     if (!name) continue;
@@ -600,6 +633,10 @@ export function deriveManifestData(inputs: DeriveInputs): DerivedManifestData {
       value,
     })),
     tuningPlugStats: [...tuningPlugStats.entries()].flatMap(
+      ([plug_hash, deltas]) =>
+        deltas.map(({ stat, value }) => ({ plug_hash, stat, value })),
+    ),
+    statModPlugStats: [...statModPlugStats.entries()].flatMap(
       ([plug_hash, deltas]) =>
         deltas.map(({ stat, value }) => ({ plug_hash, stat, value })),
     ),

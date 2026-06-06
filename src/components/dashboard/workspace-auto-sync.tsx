@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   BUNGIE_REAUTH_REQUIRED_CODE,
-  BUNGIE_RECONNECT_PATH,
   BUNGIE_REAUTH_USER_MESSAGE,
 } from "@/lib/auth/bungie-reauth";
+import { showBungieReconnectToast } from "@/lib/auth/show-bungie-reconnect-toast";
 import {
   inventoryCacheNeedsSync,
   inventoryMsUntilResync,
@@ -62,6 +62,7 @@ export function WorkspaceAutoSync() {
   } = useWorkspaceSync();
 
   const inFlightRef = useRef(false);
+  const reauthBlockedRef = useRef(false);
   const generationRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestSyncedAtRef = useRef(health.inventorySyncedAt);
@@ -74,16 +75,9 @@ export function WorkspaceAutoSync() {
 
   const handleReauth = useCallback(
     (message: string, reconnectPath?: string) => {
+      reauthBlockedRef.current = true;
       setReauthMessage(message);
-      toast.error(message, {
-        duration: 22_000,
-        action: {
-          label: "Reconnect Bungie",
-          onClick: () => {
-            window.location.href = reconnectPath ?? BUNGIE_RECONNECT_PATH;
-          },
-        },
-      });
+      showBungieReconnectToast(message, reconnectPath);
     },
     [setReauthMessage],
   );
@@ -212,12 +206,21 @@ export function WorkspaceAutoSync() {
   );
 
   const runPipeline = useCallback(
-    async (opts?: { forceManifest?: boolean; forceInventory?: boolean }) => {
+    async (opts?: {
+      forceManifest?: boolean;
+      forceInventory?: boolean;
+      /** User-initiated retry after reconnect or from the sync gate. */
+      ignoreReauthBlock?: boolean;
+    }) => {
       if (inFlightRef.current) return;
+      if (reauthBlockedRef.current && !opts?.ignoreReauthBlock) return;
       const gen = ++generationRef.current;
       inFlightRef.current = true;
       try {
-        setReauthMessage(null);
+        if (opts?.ignoreReauthBlock) {
+          reauthBlockedRef.current = false;
+          setReauthMessage(null);
+        }
 
         const needsManifest =
           health.manifestNeedsSync || opts?.forceManifest === true;
@@ -268,7 +271,11 @@ export function WorkspaceAutoSync() {
 
   useEffect(() => {
     registerRetry(() => {
-      void runPipeline({ forceManifest: true, forceInventory: true });
+      void runPipeline({
+        forceManifest: true,
+        forceInventory: true,
+        ignoreReauthBlock: true,
+      });
     });
     return () => registerRetry(null);
   }, [registerRetry, runPipeline]);

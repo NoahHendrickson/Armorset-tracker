@@ -29,7 +29,7 @@ export function userBuildPool(): DerivedArmorPieceJson[] {
     tuningHash: 1,
     tuningName: "+Weapons",
     tuningCommitted: true,
-    tier: 5 as const,
+    tier: null,
     location: { kind: "vault" as const },
   };
 
@@ -136,7 +136,7 @@ export function vaultFillerPieces(): DerivedArmorPieceJson[] {
     tuningHash: 1,
     tuningName: "+Weapons",
     tuningCommitted: true,
-    tier: 5 as const,
+    tier: null,
     location: { kind: "vault" as const },
   };
 

@@ -4,6 +4,7 @@ import {
   instanceArmorStatTotals,
   mergeExoticInstanceStatTotals,
   resolveExoticStatTotals,
+  stripSlottedStatMods,
 } from "@/lib/inventory/instance-armor-stats";
 import type { ProfileResponse } from "@/lib/bungie/types";
 
@@ -158,5 +159,43 @@ describe("instanceArmorStatTotals", () => {
     expect(
       resolveExoticStatTotals(false, "leg", {} as ProfileResponse, plug, new Map()),
     ).toEqual(plug);
+  });
+});
+
+describe("stripSlottedStatMods", () => {
+  const statModPlugStats = new Map([
+    [4_021_790_309, [{ stat: "Grenade" as const, value: 5 }]],
+    [617_569_843, [{ stat: "Grenade" as const, value: 3 }]],
+    [1_703_647_492, [{ stat: "Weapons" as const, value: 5 }]],
+  ]);
+
+  it("subtracts slotted mods from modded totals", () => {
+    expect(
+      stripSlottedStatMods(
+        { Weapons: 25, Grenade: 12 },
+        [{ plugHash: 4_021_790_309 }, { plugHash: 617_569_843 }],
+        statModPlugStats,
+      ),
+    ).toEqual({ Weapons: 25, Grenade: 4 });
+  });
+
+  it("floors stripped stats at zero", () => {
+    expect(
+      stripSlottedStatMods(
+        { Grenade: 2 },
+        [{ plugHash: 4_021_790_309 }],
+        statModPlugStats,
+      ),
+    ).toEqual({ Grenade: 0 });
+  });
+
+  it("leaves unmodded stats unchanged", () => {
+    expect(
+      stripSlottedStatMods(
+        { Weapons: 25, Super: 31 },
+        [{ plugHash: 4_021_790_309 }],
+        statModPlugStats,
+      ),
+    ).toEqual({ Weapons: 25, Super: 31, Grenade: 0 });
   });
 });

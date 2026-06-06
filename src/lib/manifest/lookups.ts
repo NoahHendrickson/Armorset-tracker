@@ -44,6 +44,8 @@ export interface ManifestLookups {
   statPlug: Map<number, { stat: ArmorStatName; value: number }>;
   /** Tuning plug hash → stat deltas (+/-) from manifest investmentStats. */
   tuningPlugStats: Map<number, Array<{ stat: ArmorStatName; value: number }>>;
+  /** General / artifice armor stat-mod plug hash → +3/+5/+10 contributions. */
+  statModPlugStats: Map<number, Array<{ stat: ArmorStatName; value: number }>>;
   /** Subclass fragment plug hash → display + armor stat deltas. */
   fragmentPlugByHash: Map<
     number,
@@ -305,6 +307,7 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
     archetypeStatPairs,
     armorStatPlugs,
     tuningPlugStatRows,
+    statModPlugStatRows,
     subclassFragmentPlugs,
     subclassFragmentPlugStatRows,
     armorStatIcons,
@@ -361,6 +364,9 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
     ),
     paginatedSelect<{ plug_hash: number | string; stat: ArmorStatName; value: number }>(
       () => sb.from("tuning_plug_stats").select("plug_hash, stat, value"),
+    ),
+    paginatedSelect<{ plug_hash: number | string; stat: ArmorStatName; value: number }>(
+      () => sb.from("armor_stat_mod_plugs").select("plug_hash, stat, value"),
     ),
     paginatedSelectOptional<{
       plug_hash: number | string;
@@ -540,6 +546,19 @@ export async function getManifestLookups(force = false): Promise<ManifestLookups
         Array<{ stat: ArmorStatName; value: number }>
       >();
       for (const r of tuningPlugStatRows) {
+        const plugHash = Number(r.plug_hash);
+        const list = map.get(plugHash) ?? [];
+        list.push({ stat: r.stat, value: r.value });
+        map.set(plugHash, list);
+      }
+      return map;
+    })(),
+    statModPlugStats: (() => {
+      const map = new Map<
+        number,
+        Array<{ stat: ArmorStatName; value: number }>
+      >();
+      for (const r of statModPlugStatRows) {
         const plugHash = Number(r.plug_hash);
         const list = map.get(plugHash) ?? [];
         list.push({ stat: r.stat, value: r.value });

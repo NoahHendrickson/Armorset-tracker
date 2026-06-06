@@ -39,7 +39,6 @@ export type UseOptimizerComboEstimatesResult = {
   searchComboCount: number;
   searchComboCapped: boolean;
   hasSearchFilters: boolean;
-  searchTooLarge: boolean;
   exoticAnyFeasible: boolean;
 };
 
@@ -179,7 +178,6 @@ export function useOptimizerComboEstimates({
     searchComboCount,
     searchComboCapped,
     hasSearchFilters,
-    searchTooLarge,
     exoticAnyFeasible,
   };
 }

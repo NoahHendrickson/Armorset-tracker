@@ -20,8 +20,11 @@ import {
   tuningDeltasFromDisplayName,
 } from "@/lib/inventory/compute-stat-totals";
 import { buildPieceDisplayAndTuning } from "@/lib/inventory/armor-tuning-stats";
-import { clampExoticStatTotalsToBudget, capInflatedExoticGrenade } from "@/lib/inventory/exotic-stat-fallback";
-import { resolveExoticStatTotals } from "@/lib/inventory/instance-armor-stats";
+import {
+  instanceArmorStatTotals,
+  resolveExoticStatTotals,
+  stripSlottedStatMods,
+} from "@/lib/inventory/instance-armor-stats";
 import { exoticPieceIdentityKey } from "@/lib/optimizer/exotic-lock";
 
 interface ItemEntry {
@@ -259,35 +262,20 @@ export function deriveArmorPiece(
   );
 
   if (isExotic) {
-    const manifestBudget =
-      lookups.exoticStatBudgetByItemHash.get(item.itemHash) ??
-      lookups.exoticStatBudgetByIdentity.get(
-        exoticPieceIdentityKey({
-          itemInstanceId: item.itemInstanceId,
-          itemHash: item.itemHash,
-          slot,
-          classType,
-          setHash: null,
-          setName: null,
-          displayName,
-          isExotic: true,
-          archetypeHash,
-          archetypeName,
-          tuningHash,
-          tuningName,
-          primaryStat: null,
-          secondaryStat: null,
-          tertiaryStat: null,
-          location,
-        }),
-      );
-    if (manifestBudget) {
-      statTotals = capInflatedExoticGrenade(
-        clampExoticStatTotalsToBudget(statTotals, manifestBudget),
-      );
-    } else {
-      statTotals = capInflatedExoticGrenade(statTotals);
-    }
+    const fromInstance = instanceArmorStatTotals(
+      item.itemInstanceId,
+      profile,
+      lookups.destinyStatHashToArmorStat,
+    );
+    const stripBase =
+      fromInstance && Object.keys(fromInstance).length > 0
+        ? fromInstance
+        : statTotals;
+    statTotals = stripSlottedStatMods(
+      stripBase,
+      sockets,
+      lookups.statModPlugStats,
+    );
   }
 
   const uniqueVariantPlugHashes = [

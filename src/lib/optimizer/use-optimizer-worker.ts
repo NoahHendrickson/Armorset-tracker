@@ -56,6 +56,7 @@ function requestCacheKey(payload: OptimizerRequest): string {
 export function useOptimizerWorker() {
   const runIdRef = useRef(0);
   const workerRefs = useRef<Worker[]>([]);
+  const prewarmedRef = useRef<Worker | null>(null);
   const workerBrokenRef = useRef(false);
   const lastCompletedKeyRef = useRef<string | null>(null);
   const [state, setState] = useState<OptimizerWorkerState>(INITIAL_STATE);
@@ -80,11 +81,43 @@ export function useOptimizerWorker() {
     workerRefs.current = [];
   }, []);
 
+  const terminatePrewarmed = useCallback(() => {
+    if (prewarmedRef.current) {
+      prewarmedRef.current.terminate();
+      prewarmedRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Eagerly spins up an idle search worker (without running anything) so the
+   * first real search has no module cold-start. Idempotent, and a no-op while a
+   * run is already active or when workers are unavailable. The next single
+   * search adopts this worker (see `adoptOrCreateWorker`).
+   */
+  const prewarm = useCallback(() => {
+    if (prewarmedRef.current || workerRefs.current.length > 0) return;
+    const worker = createWorker();
+    if (worker) {
+      prewarmedRef.current = worker;
+    }
+  }, [createWorker]);
+
+  /** Hands off a pre-warmed worker if one is idle, otherwise creates a fresh one. */
+  const adoptOrCreateWorker = useCallback((): Worker | null => {
+    const prewarmed = prewarmedRef.current;
+    if (prewarmed) {
+      prewarmedRef.current = null;
+      return prewarmed;
+    }
+    return createWorker();
+  }, [createWorker]);
+
   useEffect(() => {
     return () => {
       terminateWorkers();
+      terminatePrewarmed();
     };
-  }, [terminateWorkers]);
+  }, [terminateWorkers, terminatePrewarmed]);
 
   const cancel = useCallback(() => {
     runIdRef.current += 1;
@@ -131,7 +164,7 @@ export function useOptimizerWorker() {
 
   const runSingleWorker = useCallback(
     (payload: OptimizerRequest, runId: number) => {
-      const worker = createWorker();
+      const worker = adoptOrCreateWorker();
       if (!worker) {
         runOnMainThread(payload, runId);
         return;
@@ -180,7 +213,7 @@ export function useOptimizerWorker() {
 
       worker.postMessage({ type: "run", id: String(runId), payload });
     },
-    [createWorker, runOnMainThread, terminateWorkers],
+    [adoptOrCreateWorker, runOnMainThread, terminateWorkers],
   );
 
   const runShardedWorkers = useCallback(
@@ -310,5 +343,5 @@ export function useOptimizerWorker() {
     [runShardedWorkers, runSingleWorker, terminateWorkers],
   );
 
-  return { state, run, cancel };
+  return { state, run, cancel, prewarm };
 }

@@ -8,3 +8,6 @@ export const BUNGIE_RECONNECT_PATH = "/api/auth/bungie/login" as const;
 
 export const BUNGIE_REAUTH_USER_MESSAGE =
   "Your Bungie link expired — reconnect to refresh your inventory.";
+
+/** Stable Sonner id so parallel sync failures surface one reconnect toast. */
+export const BUNGIE_REAUTH_TOAST_ID = "bungie-reauth-required" as const;

@@ -78,3 +78,21 @@ export function resolveExoticStatTotals(
   }
   return plugDerivedTotals;
 }
+
+/** Subtract slotted general / artifice stat mods from ItemStats (304) totals. */
+export function stripSlottedStatMods(
+  totals: Partial<Record<ArmorStatName, number>>,
+  sockets: Array<{ plugHash?: number }>,
+  statModPlugStats: Map<number, Array<{ stat: ArmorStatName; value: number }>>,
+): Partial<Record<ArmorStatName, number>> {
+  const out = { ...totals };
+  for (const socket of sockets) {
+    if (!socket.plugHash) continue;
+    const deltas = statModPlugStats.get(socket.plugHash);
+    if (!deltas) continue;
+    for (const { stat, value } of deltas) {
+      out[stat] = Math.max(0, (out[stat] ?? 0) - value);
+    }
+  }
+  return out;
+}

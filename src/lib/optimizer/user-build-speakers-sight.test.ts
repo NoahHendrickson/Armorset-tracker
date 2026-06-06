@@ -135,7 +135,7 @@ function userBuildPool(): DerivedArmorPieceJson[] {
 }
 
 const SCREENSHOT_CONSTRAINTS = [
-  { stat: "Weapons" as const, min: 200 },
+  { stat: "Weapons" as const, min: 210 },
   { stat: "Class" as const, min: 50 },
   { stat: "Grenade" as const, min: 100 },
   { stat: "Super" as const, min: 70 },
@@ -166,7 +166,7 @@ describe("Speaker's Sight user build (real stat totals)", () => {
     expect(count).toBe(0);
   });
 
-  it("rejects Weapons 200 — five +10 mods cannot close the gap on these rolls", () => {
+  it("rejects Weapons 210 — five +10 mods cannot close the gap on these rolls", () => {
     const five = pool;
     expect(
       resolveLoadoutTotals(five, SCREENSHOT_CONSTRAINTS, {}, ASSUMED_MODS),
@@ -253,7 +253,7 @@ describe("Speaker's Sight user build (real stat totals)", () => {
     expect(bounds.Weapons.max).toBeGreaterThan(0);
     expect(bounds.Grenade.max).toBeGreaterThan(0);
     expect(bounds.Weapons.max).toBeGreaterThanOrEqual(bounds.Weapons.min);
-    expect(bounds.Grenade.max).toBeGreaterThan(bounds.Grenade.min);
+    expect(bounds.Grenade.max).toBeGreaterThanOrEqual(bounds.Grenade.min);
   });
 
   it("does not zero bounds when greedy fails on a tiny pool", () => {

@@ -5,6 +5,7 @@ import {
   type DerivedArmorPieceJson,
 } from "@/lib/db/types";
 import { dedupeSlotPieces } from "@/lib/optimizer/dedupe";
+import { getPieceStatCeiling } from "@/lib/inventory/compute-stat-totals";
 import { enumerateLoadouts } from "@/lib/optimizer/enumeration/enumerate-loadouts";
 import {
   groupPoolBySlot,
@@ -13,6 +14,7 @@ import { prepareDedupedSlotPool } from "@/lib/optimizer/enumeration/prepare-slot
 import {
   hasStatTargets,
   otherActiveStatConstraints,
+  partialCanReachMins,
   totalsFromPieces,
 } from "@/lib/optimizer/constraints";
 import {
@@ -22,6 +24,7 @@ import {
 } from "@/lib/optimizer/exotic-lock";
 import { addStatOffsets } from "@/lib/optimizer/fragment-offset";
 import {
+  BOUNDS_WORKER_UNTARGETED_LEAF_CAP,
   FEASIBILITY_PROBE_VISIT_CAP,
   SYNC_UI_ENUMERATION_COMBO_LIMIT,
 } from "@/lib/optimizer/constants";
@@ -29,8 +32,12 @@ import {
   DEFAULT_ASSUMED_STAT_MODS,
   type AssumedStatMods,
 } from "@/lib/optimizer/mod-offset";
-import { resolveLoadoutStatExtremum, resolveLoadoutTotals } from "@/lib/optimizer/resolve-loadout-totals";
 import {
+  resolveLoadoutStatExtremum,
+  resolveLoadoutTotals,
+} from "@/lib/optimizer/resolve-loadout-totals";
+import {
+  partialCanSatisfySetBonuses,
   satisfiesSetBonuses,
   type SetBonusSelection,
 } from "@/lib/optimizer/set-bonus";
@@ -115,6 +122,8 @@ export type FilteredComboCountOptions = {
   setBonusSelections?: SetBonusSelection[];
   statOffset?: Partial<Record<(typeof ARMOR_STAT_NAMES)[number], number>>;
   assumedMods?: AssumedStatMods;
+  /** Prefer branches high in this stat before applying caps/visit caps. */
+  visitOrderStat?: ArmorStatName;
   /** Stop counting once this many feasible loadouts are found. */
   cap?: number;
   /** Stop after this many DFS branch visits (large-vault feasibility probes). */
@@ -151,10 +160,14 @@ export function estimateFilteredComboCount(
     };
   }
 
-  const prepared = prepareDedupedSlotPool({ pool, exoticLock });
-  if (prepared == null) {
+  const preparedRaw = prepareDedupedSlotPool({ pool, exoticLock });
+  if (preparedRaw == null) {
     return { count: 0, capped: false };
   }
+  const prepared =
+    options.visitOrderStat != null
+      ? clonePreparedWithFocusStatOrder(preparedRaw, options.visitOrderStat)
+      : preparedRaw;
 
   const verifyAtLeaves = hasStatTargets(constraints);
   const zeroTotals = totalsFromPieces([]);
@@ -216,6 +229,38 @@ function constraintsWithStatMin(
   return constraints.map((row) =>
     row.stat === focusStat ? { ...row, min: clamped } : row,
   );
+}
+
+function clonePreparedWithFocusStatOrder(
+  prepared: NonNullable<ReturnType<typeof prepareDedupedSlotPool>>,
+  focusStat: ArmorStatName,
+): NonNullable<ReturnType<typeof prepareDedupedSlotPool>> {
+  return {
+    ...prepared,
+    slotPieces: prepared.slotPieces.map((pieces) =>
+      [...pieces].sort(
+        (a, b) =>
+          getPieceStatCeiling(b, focusStat) - getPieceStatCeiling(a, focusStat),
+      ),
+    ),
+  };
+}
+
+function focusSuffixCeilings(
+  slotPieces: DerivedArmorPieceJson[][],
+  focusStat: ArmorStatName,
+): number[] {
+  const suffix = Array(slotPieces.length + 1).fill(0) as number[];
+  for (let i = slotPieces.length - 1; i >= 0; i--) {
+    const slotMax = Math.max(
+      0,
+      ...(slotPieces[i] ?? []).map((piece) =>
+        getPieceStatCeiling(piece, focusStat),
+      ),
+    );
+    suffix[i] = suffix[i + 1]! + slotMax;
+  }
+  return suffix;
 }
 
 /**
@@ -282,8 +327,71 @@ export function maxAchievableUntargetedStat(
   return best ?? OPTIMIZER_STAT_MIN;
 }
 
+/**
+ * Highest verified total on `focusStat` while satisfying the current active
+ * targets, without pretending the focus target was raised.
+ */
+export function maxAchievableTargetedStat(
+  pool: DerivedArmorPieceJson[],
+  exoticLock: ExoticLock = DEFAULT_EXOTIC_LOCK,
+  constraints: StatConstraintRow[],
+  focusStat: ArmorStatName,
+  options: StatTargetFeasibilityOptions = {},
+): number {
+  const assumedMods = options.assumedMods ?? DEFAULT_ASSUMED_STAT_MODS;
+  const setBonusSelections = options.setBonusSelections ?? [];
+  const fragmentOffset = options.statOffset ?? {};
+
+  const prepared = prepareDedupedSlotPool({ pool, exoticLock });
+  if (prepared == null) {
+    return OPTIMIZER_STAT_MIN;
+  }
+
+  const zeroTotals = totalsFromPieces([]);
+  const startTotals =
+    Object.keys(fragmentOffset).length > 0
+      ? addStatOffsets(
+          zeroTotals,
+          fragmentOffset as Record<ArmorStatName, number>,
+        )
+      : zeroTotals;
+
+  let best: number | null = null;
+  enumerateLoadouts({
+    prepared,
+    exoticLock,
+    startTotals,
+    constraints,
+    assumedMods,
+    setBonusSelections,
+    onLeaf: (chosen) => {
+      if (!satisfiesSetBonuses(chosen, setBonusSelections)) {
+        return "reject";
+      }
+      const value = resolveLoadoutStatExtremum(
+        chosen,
+        constraints,
+        fragmentOffset,
+        assumedMods,
+        focusStat,
+        "max",
+      );
+      if (value == null) {
+        return "reject";
+      }
+      if (best == null || value > best) {
+        best = value;
+      }
+      return "accept";
+    },
+  });
+
+  return best ?? OPTIMIZER_STAT_MIN;
+}
+
 /** Leaf visits when full enumeration is too large for slider gray bands. */
-export const UNTARGETED_STAT_BOUNDED_LEAF_CAP = 8_000;
+export const UNTARGETED_STAT_BOUNDED_LEAF_CAP =
+  BOUNDS_WORKER_UNTARGETED_LEAF_CAP;
 
 /**
  * Same as `maxAchievableUntargetedStat`, but caps DFS leaf visits for large
@@ -313,10 +421,11 @@ export function maxAchievableUntargetedStatBounded(
   const fragmentOffset = options.statOffset ?? {};
   const otherConstraints = otherActiveStatConstraints(constraints, focusStat);
 
-  const prepared = prepareDedupedSlotPool({ pool, exoticLock });
-  if (prepared == null) {
+  const preparedRaw = prepareDedupedSlotPool({ pool, exoticLock });
+  if (preparedRaw == null) {
     return OPTIMIZER_STAT_MIN;
   }
+  const prepared = clonePreparedWithFocusStatOrder(preparedRaw, focusStat);
 
   const zeroTotals = totalsFromPieces([]);
   const startTotals =
@@ -329,13 +438,38 @@ export function maxAchievableUntargetedStatBounded(
 
   let best: number | null = null;
   let leaves = 0;
+  const suffixCeilings = focusSuffixCeilings(prepared.slotPieces, focusStat);
   enumerateLoadouts({
     prepared,
     exoticLock,
     startTotals,
-    constraints,
+    constraints: otherConstraints,
     assumedMods,
     setBonusSelections,
+    canExtend: (ctx) => {
+      const optimistic =
+        (ctx.nextTotals[focusStat] ?? 0) + suffixCeilings[ctx.slotIndex + 1]!;
+      if (best != null && optimistic <= best) {
+        return false;
+      }
+      if (
+        !partialCanReachMins(
+          ctx.nextTotals,
+          ctx.remainingSlots.length,
+          prepared.perSlotMax,
+          otherConstraints,
+          assumedMods,
+        )
+      ) {
+        return false;
+      }
+      return partialCanSatisfySetBonuses(
+        [...ctx.chosen, ctx.piece],
+        ctx.remainingSlots,
+        prepared.bySlot,
+        setBonusSelections,
+      );
+    },
     onLeaf: (chosen) => {
       if (!satisfiesSetBonuses(chosen, setBonusSelections)) {
         return "reject";
@@ -343,6 +477,111 @@ export function maxAchievableUntargetedStatBounded(
       const value = resolveLoadoutStatExtremum(
         chosen,
         otherConstraints,
+        fragmentOffset,
+        assumedMods,
+        focusStat,
+        "max",
+      );
+      if (value == null) {
+        return "reject";
+      }
+      if (best == null || value > best) {
+        best = value;
+      }
+      leaves += 1;
+      if (leaves >= leafCap) {
+        return "accept-and-stop";
+      }
+      return "accept";
+    },
+  });
+
+  return best ?? OPTIMIZER_STAT_MIN;
+}
+
+/**
+ * Bounded version of `maxAchievableTargetedStat` for live slider gray bands on
+ * larger pools.
+ */
+export function maxAchievableTargetedStatBounded(
+  pool: DerivedArmorPieceJson[],
+  exoticLock: ExoticLock = DEFAULT_EXOTIC_LOCK,
+  constraints: StatConstraintRow[],
+  focusStat: ArmorStatName,
+  options: StatTargetFeasibilityOptions = {},
+  leafCap: number = UNTARGETED_STAT_BOUNDED_LEAF_CAP,
+): number {
+  const rawCombo = estimateOptimizerComboCount(pool, exoticLock);
+  if (rawCombo <= SYNC_UI_ENUMERATION_COMBO_LIMIT) {
+    return maxAchievableTargetedStat(
+      pool,
+      exoticLock,
+      constraints,
+      focusStat,
+      options,
+    );
+  }
+
+  const assumedMods = options.assumedMods ?? DEFAULT_ASSUMED_STAT_MODS;
+  const setBonusSelections = options.setBonusSelections ?? [];
+  const fragmentOffset = options.statOffset ?? {};
+
+  const preparedRaw = prepareDedupedSlotPool({ pool, exoticLock });
+  if (preparedRaw == null) {
+    return OPTIMIZER_STAT_MIN;
+  }
+  const prepared = clonePreparedWithFocusStatOrder(preparedRaw, focusStat);
+
+  const zeroTotals = totalsFromPieces([]);
+  const startTotals =
+    Object.keys(fragmentOffset).length > 0
+      ? addStatOffsets(
+          zeroTotals,
+          fragmentOffset as Record<ArmorStatName, number>,
+        )
+      : zeroTotals;
+
+  let best: number | null = null;
+  let leaves = 0;
+  const suffixCeilings = focusSuffixCeilings(prepared.slotPieces, focusStat);
+  enumerateLoadouts({
+    prepared,
+    exoticLock,
+    startTotals,
+    constraints,
+    assumedMods,
+    setBonusSelections,
+    canExtend: (ctx) => {
+      const optimistic =
+        (ctx.nextTotals[focusStat] ?? 0) + suffixCeilings[ctx.slotIndex + 1]!;
+      if (best != null && optimistic <= best) {
+        return false;
+      }
+      if (
+        !partialCanReachMins(
+          ctx.nextTotals,
+          ctx.remainingSlots.length,
+          prepared.perSlotMax,
+          constraints,
+          assumedMods,
+        )
+      ) {
+        return false;
+      }
+      return partialCanSatisfySetBonuses(
+        [...ctx.chosen, ctx.piece],
+        ctx.remainingSlots,
+        prepared.bySlot,
+        setBonusSelections,
+      );
+    },
+    onLeaf: (chosen) => {
+      if (!satisfiesSetBonuses(chosen, setBonusSelections)) {
+        return "reject";
+      }
+      const value = resolveLoadoutStatExtremum(
+        chosen,
+        constraints,
         fragmentOffset,
         assumedMods,
         focusStat,
@@ -386,6 +625,7 @@ export function maxFeasibleStatTarget(
       constraints: constraintsWithStatMin(constraints, focusStat, min),
       cap: 1,
       visitCap: feasibilityVisitCap,
+      visitOrderStat: focusStat,
     }).count > 0;
 
   if (!feasible(OPTIMIZER_STAT_MIN)) {

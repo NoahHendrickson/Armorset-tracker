@@ -41,6 +41,7 @@ export interface SyncResult {
     archetype_stat_pairs: number;
     armor_stat_plugs: number;
     tuning_plug_stats: number;
+    armor_stat_mod_plugs: number;
     subclass_fragment_plugs: number;
     subclass_fragment_plug_stats: number;
     armor_set_perks: number;
@@ -196,6 +197,7 @@ export async function syncManifest({
       archetype_stat_pairs: derived.archetypeStatPairs.length,
       armor_stat_plugs: derived.armorStatPlugs.length,
       tuning_plug_stats: derived.tuningPlugStats.length,
+      armor_stat_mod_plugs: derived.statModPlugStats.length,
       subclass_fragment_plugs: derived.subclassFragmentPlugs.length,
       subclass_fragment_plug_stats: derived.subclassFragmentPlugStats.length,
       armor_set_perks: derived.armorSetPerks.length,
@@ -215,6 +217,7 @@ type DerivedTable =
   | "archetype_stat_pairs"
   | "armor_stat_plugs"
   | "tuning_plug_stats"
+  | "armor_stat_mod_plugs"
   | "subclass_fragment_plugs"
   | "subclass_fragment_plug_stats"
   | "armor_set_perks"
@@ -232,6 +235,7 @@ async function currentCounts(sb: ReturnType<typeof getServiceRoleClient>) {
     archetype_stat_pairs,
     armor_stat_plugs,
     tuning_plug_stats,
+    armor_stat_mod_plugs,
     subclass_fragment_plugs,
     subclass_fragment_plug_stats,
     armor_set_perks,
@@ -247,6 +251,7 @@ async function currentCounts(sb: ReturnType<typeof getServiceRoleClient>) {
     countTable(sb, "archetype_stat_pairs"),
     countTable(sb, "armor_stat_plugs"),
     countTable(sb, "tuning_plug_stats"),
+    countTable(sb, "armor_stat_mod_plugs"),
     countTable(sb, "subclass_fragment_plugs"),
     countTable(sb, "subclass_fragment_plug_stats"),
     countTable(sb, "armor_set_perks"),
@@ -263,6 +268,7 @@ async function currentCounts(sb: ReturnType<typeof getServiceRoleClient>) {
     archetype_stat_pairs,
     armor_stat_plugs,
     tuning_plug_stats,
+    armor_stat_mod_plugs,
     subclass_fragment_plugs,
     subclass_fragment_plug_stats,
     armor_set_perks,
@@ -291,6 +297,7 @@ async function replaceDerivedTables(derived: ReturnType<typeof deriveManifestDat
   await sb.from("subclass_fragment_plugs").delete().not("plug_hash", "is", null);
   await sb.from("armor_set_perks").delete().not("set_hash", "is", null);
   await sb.from("tuning_plug_stats").delete().not("plug_hash", "is", null);
+  await sb.from("armor_stat_mod_plugs").delete().not("plug_hash", "is", null);
   await sb.from("armor_stat_plugs").delete().not("plug_hash", "is", null);
   await sb.from("armor_stat_icons").delete().not("stat", "is", null);
   await sb.from("archetypes").delete().not("archetype_hash", "is", null);
@@ -307,6 +314,7 @@ async function replaceDerivedTables(derived: ReturnType<typeof deriveManifestDat
   await chunkInsert(sb, "archetype_stat_pairs", derived.archetypeStatPairs);
   await chunkInsert(sb, "armor_stat_plugs", derived.armorStatPlugs);
   await chunkInsert(sb, "tuning_plug_stats", derived.tuningPlugStats);
+  await chunkInsert(sb, "armor_stat_mod_plugs", derived.statModPlugStats);
   await chunkInsert(sb, "subclass_fragment_plugs", derived.subclassFragmentPlugs);
   await chunkInsert(
     sb,

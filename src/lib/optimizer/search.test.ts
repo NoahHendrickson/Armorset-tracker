@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { ARMOR_STAT_NAMES } from "@/lib/db/types";
 import {
   satisfiesConstraints,
@@ -37,7 +36,7 @@ describe("searchLoadouts", () => {
       stat,
       min: 0,
     }));
-    expect(totals.Grenade).toBe(-5);
+    expect(totals.Grenade).toBe(0);
     expect(satisfiesConstraints(totals, constraints)).toBe(true);
   });
 

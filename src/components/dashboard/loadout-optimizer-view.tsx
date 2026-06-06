@@ -8,21 +8,21 @@ import {
 } from "react";
 import { Info } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { AssumedStatModsPanel } from "@/components/optimizer/assumed-stat-mods-panel";
 import { ExoticArmorPicker } from "@/components/optimizer/exotic-armor-picker";
 import { OptimizerResultCard } from "@/components/optimizer/optimizer-result-card";
+import { OptimizerResultsPlaceholder } from "@/components/optimizer/optimizer-results-placeholder";
 import { OptimizerSettingsSection } from "@/components/optimizer/optimizer-settings-section";
 import { SetBonusPicker } from "@/components/optimizer/set-bonus-picker";
 import { StatRangeSlider } from "@/components/optimizer/stat-range-slider";
 import { PlanFragmentSelector } from "@/components/plan/plan-fragment-selector";
 import type { GridLookupPayload } from "@/lib/views/grid-lookup-payload";
-import { SLOT_ORDER } from "@/lib/bungie/constants";
 import type { ArmorStatName } from "@/lib/db/types";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { ClassSwitcher } from "@/components/workspace/class-switcher";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { useStatBoundsForSliders } from "@/lib/optimizer/use-stat-bounds-for-sliders";
+import { optimizerAutoRunReadiness } from "@/lib/optimizer/auto-run-readiness";
 import {
   defaultStatConstraints,
   hasStatTargets,
@@ -170,7 +170,6 @@ export function LoadoutOptimizerView({
     searchComboCount,
     searchComboCapped,
     hasSearchFilters,
-    searchTooLarge,
     exoticAnyFeasible,
   } = useOptimizerComboEstimates({
     optimizerPool,
@@ -186,11 +185,27 @@ export function LoadoutOptimizerView({
   const canGenerateBuilds =
     hasStatTargets(constraints) || selectedSetBonuses.length > 0;
 
+  // The results-pane phase is derived from LIVE selections (not the debounced
+  // search constraints) so the placeholder reacts instantly to clicks.
+  const liveReadiness = useMemo(
+    () =>
+      optimizerAutoRunReadiness({
+        constraints,
+        selectedSetBonuses,
+        exoticLock,
+      }),
+    [constraints, selectedSetBonuses, exoticLock],
+  );
+  const enoughIntentLive =
+    canRunOptimizer &&
+    setBonusConflict == null &&
+    liveReadiness.state === "ready";
+  const primingHint =
+    "message" in liveReadiness ? liveReadiness.message : undefined;
+
   const {
     workerState,
-    run,
     cancel,
-    optimizerRequest,
     groupedResults,
   } = useOptimizerSearchSession({
     optimizerPool,
@@ -202,8 +217,6 @@ export function LoadoutOptimizerView({
     selectedSetBonuses,
     canRunOptimizer,
     setBonusConflict,
-    searchTooLarge,
-    canGenerateBuilds,
     targetsPending,
     sessionActive,
   });
@@ -461,38 +474,15 @@ export function LoadoutOptimizerView({
                           ) : null}
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                          {canGenerateBuilds &&
-                          canRunOptimizer &&
-                          setBonusConflict == null &&
-                          !workerState.running &&
-                          !targetsPending ? (
+                          {workerState.running ? (
                             <Button
                               type="button"
-                              variant={
-                                searchTooLarge ? "default" : "outline"
-                              }
+                              variant="outline"
                               size="sm"
-                              onClick={() => run(optimizerRequest)}
+                              onClick={cancel}
                             >
-                              Generate builds
+                              Cancel
                             </Button>
-                          ) : null}
-                          {workerState.running ? (
-                            <span className="inline-flex items-center gap-2 text-xs text-foreground">
-                              <span
-                                className="size-3 animate-spin rounded-full border-2 border-muted-foreground/40 border-t-foreground"
-                                aria-hidden
-                              />
-                              Generating… {Math.round(workerState.progress)}%
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={cancel}
-                              >
-                                Cancel
-                              </Button>
-                            </span>
                           ) : null}
                         </div>
                       </div>
@@ -504,40 +494,7 @@ export function LoadoutOptimizerView({
                     </div>
 
                     <div className="menu-scrollbar mt-4 min-h-0 flex-1 overflow-y-auto">
-                    {workerState.running && groupedResults.size === 0 ? (
-                      <ul className="mt-4 space-y-3" aria-hidden>
-                        {[0, 1, 2].map((i) => (
-                          <li
-                            key={i}
-                            className="space-y-2 rounded border border-border p-3"
-                          >
-                            <Skeleton className="h-4 w-3/4" />
-                            {SLOT_ORDER.map((slot) => (
-                              <div key={slot} className="flex items-center gap-2">
-                                <Skeleton className="size-7 rounded" />
-                                <Skeleton className="h-3 flex-1" />
-                              </div>
-                            ))}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : groupedResults.size === 0 ? (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {!canGenerateBuilds
-                          ? "Set at least one stat minimum or armor set requirement to generate builds."
-                          : workerState.running
-                            ? `Generating builds… ${Math.round(workerState.progress)}%`
-                          : workerState.hasCompletedRun
-                            ? exoticAnyFeasible
-                              ? "No all-legendary builds match. Select an exotic below (e.g. Speaker's Sight)."
-                              : "No builds match your targets. Lower a stat minimum, adjust set bonuses, or change the exotic."
-                          : targetsPending
-                            ? "Updating targets…"
-                          : searchTooLarge
-                            ? "Large search space — click Generate builds above."
-                            : "Starting search…"}
-                      </p>
-                    ) : (
+                    {groupedResults.size > 0 ? (
                       <ul className="space-y-3">
                         {[...groupedResults.entries()].map(
                           ([signature, solutions]) => (
@@ -551,6 +508,37 @@ export function LoadoutOptimizerView({
                           ),
                         )}
                       </ul>
+                    ) : workerState.running ? (
+                      <OptimizerResultsPlaceholder
+                        phase="generating"
+                        progress={workerState.progress}
+                      />
+                    ) : !canGenerateBuilds ? (
+                      <OptimizerResultsPlaceholder
+                        phase="idle"
+                        hint="Set a stat minimum or pick an armor set to start."
+                      />
+                    ) : !enoughIntentLive ? (
+                      <OptimizerResultsPlaceholder
+                        phase="priming"
+                        hint={primingHint}
+                      />
+                    ) : targetsPending ? (
+                      <OptimizerResultsPlaceholder
+                        phase="generating"
+                        message="Updating targets…"
+                      />
+                    ) : workerState.hasCompletedRun ? (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {exoticAnyFeasible
+                          ? "No all-legendary builds match. Select an exotic below (e.g. Speaker's Sight)."
+                          : "No builds match your targets. Lower a stat minimum, adjust set bonuses, or change the exotic."}
+                      </p>
+                    ) : (
+                      <OptimizerResultsPlaceholder
+                        phase="generating"
+                        message="Auto-generating builds…"
+                      />
                     )}
                     </div>
                   </section>

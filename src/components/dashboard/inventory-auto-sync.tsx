@@ -2,12 +2,8 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import {
-  BUNGIE_REAUTH_REQUIRED_CODE,
-  BUNGIE_RECONNECT_PATH,
-  BUNGIE_REAUTH_USER_MESSAGE,
-} from "@/lib/auth/bungie-reauth";
+import { BUNGIE_REAUTH_REQUIRED_CODE } from "@/lib/auth/bungie-reauth";
+import { showBungieReconnectToast } from "@/lib/auth/show-bungie-reconnect-toast";
 import {
   inventoryCacheNeedsSync,
   inventoryMsUntilResync,
@@ -59,16 +55,7 @@ export function InventoryAutoSync({
 
       if (!res.ok) {
         if (body.code === BUNGIE_REAUTH_REQUIRED_CODE) {
-          toast.error(body.error ?? BUNGIE_REAUTH_USER_MESSAGE, {
-            duration: 22_000,
-            action: {
-              label: "Reconnect Bungie",
-              onClick: () => {
-                window.location.href =
-                  body.reconnectPath ?? BUNGIE_RECONNECT_PATH;
-              },
-            },
-          });
+          showBungieReconnectToast(body.error, body.reconnectPath);
         }
         return latestSyncedAtRef.current;
       }

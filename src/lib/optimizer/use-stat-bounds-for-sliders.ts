@@ -69,6 +69,7 @@ export function useStatBoundsForSliders({
       constraints,
       assumedStatMods,
       setBonusSelections,
+      { previewOnly: true },
     ),
   );
 

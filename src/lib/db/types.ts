@@ -395,6 +395,12 @@ export type Database = {
         Update: { plug_hash?: number; stat?: ArmorStatName; value?: number };
         Relationships: [];
       };
+      armor_stat_mod_plugs: {
+        Row: { plug_hash: number; stat: ArmorStatName; value: number };
+        Insert: { plug_hash: number; stat: ArmorStatName; value: number };
+        Update: { plug_hash?: number; stat?: ArmorStatName; value?: number };
+        Relationships: [];
+      };
       subclass_fragment_plugs: {
         Row: {
           plug_hash: number;

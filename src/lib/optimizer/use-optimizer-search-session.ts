@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo } from "react";
 import type { ArmorStatName, DerivedArmorPieceJson } from "@/lib/db/types";
+import {
+  optimizerAutoRunReadiness,
+  type OptimizerAutoRunReadiness,
+} from "@/lib/optimizer/auto-run-readiness";
 import { hasStatTargets } from "@/lib/optimizer/constraints";
 import type { ExoticLock } from "@/lib/optimizer/exotic-lock";
 import type { AssumedStatMods } from "@/lib/optimizer/mod-offset";
@@ -24,8 +28,6 @@ export type UseOptimizerSearchSessionArgs = {
   selectedSetBonuses: SetBonusSelection[];
   canRunOptimizer: boolean;
   setBonusConflict: string | null;
-  searchTooLarge: boolean;
-  canGenerateBuilds: boolean;
   targetsPending: boolean;
   /** When false, skips auto-run and cancels in-flight search while tab is hidden. */
   sessionActive?: boolean;
@@ -36,6 +38,7 @@ export type UseOptimizerSearchSessionResult = {
   run: (payload: OptimizerRequest) => void;
   cancel: () => void;
   optimizerRequest: OptimizerRequest;
+  autoRunReadiness: OptimizerAutoRunReadiness;
   groupedResults: Map<string, OptimizerSolution[]>;
 };
 
@@ -49,12 +52,10 @@ export function useOptimizerSearchSession({
   selectedSetBonuses,
   canRunOptimizer,
   setBonusConflict,
-  searchTooLarge,
-  canGenerateBuilds,
   targetsPending,
   sessionActive = true,
 }: UseOptimizerSearchSessionArgs): UseOptimizerSearchSessionResult {
-  const { state: workerState, run, cancel } = useOptimizerWorker();
+  const { state: workerState, run, cancel, prewarm } = useOptimizerWorker();
 
   const optimizerRequest = useMemo(
     () => ({
@@ -76,16 +77,49 @@ export function useOptimizerSearchSession({
     ],
   );
 
+  const autoRunReadiness = useMemo((): OptimizerAutoRunReadiness => {
+    if (
+      !sessionActive ||
+      !canRunOptimizer ||
+      setBonusConflict != null ||
+      targetsPending
+    ) {
+      return {
+        state: "not-enough-intent",
+        message: "Add another target to start auto-generating.",
+      };
+    }
+    return optimizerAutoRunReadiness({
+      constraints: searchConstraints,
+      selectedSetBonuses,
+      exoticLock,
+    });
+  }, [
+    sessionActive,
+    canRunOptimizer,
+    setBonusConflict,
+    targetsPending,
+    searchConstraints,
+    selectedSetBonuses,
+    exoticLock,
+  ]);
+
   useOptimizerAutoRun(
     optimizerRequest,
-    sessionActive &&
-      canRunOptimizer &&
-      setBonusConflict == null &&
-      !searchTooLarge &&
-      canGenerateBuilds,
+    autoRunReadiness,
     run,
     cancel,
   );
+
+  // Warm the search worker while the user is still under-constrained so the
+  // first real auto-run starts without a worker cold-start.
+  const underConstrained =
+    !hasStatTargets(constraints) && selectedSetBonuses.length === 0;
+  useEffect(() => {
+    if (sessionActive && optimizerPool.length > 0 && underConstrained) {
+      prewarm();
+    }
+  }, [sessionActive, optimizerPool.length, underConstrained, prewarm]);
 
   useEffect(() => {
     if (
@@ -121,6 +155,7 @@ export function useOptimizerSearchSession({
     run,
     cancel,
     optimizerRequest,
+    autoRunReadiness,
     groupedResults,
   };
 }

@@ -4,11 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowsCounterClockwise } from "@phosphor-icons/react/dist/ssr";
 import { toast } from "sonner";
-import {
-  BUNGIE_REAUTH_REQUIRED_CODE,
-  BUNGIE_RECONNECT_PATH,
-  BUNGIE_REAUTH_USER_MESSAGE,
-} from "@/lib/auth/bungie-reauth";
+import { BUNGIE_REAUTH_REQUIRED_CODE } from "@/lib/auth/bungie-reauth";
+import { showBungieReconnectToast } from "@/lib/auth/show-bungie-reconnect-toast";
 import { useInventoryDropFeedOptional } from "@/components/dashboard/inventory-drop-feed-context";
 import { useInventoryEquipmentOnlyAlert } from "@/components/dashboard/inventory-equipment-only-alert";
 import type { DerivedArmorPieceJson } from "@/lib/db/types";
@@ -77,18 +74,7 @@ export function RefreshButton({
       };
       if (!res.ok) {
         if (body.code === BUNGIE_REAUTH_REQUIRED_CODE) {
-          toast.error(body.error ?? BUNGIE_REAUTH_USER_MESSAGE, {
-            ...refreshToastDefaults,
-            duration: 22_000,
-            action: {
-              label: "Reconnect Bungie",
-              actionButtonStyle: { borderRadius: 0 },
-              onClick: () => {
-                window.location.href =
-                  body.reconnectPath ?? BUNGIE_RECONNECT_PATH;
-              },
-            },
-          });
+          showBungieReconnectToast(body.error, body.reconnectPath);
         } else {
           toast.error(body.error ?? "Refresh failed", {
             ...refreshToastDefaults,

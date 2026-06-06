@@ -15,9 +15,10 @@ import { SYNC_UI_ENUMERATION_COMBO_LIMIT } from "@/lib/optimizer/constants";
 import {
   estimateFilteredComboCount,
   estimateOptimizerComboCount,
+  maxAchievableTargetedStat,
+  maxAchievableTargetedStatBounded,
   maxAchievableUntargetedStat,
   maxAchievableUntargetedStatBounded,
-  maxFeasibleStatTarget,
 } from "@/lib/optimizer/combo-count";
 import { prepareDedupedSlotPool } from "@/lib/optimizer/enumeration/prepare-slot-pool";
 import { groupPoolBySlot } from "@/lib/optimizer/enumeration/pool-by-slot";
@@ -317,19 +318,28 @@ export function computeHeuristicConstrainedStatBounds(
     };
 
     if (isTargeted && !previewOnly) {
-      const cappedTarget = maxFeasibleStatTarget(
-        pool,
-        exoticLock,
-        constraints,
-        stat,
-        {
-          ...capOptions,
-          hi: independentBounds[stat].max,
-        },
-      );
-      if (cappedTarget > OPTIMIZER_STAT_MIN) {
-        verifiedCap = cappedTarget;
-        tightenedMax = Math.min(tightenedMax, cappedTarget);
+      const achievableMax =
+        !greedyOnly &&
+        filteredCombo != null &&
+        !filteredCombo.capped &&
+        filteredCombo.count <= SYNC_UI_ENUMERATION_COMBO_LIMIT
+          ? maxAchievableTargetedStat(
+              pool,
+              exoticLock,
+              constraints,
+              stat,
+              capOptions,
+            )
+          : maxAchievableTargetedStatBounded(
+              pool,
+              exoticLock,
+              constraints,
+              stat,
+              capOptions,
+            );
+      if (achievableMax > OPTIMIZER_STAT_MIN) {
+        verifiedCap = achievableMax;
+        tightenedMax = Math.min(tightenedMax, achievableMax);
       }
     } else if (!previewOnly && othersActive.length > 0) {
       const canRunFullUntargetedEnumeration =

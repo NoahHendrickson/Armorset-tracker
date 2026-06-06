@@ -150,6 +150,11 @@ export interface DerivedManifestData {
     stat: ArmorStatName;
     value: number;
   }>;
+  statModPlugStats: Array<{
+    plug_hash: number;
+    stat: ArmorStatName;
+    value: number;
+  }>;
   subclassFragmentPlugs: Array<{
     plug_hash: number;
     name: string;

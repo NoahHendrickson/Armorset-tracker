@@ -64,7 +64,9 @@ export const GeneratesBuilds: Story = {
       name: /weapons minimum/i,
     });
     fireEvent.input(weaponsSlider, { target: { value: "100" } });
-    await waitFor(() => expect(canvas.getByText("100")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(weaponsSlider).toHaveAttribute("aria-valuenow", "100"),
+    );
   },
 };
 

@@ -1,20 +1,17 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { hasStatTargets } from "@/lib/optimizer/constraints";
+import type { OptimizerAutoRunReadiness } from "@/lib/optimizer/auto-run-readiness";
 import type { OptimizerRequest } from "@/lib/optimizer/types";
 
-/** Request debounce lives in `searchConstraints`; run as soon as that commits. */
-const AUTO_RUN_DEBOUNCE_MS = 0;
-
 /**
- * Schedules automatic optimizer runs when `canAutoRun` is true.
+ * Schedules automatic optimizer runs when the readiness policy allows it.
  * Does not cancel in-flight work when auto-run is disabled (large vault) —
  * hard aborts are handled separately in the view layer.
  */
 export function useOptimizerAutoRun(
   request: OptimizerRequest,
-  canAutoRun: boolean,
+  readiness: OptimizerAutoRunReadiness,
   run: (payload: OptimizerRequest) => void,
   cancel: () => void,
 ) {
@@ -27,19 +24,17 @@ export function useOptimizerAutoRun(
   });
 
   useEffect(() => {
-    const hasTargets = hasStatTargets(request.constraints);
-    const hasSetBonuses = (request.setBonusSelections?.length ?? 0) > 0;
-    if (!canAutoRun || (!hasTargets && !hasSetBonuses)) {
+    if (readiness.state !== "ready") {
       return;
     }
 
     const timer = window.setTimeout(() => {
       runRef.current(request);
-    }, AUTO_RUN_DEBOUNCE_MS);
+    }, readiness.delayMs);
 
     return () => {
       window.clearTimeout(timer);
       cancelRef.current();
     };
-  }, [canAutoRun, request]);
+  }, [readiness, request]);
 }
