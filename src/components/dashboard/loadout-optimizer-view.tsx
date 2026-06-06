@@ -22,7 +22,6 @@ import type { DerivedArmorPieceJson } from "@/lib/db/types";
 import { ClassSwitcher } from "@/components/workspace/class-switcher";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { useStatBoundsForSliders } from "@/lib/optimizer/use-stat-bounds-for-sliders";
-import { optimizerAutoRunReadiness } from "@/lib/optimizer/auto-run-readiness";
 import {
   defaultStatConstraints,
   hasStatTargets,
@@ -185,28 +184,11 @@ export function LoadoutOptimizerView({
   const canGenerateBuilds =
     hasStatTargets(constraints) || selectedSetBonuses.length > 0;
 
-  // The results-pane phase is derived from LIVE selections (not the debounced
-  // search constraints) so the placeholder reacts instantly to clicks.
-  const liveReadiness = useMemo(
-    () =>
-      optimizerAutoRunReadiness({
-        constraints,
-        selectedSetBonuses,
-        exoticLock,
-      }),
-    [constraints, selectedSetBonuses, exoticLock],
-  );
-  const enoughIntentLive =
-    canRunOptimizer &&
-    setBonusConflict == null &&
-    liveReadiness.state === "ready";
-  const primingHint =
-    "message" in liveReadiness ? liveReadiness.message : undefined;
-
   const {
     workerState,
     cancel,
     groupedResults,
+    liveAutoRunReadiness,
   } = useOptimizerSearchSession({
     optimizerPool,
     searchConstraints,
@@ -220,6 +202,15 @@ export function LoadoutOptimizerView({
     targetsPending,
     sessionActive,
   });
+
+  const enoughIntentLive =
+    canRunOptimizer &&
+    setBonusConflict == null &&
+    liveAutoRunReadiness.state === "ready";
+  const primingHint =
+    "message" in liveAutoRunReadiness
+      ? liveAutoRunReadiness.message
+      : undefined;
 
   const lockedExoticLabel = useMemo(() => {
     if (exoticLock.mode !== "locked") return null;

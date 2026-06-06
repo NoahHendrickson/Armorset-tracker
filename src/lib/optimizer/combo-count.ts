@@ -499,8 +499,13 @@ export function maxAchievableTargetedStatBounded(
 
 /**
  * Highest minimum target on `focusStat` that still yields at least one verified
- * loadout (same rules as search). Used to cap slider gray-band maxes for
- * user-targeted stats only — activates the focus stat during mod allocation.
+ * loadout (binary search over `estimateFilteredComboCount`).
+ *
+ * **Not used for gray-band slider maxes** — those use `maxAchievableTargetedStat`
+ * / `maxAchievableUntargetedStat` in `bounds-heuristic.ts`, which answer
+ * "what total can this stat reach?" without raising the focus stat's min target.
+ * This function answers "how high can I set this stat's min slider?" and
+ * activates the focus stat during mod allocation.
  */
 export function maxFeasibleStatTarget(
   pool: DerivedArmorPieceJson[],

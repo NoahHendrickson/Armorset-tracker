@@ -38,7 +38,10 @@ export type UseOptimizerSearchSessionResult = {
   run: (payload: OptimizerRequest) => void;
   cancel: () => void;
   optimizerRequest: OptimizerRequest;
+  /** Debounced constraints — drives auto-run timing. */
   autoRunReadiness: OptimizerAutoRunReadiness;
+  /** Live constraints — drives instant results-pane placeholder copy. */
+  liveAutoRunReadiness: OptimizerAutoRunReadiness;
   groupedResults: Map<string, OptimizerSolution[]>;
 };
 
@@ -75,6 +78,16 @@ export function useOptimizerSearchSession({
       exoticLock,
       selectedSetBonuses,
     ],
+  );
+
+  const liveAutoRunReadiness = useMemo(
+    (): OptimizerAutoRunReadiness =>
+      optimizerAutoRunReadiness({
+        constraints,
+        selectedSetBonuses,
+        exoticLock,
+      }),
+    [constraints, selectedSetBonuses, exoticLock],
   );
 
   const autoRunReadiness = useMemo((): OptimizerAutoRunReadiness => {
@@ -156,6 +169,7 @@ export function useOptimizerSearchSession({
     cancel,
     optimizerRequest,
     autoRunReadiness,
+    liveAutoRunReadiness,
     groupedResults,
   };
 }

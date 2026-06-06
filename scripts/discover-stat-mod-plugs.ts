@@ -1,6 +1,6 @@
 /**
  * Phase A0: discover plugCategoryIdentifier values for armor stat mods (+3/+5/+10).
- * Run: NODE_OPTIONS='--require ./scripts/stub-server-only.cjs' npx tsx --tsconfig tsconfig.json scripts/tmp-discover-stat-mod-plugs.ts
+ * Run: NODE_OPTIONS='--require ./scripts/stub-server-only.cjs' npx tsx --tsconfig tsconfig.json scripts/discover-stat-mod-plugs.ts
  */
 import { loadEnvConfig } from "@next/env";
 import type {
