@@ -3,6 +3,7 @@ import { buildDestinyStatHashToArmorStat } from "@/lib/inventory/armor-stat-dest
 import {
   instanceArmorStatTotals,
   mergeExoticInstanceStatTotals,
+  resolveExoticBaseStatsForOptimizer,
   resolveExoticStatTotals,
   stripSlottedStatMods,
 } from "@/lib/inventory/instance-armor-stats";
@@ -159,6 +160,74 @@ describe("instanceArmorStatTotals", () => {
     expect(
       resolveExoticStatTotals(false, "leg", {} as ProfileResponse, plug, new Map()),
     ).toEqual(plug);
+  });
+});
+
+describe("resolveExoticBaseStatsForOptimizer", () => {
+  const statModPlugStats = new Map([
+    [4_021_790_309, [{ stat: "Grenade" as const, value: 5 }]],
+    [617_569_843, [{ stat: "Grenade" as const, value: 3 }]],
+  ]);
+
+  const speakersSight304 = {
+    itemComponents: {
+      stats: {
+        data: {
+          exotic: {
+            stats: {
+              "2996146975": { statHash: 2996146975, value: 25 },
+              "392767087": { statHash: 392767087, value: 8 },
+              "1735777505": { statHash: 1735777505, value: 12 },
+              "1943323491": { statHash: 1943323491, value: 4 },
+              "4244567218": { statHash: 4244567218, value: 4 },
+              "144602215": { statHash: 144602215, value: 31 },
+            },
+          },
+        },
+      },
+    },
+  } as ProfileResponse;
+
+  it("strips slotted mods and preserves plug Weapons when 304 Weapons is inflated", () => {
+    const plugDerived = {
+      Weapons: 25,
+      Health: 8,
+      Grenade: 12,
+      Super: 31,
+      Melee: 4,
+    };
+
+    expect(
+      resolveExoticBaseStatsForOptimizer(
+        "exotic",
+        speakersSight304,
+        plugDerived,
+        [{ plugHash: 4_021_790_309 }, { plugHash: 617_569_843 }],
+        new Map(),
+        statModPlugStats,
+      ),
+    ).toEqual({
+      Weapons: 25,
+      Health: 8,
+      Grenade: 4,
+      Super: 31,
+      Class: 4,
+      Melee: 4,
+    });
+  });
+
+  it("falls back to plug-derived totals when ItemStats (304) is absent", () => {
+    const plugDerived = { Weapons: 25, Grenade: 4 };
+    expect(
+      resolveExoticBaseStatsForOptimizer(
+        "exotic",
+        {} as ProfileResponse,
+        plugDerived,
+        [],
+        new Map(),
+        statModPlugStats,
+      ),
+    ).toEqual(plugDerived);
   });
 });
 

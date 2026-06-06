@@ -20,11 +20,7 @@ import {
   tuningDeltasFromDisplayName,
 } from "@/lib/inventory/compute-stat-totals";
 import { buildPieceDisplayAndTuning } from "@/lib/inventory/armor-tuning-stats";
-import {
-  instanceArmorStatTotals,
-  resolveExoticStatTotals,
-  stripSlottedStatMods,
-} from "@/lib/inventory/instance-armor-stats";
+import { resolveExoticBaseStatsForOptimizer } from "@/lib/inventory/instance-armor-stats";
 import { exoticPieceIdentityKey } from "@/lib/optimizer/exotic-lock";
 
 interface ItemEntry {
@@ -253,27 +249,13 @@ export function deriveArmorPiece(
     tier,
   );
 
-  statTotals = resolveExoticStatTotals(
-    isExotic,
-    item.itemInstanceId,
-    profile,
-    statTotals,
-    lookups.destinyStatHashToArmorStat,
-  );
-
   if (isExotic) {
-    const fromInstance = instanceArmorStatTotals(
+    statTotals = resolveExoticBaseStatsForOptimizer(
       item.itemInstanceId,
       profile,
-      lookups.destinyStatHashToArmorStat,
-    );
-    const stripBase =
-      fromInstance && Object.keys(fromInstance).length > 0
-        ? fromInstance
-        : statTotals;
-    statTotals = stripSlottedStatMods(
-      stripBase,
+      statTotals,
       sockets,
+      lookups.destinyStatHashToArmorStat,
       lookups.statModPlugStats,
     );
   }

@@ -1,6 +1,6 @@
 # Handoff: strip slotted stat mods from exotics (optimize from base)
 
-**Status:** Open — root cause confirmed; fix not started.
+**Status:** Done — implemented in commit `e8d8a9b`; exotic base stats unified in `resolveExoticBaseStatsForOptimizer` (follow-up `cursor/code-quality-followup-92b5`).
 **Last updated:** 2026-06-06
 **Repo:** `armorset-checklist`
 **Related:**
@@ -228,11 +228,11 @@ NODE_OPTIONS='--require ./scripts/stub-server-only.cjs' \
 
 ## 13. Acceptance criteria
 
-- [ ] `armor_stat_mod_plugs` table populated after sync; lookup map non-empty.
-- [ ] Unit tests green for the stat-mod map and `stripSlottedStatMods`.
-- [ ] Derived exotic `statTotals` for `6917530125298828509` = base Grenade **4**, Weapons **25** (post re-sync + refresh).
-- [ ] Legendary `statTotals` unchanged (regression check on any legendary instance).
-- [ ] `npm run lint` clean (except the documented pre-existing `tuningDeltas` warning).
+- [x] `armor_stat_mod_plugs` table populated after sync; lookup map non-empty.
+- [x] Unit tests green for the stat-mod map and `stripSlottedStatMods`.
+- [ ] Derived exotic `statTotals` for `6917530125298828509` = base Grenade **4**, Weapons **25** (post re-sync + refresh) — **needs live Bungie session (Phase C)**.
+- [x] Legendary `statTotals` unchanged (regression check on any legendary instance).
+- [x] `npm run lint` clean (except the documented pre-existing `tuningDeltas` warning).
 
 ---
 
